@@ -243,27 +243,43 @@ def contains_atom(atom, text_tokens):
     if not a_tok: return False
     return a_tok.issubset(text_tokens)
 
-def coverage_from_atoms_semantic(must_atoms, nice_atoms, resume_chunks, embedder, threshold=0.40):
-    """Semantic-based coverage: each requirement matched via embedding similarity."""
+def coverage_from_atoms_semantic(must_atoms, nice_atoms, resume_chunks, embedder, threshold=0.30):
+    """Semantic-based coverage: each requirement matched via embedding similarity with fuzzy scoring."""
     if not resume_chunks or (not must_atoms and not nice_atoms):
         return 0.0, 0.0, 0.0, [], []
     try:
         chunk_embs = embedder.encode(resume_chunks, convert_to_numpy=True, normalize_embeddings=True)
+        if chunk_embs.ndim == 1:
+            chunk_embs = chunk_embs.reshape(1, -1)
     except Exception:
         return 0.0, 0.0, 0.0, [], []
     
     must_hits, nice_hits = [], []
+    
+    # Process must-have requirements with fuzzy scoring
     for atom in must_atoms:
         try:
             atom_emb = embedder.encode(atom, convert_to_numpy=True, normalize_embeddings=True)
             if atom_emb.ndim > 1:
                 atom_emb = atom_emb[0]
+            # Compute similarities
             sims = np.dot(chunk_embs, atom_emb)
             max_sim = float(np.max(sims)) if sims.size > 0 else 0.0
-            must_hits.append(1.0 if max_sim >= threshold else 0.0)
+            
+            # Fuzzy scoring: give partial credit for near-matches
+            if max_sim >= threshold:
+                score = 1.0  # Full match
+            elif max_sim >= (threshold - 0.10):
+                score = 0.6  # Partial match (60% credit)
+            elif max_sim >= (threshold - 0.15):
+                score = 0.3  # Weak match (30% credit)
+            else:
+                score = 0.0  # No match
+            must_hits.append(score)
         except Exception:
             must_hits.append(0.0)
     
+    # Process nice-to-have requirements with same fuzzy logic
     for atom in nice_atoms:
         try:
             atom_emb = embedder.encode(atom, convert_to_numpy=True, normalize_embeddings=True)
@@ -271,7 +287,17 @@ def coverage_from_atoms_semantic(must_atoms, nice_atoms, resume_chunks, embedder
                 atom_emb = atom_emb[0]
             sims = np.dot(chunk_embs, atom_emb)
             max_sim = float(np.max(sims)) if sims.size > 0 else 0.0
-            nice_hits.append(1.0 if max_sim >= threshold else 0.0)
+            
+            # Same fuzzy scoring
+            if max_sim >= threshold:
+                score = 1.0
+            elif max_sim >= (threshold - 0.10):
+                score = 0.6
+            elif max_sim >= (threshold - 0.15):
+                score = 0.3
+            else:
+                score = 0.0
+            nice_hits.append(score)
         except Exception:
             nice_hits.append(0.0)
     
@@ -399,11 +425,14 @@ risk_flags (string[]),
 followup_questions (string[]),
 fit_score (0..10 number; reflect semantic + coverage + LLM judgment; do not output strings).
 
-SCORING GUIDANCE:
-- If coverage_final >= 0.70 and semantic >= 0.60, fit_score should be >= 7.
-- If coverage_final >= 0.50 but semantic < 0.50, fit_score should be 5-6.
-- If coverage_final < 0.40, fit_score should not exceed 5 unless semantic is very high.
-- Penalize low coverage heavily; it indicates missing must-haves.
+SCORING GUIDANCE (IMPORTANT - Use holistic assessment):
+- If semantic >= 0.70 (high semantic match), start with fit_score 7-8 baseline
+- If semantic >= 0.60 and coverage_final >= 0.40, fit_score should be 6-7
+- If semantic >= 0.50 and coverage_final >= 0.30, fit_score should be 5-6
+- Coverage includes partial matches (0.6 weight for near-matches); don't penalize too harshly for slightly lower coverage
+- Prioritize semantic match over exact keyword coverage - semantic shows actual relevance
+- Low coverage (<0.30) AND low semantic (<0.40) → fit_score 3-4
+- Focus on overall competency alignment, not just keyword matching
 
 CONTEXT:
 - JOB_DESCRIPTION: {jd}
@@ -584,7 +613,7 @@ with tab1:
                 # ---------- Coverage (semantic similarity over chunks) ----------
                 prog.progress(0.58); stat.info("Scoring requirement coverage...")
                 cov_final, must_cov, nice_cov, must_hits, nice_hits = coverage_from_atoms_semantic(
-                    must_atoms, nice_atoms, parsed.get("chunks", []), embedder, threshold=0.35
+                    must_atoms, nice_atoms, parsed.get("chunks", []), embedder, threshold=0.28
                 )
 
                 # ---------- Global semantic ----------
@@ -755,7 +784,7 @@ with tab1:
                 name='Match Profile',
                 line=dict(color='#667eea', width=3),
                 fillcolor='rgba(102,126,234,.25)',
-                hoverinfo='label+value'
+                hoverinfo='r+theta'
             ))
             fig_radar.update_layout(
                 polar=dict(
