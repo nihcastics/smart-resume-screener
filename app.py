@@ -56,18 +56,25 @@ p,span,div{color:#94a3b8!important}
 .stTabs [aria-selected="true"]{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)!important;color:#fff!important;border-color:transparent!important;box-shadow:0 10px 40px rgba(102,126,234,.4),0 0 20px rgba(118,75,162,.3)}
 .stButton>button{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:12px;padding:16px 48px;font-weight:700;font-size:18px;letter-spacing:.5px;text-transform:uppercase;transition:all .3s cubic-bezier(.4,0,.2,1);box-shadow:0 10px 30px rgba(102,126,234,.4)}
 .stButton>button:hover{transform:translateY(-3px);box-shadow:0 15px 50px rgba(102,126,234,.6),0 0 30px rgba(118,75,162,.4)}
-.stFileUploader{background:rgba(22,33,62,.5);border:2px dashed rgba(102,126,234,.3);border-radius:12px;padding:24px}
+.stFileUploader{background:rgba(22,33,62,.5);border:2px dashed rgba(102,126,234,.3);border-radius:12px;padding:24px;transition:all .3s ease}
+.stFileUploader:hover{background:rgba(22,33,62,.7);border-color:rgba(102,126,234,.6)}
 .stTextArea textarea{background:rgba(22,33,62,.8)!important;border:1px solid rgba(148,163,184,.2)!important;border-radius:12px!important;color:#e2e8f0!important;font-size:15px!important;padding:16px!important}
-.metric-card{background:linear-gradient(135deg,rgba(22,33,62,.8) 0%,rgba(22,33,62,.6) 100%);border:1px solid rgba(148,163,184,.2);border-radius:16px;padding:24px}
-.analysis-card{background:linear-gradient(135deg,rgba(22,33,62,.8) 0%,rgba(16,21,46,.6) 100%);border:1px solid rgba(148,163,184,.2);border-radius:16px;padding:24px}
-.score-badge{display:inline-block;padding:16px 32px;border-radius:24px;font-weight:900;font-size:40px}
-.score-excellent{background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#fff}
-.score-good{background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);color:#fff}
-.score-fair{background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);color:#fff}
-.score-poor{background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%);color:#fff}
-.chip{display:inline-block;margin:4px 6px 0 0;padding:4px 10px;border-radius:9999px;background:rgba(148,163,184,.15);border:1px solid rgba(148,163,184,.25);font-size:12px;color:#cbd5e1}
+.stTextArea textarea:focus{border-color:rgba(102,126,234,.6)!important;box-shadow:0 0 0 2px rgba(102,126,234,.1)!important}
+.metric-card{background:linear-gradient(135deg,rgba(22,33,62,.8) 0%,rgba(22,33,62,.6) 100%);border:1px solid rgba(148,163,184,.2);border-radius:16px;padding:24px;transition:all .3s ease;backdrop-filter:blur(10px)}
+.metric-card:hover{border-color:rgba(102,126,234,.4);transform:translateY(-2px);box-shadow:0 10px 30px rgba(102,126,234,.15)}
+.analysis-card{background:linear-gradient(135deg,rgba(22,33,62,.8) 0%,rgba(16,21,46,.6) 100%);border:1px solid rgba(148,163,184,.2);border-radius:16px;padding:24px;transition:all .3s ease;backdrop-filter:blur(10px)}
+.analysis-card:hover{border-color:rgba(102,126,234,.4);box-shadow:0 10px 30px rgba(102,126,234,.1)}
+.score-badge{display:inline-block;padding:16px 32px;border-radius:24px;font-weight:900;font-size:40px;box-shadow:0 10px 30px rgba(0,0,0,.3);transition:all .3s ease}
+.score-excellent{background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#fff;box-shadow:0 10px 30px rgba(16,185,129,.4)}
+.score-good{background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);color:#fff;box-shadow:0 10px 30px rgba(59,130,246,.4)}
+.score-fair{background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);color:#fff;box-shadow:0 10px 30px rgba(245,158,11,.4)}
+.score-poor{background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%);color:#fff;box-shadow:0 10px 30px rgba(239,68,68,.4)}
+.chip{display:inline-block;margin:4px 6px 0 0;padding:6px 12px;border-radius:20px;background:rgba(102,126,234,.15);border:1px solid rgba(102,126,234,.3);font-size:12px;color:#cbd5e1;transition:all .3s ease}
+.chip:hover{background:rgba(102,126,234,.25);border-color:rgba(102,126,234,.6)}
 hr{border:none;height:2px;background:linear-gradient(90deg,transparent,rgba(148,163,184,.3),transparent);margin:24px 0}
 .small{font-size:12px;color:#9aa5b1}
+.stExpander{background:rgba(22,33,62,.6)!important;border:1px solid rgba(148,163,184,.2)!important;border-radius:12px!important}
+.stExpander [data-testid="stExpanderToggleButton"]{color:#e2e8f0!important}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -654,139 +661,223 @@ with tab1:
         resume, analysis = st.session_state.current_analysis
         st.markdown("<hr>", unsafe_allow_html=True)
 
-        c1,c2,c3 = st.columns([2,1,1])
-        with c1:
+        # ===== Clean Header: Name + Score Badge =====
+        c_name, c_fill, c_score = st.columns([2, 1, 1], gap="medium")
+        with c_name:
             st.markdown(f"""
             <div class="metric-card">
-                <h3 style="margin-top:0;color:#e2e8f0;font-size:22px;">👤 Candidate</h3>
-                <p><strong>Name:</strong> {resume['name']}</p>
-                <p><strong>Email:</strong> {resume['email']} <span class="chip">{resume['phone']}</span></p>
-                <p><strong>File:</strong> {resume.get('file_name','')}</p>
+                <h2 style="margin:0;color:#e2e8f0;font-size:32px;font-weight:800;">{resume['name']}</h2>
+                <p style="margin:8px 0 0 0;color:#94a3b8;font-size:14px;">
+                    📧 {resume['email']}<br>📱 {resume['phone']}
+                </p>
             </div>
             """, unsafe_allow_html=True)
-        with c2:
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3 style="margin-top:0;color:#e2e8f0;font-size:22px;">📊 Metrics</h3>
-                <p><strong>Semantic:</strong> {analysis['semantic_score']:.1f}/10</p>
-                <p><strong>Coverage:</strong> {analysis['coverage_score']:.1f}/10</p>
-                <p><strong>LLM Fit:</strong> {analysis['llm_fit_score']:.1f}/10</p>
-            </div>
-            """, unsafe_allow_html=True)
-        with c3:
+        with c_fill:
+            pass  # spacer
+        with c_score:
             sc = analysis['score']
             cls = 'score-excellent' if sc>=8 else 'score-good' if sc>=6 else 'score-fair' if sc>=4 else 'score-poor'
             lab = '🌟 Excellent' if sc>=8 else '👍 Good' if sc>=6 else '⚠️ Fair' if sc>=4 else '❌ Poor'
             st.markdown(f"""
-            <div class="metric-card" style="text-align:center;">
-                <div class="score-badge {cls}">{sc}</div>
-                <p style="margin-top:12px;font-size:16px;font-weight:700;">{lab}</p>
+            <div class="metric-card" style="text-align:center;border:3px solid #667eea;">
+                <div class="score-badge {cls}" style="font-size:48px;margin:8px 0;">{sc}</div>
+                <p style="margin:4px 0 0 0;font-size:13px;font-weight:700;color:#e2e8f0;text-transform:uppercase;">{lab}</p>
+                <p style="margin:8px 0 0 0;font-size:12px;color:#7a8b99;">Overall Match</p>
             </div>
             """, unsafe_allow_html=True)
-
-        c4,c5 = st.columns(2, gap="large")
-        with c4:
-            gauge = go.Figure(go.Indicator(mode="gauge+number", value=analysis['score'],
-                                           title={'text':"Overall Match"},
-                                           gauge={'axis':{'range':[0,10]}}))
-            st.plotly_chart(gauge, use_container_width=True, config={'displayModeBar': False})
-        with c5:
-            cats = ['Semantic','Coverage','LLM Fit']
+        
+        st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+        
+        # ===== Key Metrics Dashboard =====
+        section("Match Metrics", "📊")
+        m1, m2, m3 = st.columns(3, gap="medium")
+        
+        metrics_style = """
+        <div class="metric-card" style="text-align:center;border-left:4px solid #667eea;">
+            <p style="margin:0;font-size:12px;color:#7a8b99;text-transform:uppercase;letter-spacing:0.5px;">%s</p>
+            <h3 style="margin:8px 0 0 0;font-size:36px;color:#10b981;">%.1f</h3>
+            <p style="margin:4px 0 0 0;font-size:12px;color:#94a3b8;">out of 10</p>
+        </div>
+        """
+        
+        with m1:
+            st.markdown(metrics_style % ("Semantic Match", analysis['semantic_score']), unsafe_allow_html=True)
+        with m2:
+            st.markdown(metrics_style % ("Coverage", analysis['coverage_score']), unsafe_allow_html=True)
+        with m3:
+            st.markdown(metrics_style % ("LLM Fit Assessment", analysis['llm_fit_score']), unsafe_allow_html=True)
+        
+        # ===== Beautiful Visualizations =====
+        st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
+        section("Detailed Assessment", "📈")
+        
+        v1, v2 = st.columns(2, gap="large")
+        
+        with v1:
+            # Enhanced gauge with gradient
+            fig_gauge = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=analysis['score'],
+                domain={'x': [0,1], 'y': [0,1]},
+                title={'text': "Overall Fit Score", 'font': {'size': 20, 'color': '#e2e8f0', 'family': 'Inter'}},
+                number={'suffix': "/10", 'font': {'size': 40, 'color': '#10b981', 'family': 'Inter'}},
+                gauge={
+                    'axis': {'range': [0,10], 'tickwidth': 2, 'tickcolor': '#475569', 'tickfont': {'size': 12, 'color': '#94a3b8'}},
+                    'bar': {'color': '#667eea', 'thickness': 0.8},
+                    'bgcolor': 'rgba(22,33,62,.3)',
+                    'borderwidth': 3,
+                    'bordercolor': '#667eea',
+                    'steps': [
+                        {'range': [0,3], 'color': 'rgba(239,68,68,.15)'},
+                        {'range': [3,6], 'color': 'rgba(245,158,11,.15)'},
+                        {'range': [6,9], 'color': 'rgba(59,130,246,.15)'},
+                        {'range': [9,10], 'color': 'rgba(16,185,129,.15)'}
+                    ]
+                }
+            ))
+            fig_gauge.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font={'color': '#e2e8f0', 'family': 'Inter'},
+                height=360,
+                margin=dict(l=20,r=20,t=60,b=20)
+            )
+            st.plotly_chart(fig_gauge, use_container_width=True, config={'displayModeBar': False})
+        
+        with v2:
+            # Enhanced radar chart
+            cats = ['Semantic', 'Coverage', 'LLM Fit']
             vals = [analysis['semantic_score'], analysis['coverage_score'], analysis['llm_fit_score']]
-            fig = go.Figure(go.Scatterpolar(r=vals+[vals[0]], theta=cats+[cats[0]], fill='toself'))
-            fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,10])))
-            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-
-        st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
-        c6,c7 = st.columns(2, gap="large")
-        with c6:
-            section("Coverage Overview", "✅")
-            df = []
-            # show top 12 atoms w/ hit flags (no chunks/evidence)
-            must = analysis["atoms"]["must"][:8]
-            nice = analysis["atoms"]["nice"][:4]
-            resume_text = resume.get("text","")
-            tok = token_set(resume_text)
-            for a in must:
-                df.append({"Requirement": a, "Covered": 1.0 if contains_atom(a,tok) else 0.0})
-            for a in nice:
-                df.append({"Requirement": a, "Covered": 1.0 if contains_atom(a,tok) else 0.0})
-            if not df:
-                df=[{"Requirement":"None","Covered":0.0}]
-            fig = px.bar(df, x="Requirement", y="Covered")
-            fig.update_yaxes(range=[0,1])
-            fig.update_layout(height=360, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-        with c7:
-            section("Similarity Distribution", "📈")
-            # approximate: similarity of chunks vs JD to visualize spread
-            if resume.get("embs") is not None and len(resume["embs"])>0:
-                job_vec = embedder.encode(jd, convert_to_numpy=True, normalize_embeddings=True)
-                if job_vec.ndim>1: job_vec = job_vec[0]
-                sims = (resume["embs"] @ job_vec + 1.0)/2.0
-                st.plotly_chart(px.histogram({"sim":sims.tolist()}, x="sim", nbins=12),
-                                use_container_width=True, config={'displayModeBar': False})
-            else:
-                st.info("No embeddings to plot.")
-
-        profile = analysis.get("resume_profile") or {}
-        if profile:
-            lines = ["<div class='analysis-card'>",
-                     "<h3 style='margin-top:0;color:#e0f2fe;font-size:20px;'>🧾 Resume Profile</h3>"]
-            if profile.get("summary"): lines.append(f"<p>{profile['summary']}</p>")
-            cs = profile.get("core_skills") or []
-            if cs: lines.append("<p><strong>Core Skills:</strong> " + ", ".join(cs[:15]) + "</p>")
-            proj = profile.get("projects") or []
-            if proj:
-                lines.append("<p><strong>Projects:</strong></p><ul>")
-                for p in proj[:3]:
-                    if not isinstance(p, dict): continue
-                    title = p.get('name','Project')
-                    desc = p.get('description','')
-                    impact = p.get('impact','')
-                    combined = ' '.join([s for s in [desc, impact] if s])
-                    lines.append(f"<li><strong>{title}</strong>: {combined}</li>")
-                lines.append("</ul>")
-            lines.append("</div>")
-            st.markdown("\n".join(lines), unsafe_allow_html=True)
-
-        section("Narrative Assessment", "🧩")
+            fig_radar = go.Figure(data=go.Scatterpolar(
+                r=vals + [vals[0]],
+                theta=cats + [cats[0]],
+                fill='toself',
+                name='Match Profile',
+                line=dict(color='#667eea', width=3),
+                fillcolor='rgba(102,126,234,.25)',
+                hoverinfo='label+value'
+            ))
+            fig_radar.update_layout(
+                polar=dict(
+                    radialaxis=dict(
+                        visible=True,
+                        range=[0,10],
+                        gridcolor='rgba(148,163,184,.2)',
+                        tickfont=dict(color='#94a3b8', size=12),
+                        ticksuffix=''
+                    ),
+                    angularaxis=dict(
+                        gridcolor='rgba(148,163,184,.2)',
+                        tickfont=dict(color='#e2e8f0', size=14),
+                        rotation=90
+                    ),
+                    bgcolor='rgba(22,33,62,.2)'
+                ),
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(family='Inter', color='#e2e8f0', size=13),
+                height=360,
+                showlegend=False,
+                margin=dict(l=40,r=40,t=40,b=20)
+            )
+            st.plotly_chart(fig_radar, use_container_width=True, config={'displayModeBar': False})
+        
+        # ===== Requirement Coverage =====
+        st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
+        section("Requirement Coverage", "✅")
+        
+        must = analysis["atoms"]["must"][:8]
+        nice = analysis["atoms"]["nice"][:5]
+        resume_text = resume.get("text", "")
+        tok = token_set(resume_text)
+        
+        cov_list = []
+        for a in must:
+            cov_list.append({"Requirement": a[:40], "Status": "✓" if contains_atom(a, tok) else "✗", "Type": "Must-Have"})
+        for a in nice:
+            cov_list.append({"Requirement": a[:40], "Status": "✓" if contains_atom(a, tok) else "✗", "Type": "Nice-to-Have"})
+        
+        if cov_list:
+            st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+            for item in cov_list[:12]:
+                status_color = "#10b981" if item["Status"] == "✓" else "#ef4444"
+                status_label = "Covered" if item["Status"] == "✓" else "Missing"
+                type_badge = "🔴" if item["Type"] == "Must-Have" else "⭐"
+                st.markdown(f"""
+                <div style="display:flex;align-items:center;gap:12px;padding:10px;border-bottom:1px solid rgba(148,163,184,.1);">
+                    <span style="font-size:16px;">{type_badge}</span>
+                    <span style="flex:1;color:#e2e8f0;">{item['Requirement']}</span>
+                    <span style="color:{status_color};font-weight:700;font-size:14px;">{status_label}</span>
+                </div>
+                """, unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+        
+        # ===== Assessment Cards =====
+        st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
+        section("Candidate Assessment", "🎯")
+        
         llm = analysis['llm_analysis']
-        c8,c9 = st.columns(2, gap="large")
-        with c8:
-            st.markdown("<div class='analysis-card'><h4 style='margin:0'>💪 Top Strengths</h4></div>", unsafe_allow_html=True)
-            for s in llm.get('top_strengths',[]): st.markdown(f"- {s}")
-            st.markdown("<div class='analysis-card'><h4 style='margin:8px 0 0 0'>📈 Improvement Areas</h4></div>", unsafe_allow_html=True)
-            for a in llm.get('improvement_areas',[]): st.markdown(f"- {a}")
-        with c9:
-            st.markdown("<div class='analysis-card'><h4 style='margin:0'>🤝 Cultural Fit</h4></div>", unsafe_allow_html=True)
-            st.write(llm.get('cultural_fit',''))
-            st.markdown("<div class='analysis-card'><h4 style='margin:8px 0 0 0'>⚙️ Technical Strength</h4></div>", unsafe_allow_html=True)
-            st.write(llm.get('technical_strength',''))
-
-        st.markdown(f"""
-        <div class="analysis-card" style="margin-top:16px;background:linear-gradient(135deg,rgba(102,126,234,.12),rgba(118,75,162,.12));">
-            <h4 style="margin:0;color:#e2e8f0;font-size:20px;">📋 Overall</h4>
-            <p style="font-size:15px;line-height:1.6;">{llm.get('overall_comment','')}</p>
+        
+        # Two-column layout for strengths & gaps
+        left, right = st.columns(2, gap="large")
+        
+        with left:
+            st.markdown("""
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(5,150,105,.08));border-left:4px solid #10b981;">
+                <h4 style="margin:0;color:#10b981;font-size:16px;text-transform:uppercase;">💪 Top Strengths</h4>
+                <div style="margin-top:12px;font-size:13px;color:#cbd5e1;line-height:1.7;">
+            """, unsafe_allow_html=True)
+            for s in llm.get('top_strengths', [])[:4]:
+                st.markdown(f"✓ {s}")
+            st.markdown("</div></div>", unsafe_allow_html=True)
+            
+            st.markdown("""
+            <div class="metric-card" style="margin-top:12px;background:linear-gradient(135deg,rgba(245,158,11,.08),rgba(217,119,6,.08));border-left:4px solid #f59e0b;">
+                <h4 style="margin:0;color:#f59e0b;font-size:16px;text-transform:uppercase;">📈 Development Areas</h4>
+                <div style="margin-top:12px;font-size:13px;color:#cbd5e1;line-height:1.7;">
+            """, unsafe_allow_html=True)
+            for a in llm.get('improvement_areas', [])[:3]:
+                st.markdown(f"• {a}")
+            st.markdown("</div></div>", unsafe_allow_html=True)
+        
+        with right:
+            st.markdown("""
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(102,126,234,.08),rgba(88,80,236,.08));border-left:4px solid #667eea;">
+                <h4 style="margin:0;color:#667eea;font-size:16px;text-transform:uppercase;">🤝 Cultural Fit</h4>
+                <p style="margin:12px 0 0 0;font-size:13px;color:#cbd5e1;line-height:1.6;">
+            """ + str(llm.get('cultural_fit', 'N/A'))[:300] + """
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("""
+            <div class="metric-card" style="margin-top:12px;background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(168,85,247,.08));border-left:4px solid #a855f7;">
+                <h4 style="margin:0;color:#a855f7;font-size:16px;text-transform:uppercase;">⚙️ Technical Fit</h4>
+                <p style="margin:12px 0 0 0;font-size:13px;color:#cbd5e1;line-height:1.6;">
+            """ + str(llm.get('technical_strength', 'N/A'))[:300] + """
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # ===== Final Recommendation =====
+        st.markdown("""
+        <div class="metric-card" style="margin-top:20px;background:linear-gradient(135deg,rgba(102,126,234,.15),rgba(118,75,162,.15));border:2px solid rgba(102,126,234,.3);border-radius:12px;">
+            <h3 style="margin:0;color:#667eea;font-size:18px;text-transform:uppercase;">📋 Final Recommendation</h3>
+            <p style="margin:14px 0 0 0;font-size:14px;line-height:1.8;color:#cbd5e1;">
+        """ + str(llm.get('overall_comment', 'Pending analysis'))[:500] + """
+            </p>
         </div>
         """, unsafe_allow_html=True)
 
-        section("Score Composition", "🧮")
-        parts = analysis["components"]
-        fig = go.Figure(go.Waterfall(x=list(parts.keys()), y=[parts[k] for k in parts], measure=["relative"]*len(parts)))
-        fig.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-
+        # ===== Download Results =====
+        st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
         payload = json.dumps(analysis, ensure_ascii=False, indent=2)
-        st.download_button("⬇️ Download Analysis JSON", data=payload.encode('utf-8'),
-                           file_name=f"analysis_{int(time.time())}.json", use_container_width=True)
-
-        if dbg:
-            section("Debug", "🛠️")
-            st.write("**Atoms (must):**", analysis["atoms"]["must"][:30])
-            st.write("**Atoms (nice):**", analysis["atoms"]["nice"][:20])
-            st.write("**Coverage parts:**", analysis["coverage_parts"])
-            st.caption("Note: Debug is off by default to keep UI clean.")
+        st.download_button(
+            "📥 Download Full Analysis (JSON)",
+            data=payload.encode('utf-8'),
+            file_name=f"analysis_{resume['name'].replace(' ','_')}_{int(time.time())}.json",
+            use_container_width=True,
+            help="Download the complete analysis with all metrics and details"
+        )
 
 # --- Recent tab ---
 with tab2:
