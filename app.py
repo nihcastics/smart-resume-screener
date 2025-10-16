@@ -3983,15 +3983,37 @@ with tab1:
                         rationale = _clean_rationale(raw_rationale)
                         
                         st.markdown(f"""
-                        <div style="background:rgba(21,10,46,.75);border:1px solid rgba(16,185,129,.3);border-left:4px solid #10b981;
-                                    border-radius:12px;padding:14px 18px;margin-bottom:10px;">
-                            <div style="display:flex;align-items:center;gap:12px;">
-                                <span style="color:#10b981;font-size:18px;">✓</span>
+                        <div style="background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(5,150,105,.05));
+                                    border:2px solid rgba(16,185,129,.35);border-left:5px solid #10b981;
+                                    border-radius:16px;padding:20px 24px;margin-bottom:14px;
+                                    box-shadow:0 4px 16px rgba(16,185,129,.15);
+                                    transition:all 0.3s ease;position:relative;overflow:hidden;">
+                            <div style="position:absolute;top:0;right:0;width:120px;height:120px;
+                                        background:radial-gradient(circle,rgba(16,185,129,.15),transparent 70%);
+                                        pointer-events:none;"></div>
+                            <div style="display:flex;align-items:flex-start;gap:16px;position:relative;">
+                                <div style="width:42px;height:42px;min-width:42px;
+                                            background:linear-gradient(135deg,#10b981,#059669);
+                                            border-radius:12px;display:flex;align-items:center;justify-content:center;
+                                            font-size:22px;box-shadow:0 4px 12px rgba(16,185,129,.4);">
+                                    ✓
+                                </div>
                                 <div style="flex:1;">
-                                    <div style="color:#f1f5f9;font-size:14px;font-weight:600;margin-bottom:4px;">{html.escape(req)}</div>
-                                    <div style="color:#94a3b8;font-size:11px;">{signals}</div>
-                                    {f'<div style="color:#6ee7b7;font-size:11px;margin-top:4px;font-style:italic;">{html.escape(rationale)}</div>' if rationale else ''}
-                                    <div style="color:#cbd5e1;font-size:11px;margin-top:6px;">📄 {resume_html}</div>
+                                    <div style="color:#f1f5f9;font-size:16px;font-weight:700;margin-bottom:8px;
+                                               line-height:1.5;">{html.escape(req)}</div>
+                                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
+                                        <span style="background:rgba(16,185,129,.2);color:#6ee7b7;
+                                                     padding:4px 12px;border-radius:8px;font-size:12px;font-weight:600;">
+                                            {signals}
+                                        </span>
+                                    </div>
+                                    {f'<div style="color:#a7f3d0;font-size:13px;margin-bottom:10px;line-height:1.6;font-style:italic;padding-left:8px;border-left:2px solid rgba(16,185,129,.3);">{html.escape(rationale)}</div>' if rationale else ''}
+                                    <div style="background:rgba(15,23,42,.6);border-radius:10px;padding:12px 16px;
+                                               border:1px solid rgba(16,185,129,.2);">
+                                        <div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:4px;
+                                                   text-transform:uppercase;letter-spacing:0.5px;">Evidence from Resume</div>
+                                        <div style="color:#cbd5e1;font-size:12px;line-height:1.6;">{resume_html}</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -4029,15 +4051,37 @@ with tab1:
                         rationale = _clean_rationale(raw_rationale)
                         
                         st.markdown(f"""
-                        <div style="background:rgba(21,10,46,.75);border:1px solid rgba(251,191,36,.3);border-left:4px solid #fbbf24;
-                                    border-radius:12px;padding:14px 18px;margin-bottom:10px;">
-                            <div style="display:flex;align-items:center;gap:12px;">
-                                <span style="color:#fbbf24;font-size:18px;">△</span>
+                        <div style="background:linear-gradient(135deg,rgba(251,191,36,.08),rgba(250,204,21,.05));
+                                    border:2px solid rgba(251,191,36,.35);border-left:5px solid #fbbf24;
+                                    border-radius:16px;padding:20px 24px;margin-bottom:14px;
+                                    box-shadow:0 4px 16px rgba(251,191,36,.15);
+                                    transition:all 0.3s ease;position:relative;overflow:hidden;">
+                            <div style="position:absolute;top:0;right:0;width:120px;height:120px;
+                                        background:radial-gradient(circle,rgba(251,191,36,.15),transparent 70%);
+                                        pointer-events:none;"></div>
+                            <div style="display:flex;align-items:flex-start;gap:16px;position:relative;">
+                                <div style="width:42px;height:42px;min-width:42px;
+                                            background:linear-gradient(135deg,#fbbf24,#facc15);
+                                            border-radius:12px;display:flex;align-items:center;justify-content:center;
+                                            font-size:22px;box-shadow:0 4px 12px rgba(251,191,36,.4);">
+                                    △
+                                </div>
                                 <div style="flex:1;">
-                                    <div style="color:#f1f5f9;font-size:14px;font-weight:600;margin-bottom:4px;">{html.escape(req)}</div>
-                                    <div style="color:#94a3b8;font-size:11px;">{signals}</div>
-                                    {f'<div style="color:#fde68a;font-size:11px;margin-top:4px;font-style:italic;">{html.escape(rationale)}</div>' if rationale else ''}
-                                    <div style="color:#cbd5e1;font-size:11px;margin-top:6px;">📄 {resume_html}</div>
+                                    <div style="color:#f1f5f9;font-size:16px;font-weight:700;margin-bottom:8px;
+                                               line-height:1.5;">{html.escape(req)}</div>
+                                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
+                                        <span style="background:rgba(251,191,36,.2);color:#fde68a;
+                                                     padding:4px 12px;border-radius:8px;font-size:12px;font-weight:600;">
+                                            {signals}
+                                        </span>
+                                    </div>
+                                    {f'<div style="color:#fef3c7;font-size:13px;margin-bottom:10px;line-height:1.6;font-style:italic;padding-left:8px;border-left:2px solid rgba(251,191,36,.3);">{html.escape(rationale)}</div>' if rationale else ''}
+                                    <div style="background:rgba(15,23,42,.6);border-radius:10px;padding:12px 16px;
+                                               border:1px solid rgba(251,191,36,.2);">
+                                        <div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:4px;
+                                                   text-transform:uppercase;letter-spacing:0.5px;">Evidence from Resume</div>
+                                        <div style="color:#cbd5e1;font-size:12px;line-height:1.6;">{resume_html}</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -4074,14 +4118,35 @@ with tab1:
                         rationale = _clean_rationale(raw_rationale) or "No evidence found"
                         
                         st.markdown(f"""
-                        <div style="background:rgba(21,10,46,.75);border:1px solid rgba(239,68,68,.3);border-left:4px solid #ef4444;
-                                    border-radius:12px;padding:14px 18px;margin-bottom:10px;">
-                            <div style="display:flex;align-items:center;gap:12px;">
-                                <span style="color:#ef4444;font-size:18px;">✗</span>
+                        <div style="background:linear-gradient(135deg,rgba(239,68,68,.08),rgba(220,38,38,.05));
+                                    border:2px solid rgba(239,68,68,.35);border-left:5px solid #ef4444;
+                                    border-radius:16px;padding:20px 24px;margin-bottom:14px;
+                                    box-shadow:0 4px 16px rgba(239,68,68,.15);
+                                    transition:all 0.3s ease;position:relative;overflow:hidden;">
+                            <div style="position:absolute;top:0;right:0;width:120px;height:120px;
+                                        background:radial-gradient(circle,rgba(239,68,68,.15),transparent 70%);
+                                        pointer-events:none;"></div>
+                            <div style="display:flex;align-items:flex-start;gap:16px;position:relative;">
+                                <div style="width:42px;height:42px;min-width:42px;
+                                            background:linear-gradient(135deg,#ef4444,#dc2626);
+                                            border-radius:12px;display:flex;align-items:center;justify-content:center;
+                                            font-size:22px;box-shadow:0 4px 12px rgba(239,68,68,.4);">
+                                    ✗
+                                </div>
                                 <div style="flex:1;">
-                                    <div style="color:#f1f5f9;font-size:14px;font-weight:600;margin-bottom:4px;">{html.escape(req)}</div>
-                                    <div style="color:#fca5a5;font-size:11px;">{signals}</div>
-                                    <div style="color:#fca5a5;font-size:11px;margin-top:4px;font-style:italic;">{html.escape(rationale)}</div>
+                                    <div style="color:#f1f5f9;font-size:16px;font-weight:700;margin-bottom:8px;
+                                               line-height:1.5;">{html.escape(req)}</div>
+                                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
+                                        <span style="background:rgba(239,68,68,.2);color:#fca5a5;
+                                                     padding:4px 12px;border-radius:8px;font-size:12px;font-weight:600;">
+                                            {signals}
+                                        </span>
+                                    </div>
+                                    <div style="color:#fecaca;font-size:13px;line-height:1.6;font-style:italic;
+                                               padding:12px 16px;background:rgba(239,68,68,.1);border-radius:10px;
+                                               border-left:2px solid rgba(239,68,68,.4);">
+                                        {html.escape(rationale)}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -4123,15 +4188,37 @@ with tab1:
                         rationale = _clean_rationale(raw_rationale)
                         
                         st.markdown(f"""
-                        <div style="background:rgba(21,10,46,.75);border:1px solid rgba(139,92,246,.3);border-left:4px solid #8b5cf6;
-                                    border-radius:12px;padding:14px 18px;margin-bottom:10px;">
-                            <div style="display:flex;align-items:center;gap:12px;">
-                                <span style="color:#8b5cf6;font-size:18px;">⭐</span>
+                        <div style="background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(99,102,241,.05));
+                                    border:2px solid rgba(139,92,246,.35);border-left:5px solid #8b5cf6;
+                                    border-radius:16px;padding:20px 24px;margin-bottom:14px;
+                                    box-shadow:0 4px 16px rgba(139,92,246,.15);
+                                    transition:all 0.3s ease;position:relative;overflow:hidden;">
+                            <div style="position:absolute;top:0;right:0;width:120px;height:120px;
+                                        background:radial-gradient(circle,rgba(139,92,246,.15),transparent 70%);
+                                        pointer-events:none;"></div>
+                            <div style="display:flex;align-items:flex-start;gap:16px;position:relative;">
+                                <div style="width:42px;height:42px;min-width:42px;
+                                            background:linear-gradient(135deg,#8b5cf6,#6366f1);
+                                            border-radius:12px;display:flex;align-items:center;justify-content:center;
+                                            font-size:22px;box-shadow:0 4px 12px rgba(139,92,246,.4);">
+                                    ⭐
+                                </div>
                                 <div style="flex:1;">
-                                    <div style="color:#f1f5f9;font-size:14px;font-weight:600;margin-bottom:4px;">{html.escape(req)}</div>
-                                    <div style="color:#94a3b8;font-size:11px;">{signals}</div>
-                                    {f'<div style="color:#c7d2fe;font-size:11px;margin-top:4px;font-style:italic;">{html.escape(rationale)}</div>' if rationale else ''}
-                                    <div style="color:#cbd5e1;font-size:11px;margin-top:6px;">📄 {resume_html}</div>
+                                    <div style="color:#f1f5f9;font-size:16px;font-weight:700;margin-bottom:8px;
+                                               line-height:1.5;">{html.escape(req)}</div>
+                                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
+                                        <span style="background:rgba(139,92,246,.2);color:#c7d2fe;
+                                                     padding:4px 12px;border-radius:8px;font-size:12px;font-weight:600;">
+                                            {signals}
+                                        </span>
+                                    </div>
+                                    {f'<div style="color:#ddd6fe;font-size:13px;margin-bottom:10px;line-height:1.6;font-style:italic;padding-left:8px;border-left:2px solid rgba(139,92,246,.3);">{html.escape(rationale)}</div>' if rationale else ''}
+                                    <div style="background:rgba(15,23,42,.6);border-radius:10px;padding:12px 16px;
+                                               border:1px solid rgba(139,92,246,.2);">
+                                        <div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:4px;
+                                                   text-transform:uppercase;letter-spacing:0.5px;">Evidence from Resume</div>
+                                        <div style="color:#cbd5e1;font-size:12px;line-height:1.6;">{resume_html}</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -4169,15 +4256,37 @@ with tab1:
                         rationale = _clean_rationale(raw_rationale)
                         
                         st.markdown(f"""
-                        <div style="background:rgba(21,10,46,.75);border:1px solid rgba(59,130,246,.3);border-left:4px solid #3b82f6;
-                                    border-radius:12px;padding:14px 18px;margin-bottom:10px;">
-                            <div style="display:flex;align-items:center;gap:12px;">
-                                <span style="color:#3b82f6;font-size:18px;">△</span>
+                        <div style="background:linear-gradient(135deg,rgba(59,130,246,.08),rgba(96,165,250,.05));
+                                    border:2px solid rgba(59,130,246,.35);border-left:5px solid #3b82f6;
+                                    border-radius:16px;padding:20px 24px;margin-bottom:14px;
+                                    box-shadow:0 4px 16px rgba(59,130,246,.15);
+                                    transition:all 0.3s ease;position:relative;overflow:hidden;">
+                            <div style="position:absolute;top:0;right:0;width:120px;height:120px;
+                                        background:radial-gradient(circle,rgba(59,130,246,.15),transparent 70%);
+                                        pointer-events:none;"></div>
+                            <div style="display:flex;align-items:flex-start;gap:16px;position:relative;">
+                                <div style="width:42px;height:42px;min-width:42px;
+                                            background:linear-gradient(135deg,#3b82f6,#60a5fa);
+                                            border-radius:12px;display:flex;align-items:center;justify-content:center;
+                                            font-size:22px;box-shadow:0 4px 12px rgba(59,130,246,.4);">
+                                    △
+                                </div>
                                 <div style="flex:1;">
-                                    <div style="color:#f1f5f9;font-size:14px;font-weight:600;margin-bottom:4px;">{html.escape(req)}</div>
-                                    <div style="color:#94a3b8;font-size:11px;">{signals}</div>
-                                    {f'<div style="color:#dbeafe;font-size:11px;margin-top:4px;font-style:italic;">{html.escape(rationale)}</div>' if rationale else ''}
-                                    <div style="color:#cbd5e1;font-size:11px;margin-top:6px;">📄 {resume_html}</div>
+                                    <div style="color:#f1f5f9;font-size:16px;font-weight:700;margin-bottom:8px;
+                                               line-height:1.5;">{html.escape(req)}</div>
+                                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
+                                        <span style="background:rgba(59,130,246,.2);color:#dbeafe;
+                                                     padding:4px 12px;border-radius:8px;font-size:12px;font-weight:600;">
+                                            {signals}
+                                        </span>
+                                    </div>
+                                    {f'<div style="color:#bfdbfe;font-size:13px;margin-bottom:10px;line-height:1.6;font-style:italic;padding-left:8px;border-left:2px solid rgba(59,130,246,.3);">{html.escape(rationale)}</div>' if rationale else ''}
+                                    <div style="background:rgba(15,23,42,.6);border-radius:10px;padding:12px 16px;
+                                               border:1px solid rgba(59,130,246,.2);">
+                                        <div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:4px;
+                                                   text-transform:uppercase;letter-spacing:0.5px;">Evidence from Resume</div>
+                                        <div style="color:#cbd5e1;font-size:12px;line-height:1.6;">{resume_html}</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -4214,14 +4323,35 @@ with tab1:
                         rationale = _clean_rationale(raw_rationale) or "Optional - not found"
                         
                         st.markdown(f"""
-                        <div style="background:rgba(21,10,46,.75);border:1px solid rgba(99,102,241,.3);border-left:4px solid #6366f1;
-                                    border-radius:12px;padding:14px 18px;margin-bottom:10px;">
-                            <div style="display:flex;align-items:center;gap:12px;">
-                                <span style="color:#6366f1;font-size:18px;">○</span>
+                        <div style="background:linear-gradient(135deg,rgba(99,102,241,.06),rgba(79,70,229,.04));
+                                    border:2px solid rgba(99,102,241,.25);border-left:5px solid #6366f1;
+                                    border-radius:16px;padding:20px 24px;margin-bottom:14px;
+                                    box-shadow:0 4px 16px rgba(99,102,241,.1);
+                                    transition:all 0.3s ease;position:relative;overflow:hidden;opacity:0.85;">
+                            <div style="position:absolute;top:0;right:0;width:120px;height:120px;
+                                        background:radial-gradient(circle,rgba(99,102,241,.12),transparent 70%);
+                                        pointer-events:none;"></div>
+                            <div style="display:flex;align-items:flex-start;gap:16px;position:relative;">
+                                <div style="width:42px;height:42px;min-width:42px;
+                                            background:linear-gradient(135deg,#6366f1,#4f46e5);
+                                            border-radius:12px;display:flex;align-items:center;justify-content:center;
+                                            font-size:22px;box-shadow:0 4px 12px rgba(99,102,241,.3);">
+                                    ○
+                                </div>
                                 <div style="flex:1;">
-                                    <div style="color:#cbd5e1;font-size:14px;font-weight:600;margin-bottom:4px;">{html.escape(req)}</div>
-                                    <div style="color:#a5b4fc;font-size:11px;">{signals}</div>
-                                    <div style="color:#93c5fd;font-size:11px;margin-top:4px;font-style:italic;">{html.escape(rationale)}</div>
+                                    <div style="color:#cbd5e1;font-size:16px;font-weight:700;margin-bottom:8px;
+                                               line-height:1.5;">{html.escape(req)}</div>
+                                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
+                                        <span style="background:rgba(99,102,241,.15);color:#a5b4fc;
+                                                     padding:4px 12px;border-radius:8px;font-size:12px;font-weight:600;">
+                                            {signals}
+                                        </span>
+                                    </div>
+                                    <div style="color:#a5b4fc;font-size:13px;line-height:1.6;font-style:italic;
+                                               padding:12px 16px;background:rgba(99,102,241,.08);border-radius:10px;
+                                               border-left:2px solid rgba(99,102,241,.25);">
+                                        {html.escape(rationale)}
+                                    </div>
                                 </div>
                             </div>
                         </div>
