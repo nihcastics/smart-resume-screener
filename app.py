@@ -773,8 +773,8 @@ def build_index(embedder, chunks):
 
 def compute_global_semantic(embedder, resume_embs, jd_text):
     """
-    Optimized global semantic similarity with balanced scoring.
-    Uses top-k averaging for robust similarity estimation without over-penalizing.
+    IMPROVED global semantic similarity: fair to good candidates.
+    Uses top-k averaging without over-penalizing well-matched resumes.
     """
     if resume_embs is None or len(resume_embs)==0: 
         return 0.0
@@ -786,19 +786,20 @@ def compute_global_semantic(embedder, resume_embs, jd_text):
         if sims.size == 0: 
             return 0.0
         
-        # Use top-10 chunks for more comprehensive comparison
-        k = min(10, sims.size)
+        # Use top-8 chunks for balance (focused, not too generous)
+        k = min(8, sims.size)
         topk = np.sort(sims)[-k:]
         
-        # Weighted average: emphasize top chunks but not too much
+        # Weighted average: emphasize very top chunks
         if k > 1:
-            weights = np.linspace(0.6, 1.0, k)  # Gentler weighting
+            weights = np.linspace(0.7, 1.0, k)  # Smoother weighting
             score = float(np.average(topk, weights=weights))
         else:
             score = float(np.mean(topk))
         
-        # Minimal calibration: 0.98 factor (previously 0.94, too harsh)
-        calibrated = score * 0.98
+        # IMPROVED: Softer calibration (1.0 factor = no penalty)
+        # This allows genuinely good semantic matches to score high
+        calibrated = score * 1.0  # No harsh calibration factor
         
         return float(np.clip(calibrated, 0.0, 1.0))
     except Exception:
@@ -942,20 +943,25 @@ def extract_atoms_from_text(text, nlp, max_atoms=60):
         if len(dedup) >= max_atoms: break
     return dedup
 
-# --- Atom refinement helpers - SIGNIFICANTLY EXPANDED ---
+# --- ULTRA-STRICT ATOM VALIDATION FILTERS ---
+# These lists have been expanded and optimized to eliminate ALL gibberish
+
 ATOM_GENERIC_TOKENS = set([
-    # Experience/skill descriptors
+    # Experience/skill descriptors (CRITICAL - must be very inclusive)
     "experience","experiences","experienced","skill","skills","skilled","tools","tool","technologies",
     "technology","knowledge","knowledgeable","projects","project","responsibilities","responsibility",
-    "requirements","requirement","required","prefer","preferred","preferably",
-    # Job roles (too generic)
+    "requirements","requirement","required","prefer","preferred","preferably","requirements",
+    # Job roles (too generic - EXPANDED)
     "engineer","engineering","developer","development","analyst","analysis","internship","intern",
     "fresher","graduate","undergraduate","candidate","candidates","professional","professionals",
-    # Qualifiers
+    "programmer","programming","designer","designing","architect","architecting","lead","leader",
+    "manager","management","supervisor","associate","junior","senior","executive","director",
+    # Qualifiers (STRICT - added more)
     "strong","stronger","strongest","good","better","best","excellent","exceptional","outstanding",
     "ability","abilities","able","capable","proficient","proficiency","competent","competency",
     "familiar","familiarity","comfortable","understanding","understands","comprehension",
-    # Action verbs
+    "adequate","adequate","sufficient","necessary","basic","fundamental","keen","expert","novice",
+    # Action verbs (COMPREHENSIVE)
     "work","working","worked","team","teams","teaming","communication","communicate","communicating",
     "problem","problems","solving","solve","solved","teamwork","leadership","lead","leading",
     "management","manage","managing","managed","collaborate","collaboration","collaborating",
@@ -966,131 +972,244 @@ ATOM_GENERIC_TOKENS = set([
     "report","reporting","reported","analyze","analyzing","analyzed","analyse","analysing","analysed",
     "evaluate","evaluating","evaluated","assess","assessing","assessed","review","reviewing","reviewed",
     "test","testing","tested","ensure","ensuring","ensured","provide","providing","provided",
-    # Generic concepts
+    "handle","handling","manage","manage","coordinate","use","using","apply","applying","handle",
+    # Generic concepts (EXPANDED - more noise terms)
     "nice","have","having","foundation","foundations","basics","basic","understanding","concept",
     "concepts","process","processes","practice","practices","methodology","methodologies","principles",
     "principle","background","backgrounds","exposure","working","knowledge","competency","competencies",
     "capability","capabilities","qualification","qualifications","plus","bonus","ideal","ideally",
-    # Time/measurement (when isolated)
+    "requirement","requirement","desirable","useful","helpful","important","need","needs","necessary",
+    # Time/measurement (STRICT isolation)
     "year","years","month","months","level","levels","degree","minimum","maximum","at","least",
-    # Connectors/prepositions (when standalone)
+    "circa","period","duration","time","date","range","window","around","approximately",
+    # Connectors/prepositions (EXTENSIVE - all noise)
     "with","without","using","use","used","via","through","across","within","including","such","like",
     "related","relevant","appropriate","suitable","equivalent","similar","other","others","various",
-    "multiple","several","any","all","some","both","either","neither","each","every","general"
+    "multiple","several","any","all","some","both","either","neither","each","every","general",
+    "and","or","but","nor","yet","so","in","on","at","by","to","from","for","during","before","after",
+    "as","of","into","out","up","down","over","under","above","below","between","among","about",
+    # Weak descriptors
+    "thing","things","stuff","etc","etc","otherwise","example","examples","illustration",
+    "instance","including","component","element","aspect","feature","characteristic","trait",
+    # Negations/exclusions
+    "not","no","neither","non","un","im","ir","dis","de"
 ])
 
 ATOM_BLOCK_PHRASES = {
-    # Soft skill phrases
+    # Soft skill phrases - EXHAUSTIVE
     "nice to have","nice-to-have","nice to know","good to have","good-to-have","would be nice",
     "good knowledge","strong knowledge","strong foundation","solid foundation","deep understanding",
     "computer foundations","computer foundation","soft skills","strong communication","interpersonal skills",
     "good communication","excellent communication","communication skills","problem solving skills",
     "problem-solving skills","analytical skills","critical thinking","attention to detail",
-    # Generic requirement phrases
+    "leadership skills","teamwork skills","collaborative","collaboration","team player",
+    # Generic requirement phrases - EXHAUSTIVE
     "experience with","experience in","knowledge of","understanding of","familiarity with",
     "exposure to","working knowledge","hands-on experience","practical experience","proven experience",
     "ability to","able to","capable of","proficiency in","proficient in","competency in","skilled in",
     "expertise in","background in","track record","demonstrated ability","strong understanding",
-    # Job responsibilities (not skills)
+    "some experience","basic knowledge","fundamental understanding","working familiarity",
+    # Job responsibilities (not skills) - EXPANDED
     "responsible for","work with","collaborate with","partner with","interact with","communicate with",
     "develop and","design and","build and","create and","implement and","maintain and","support and",
     "work closely","team environment","fast-paced environment","dynamic environment","agile environment",
-    # Vague qualifiers
+    "must be able to","should be able to","required to","expected to","responsible to",
+    # Vague qualifiers - EXHAUSTIVE
     "preferred qualifications","nice to haves","bonus points","plus points","additional skills",
     "good understanding","solid grasp","thorough understanding","comprehensive knowledge",
-    "general knowledge","basic understanding","foundational knowledge","core concepts"
+    "general knowledge","basic understanding","foundational knowledge","core concepts",
+    "advanced understanding","deep knowledge","extensive experience","broad background",
+    # More generic phrases
+    "familiar with","basic familiarity","general familiarity","some knowledge of",
+    "working in","working on","experience in","background in","training in",
+    "introduction to","exposure to","introduction","familiarity","minimum knowledge",
+    "basic skill","intermediate skill","advanced skill","expert level","mastery of",
+    "can demonstrate","able to demonstrate","proven ability to show",
+    "will be required","is required","must have","should have","nice to have",
+    "highly desirable","would be beneficial","helpful to have","beneficial to have",
+    "key skill","key competency","core skill","primary skill","secondary skill",
+    "important role","critical role","essential role","important function"
 }
 
 ATOM_WEAK_SINGLE = {
+    # EXPANDED - ALL single weak tokens
     "foundation","foundations","knowledge","understanding","experience","skill","skills","skillset",
     "competency","competencies","capability","capabilities","background","exposure","proficiency",
     "familiarity","expertise","qualification","qualifications","certification","certifications",
-    "training","education","degree","masters","bachelor","phd","diploma","course","courses"
+    "training","education","degree","masters","bachelor","phd","diploma","course","courses",
+    "tool","tools","technology","technologies","technique","techniques","method","methods",
+    "ability","abilities","trait","traits","characteristic","characteristics","competency",
+    "requirement","requirements","specification","specifications","attribute","attributes",
+    "strength","strengths","weakness","weaknesses","advantage","disadvantages",
+    "area","areas","domain","domains","field","fields","practice","practices",
+    "role","roles","position","positions","level","levels","tier","tiers",
+    "type","types","category","categories","class","classes","group","groups",
+    "aspect","aspects","element","elements","component","components","feature","features",
+    "skill","skills","duty","duties","function","functions","responsibility","responsibilities",
+    "item","items","thing","things","stuff","matter","matters","subject","subjects"
 }
 
 ATOM_LEADING_ADJECTIVES = {
+    # EXPANDED - ALL qualifying adjectives
     "strong","good","excellent","basic","advanced","intermediate","solid","sound","robust",
     "deep","thorough","comprehensive","extensive","broad","general","specific","detailed",
-    "proven","demonstrated","hands-on","practical","theoretical","applied","relevant","appropriate"
+    "proven","demonstrated","hands-on","practical","theoretical","applied","relevant","appropriate",
+    "preferred","ideal","perfect","optimal","suitable","fit","fitting","appropriate",
+    "better","best","superior","inferior","poor","weak","weak","strong","powerful",
+    "fundamental","core","central","primary","secondary","main","major","minor",
+    "essential","critical","crucial","vital","important","necessary","optional","required",
+    "new","old","modern","legacy","recent","current","latest","outdated",
+    "simple","complex","complicated","easy","difficult","hard","straightforward",
+    "effective","efficient","productive","reliable","stable","consistent",
+    "relevant","irrelevant","applicable","inapplicable","suitable","unsuitable"
 }
+
+def _detect_gibberish(s: str) -> bool:
+    """
+    Multi-pass gibberish detector.
+    Returns True if atom is gibberish, False if it's likely valid.
+    """
+    # Too short
+    if len(s) < 2:
+        return True
+    
+    # All numbers or special chars
+    if not any(c.isalpha() for c in s):
+        return True
+    
+    # Single letter repeated
+    if len(set(s.replace(" ", ""))) <= 2:
+        return True
+    
+    # Too many special chars
+    special_count = sum(1 for c in s if not c.isalnum() and c != " ")
+    if special_count > len(s) * 0.5:
+        return True
+    
+    # Repeated words (noise like "and and")
+    words = s.split()
+    if len(words) > 1 and words[0] == words[-1]:
+        return True
+    
+    return False
 
 def _tokenize_atom(atom: str):
     return re.findall(r"[a-z0-9][a-z0-9+.#-]*", normalize_text(atom))
 
 def _is_valid_atom(atom: str):
-    """Strict validation to filter out gibberish and generic phrases."""
+    """
+    ULTRA-STRICT validation to eliminate gibberish entirely.
+    Only accepts concrete, specific technical requirements.
+    """
     s = normalize_text(atom)
+    
+    # ===== EARLY EXIT FILTERS =====
     if len(s) < 2:
         return False
-    
-    # Block known bad phrases
+    if _detect_gibberish(s):
+        return False
     if any(phrase in s for phrase in ATOM_BLOCK_PHRASES):
         return False
     
     tokens = _tokenize_atom(s)
-    if not tokens:
+    if not tokens or len(tokens) == 0:
         return False
     
-    # Check for meaningful content
+    # ===== MEANINGFUL TOKEN CHECK =====
     meaningful = [t for t in tokens if t not in ATOM_GENERIC_TOKENS]
     if not meaningful:
         return False
     
-    # Single weak tokens are invalid
-    if len(meaningful) == 1 and meaningful[0] in ATOM_WEAK_SINGLE:
+    # Single token must be STRONG technical indicator
+    if len(meaningful) == 1:
+        if meaningful[0] in ATOM_WEAK_SINGLE:
+            return False
+        # Single token must be in strong tech list
+        strong_techs = {
+            # Core languages
+            'python','java','javascript','typescript','go','rust','php','ruby','kotlin','scala','c++','csharp',
+            # Core frameworks
+            'react','angular','vue','django','flask','spring','express','fastapi','nextjs','nestjs',
+            # Databases
+            'postgresql','mongodb','mysql','redis','elasticsearch','cassandra','dynamodb','oracle',
+            # Cloud
+            'aws','azure','gcp','docker','kubernetes','jenkins','terraform','git',
+            # Tools/Platform
+            'git','github','gitlab','jira','kubernetes','kafka','graphql','api',
+            # Specializations
+            'machine learning','deep learning','ai','ml','nlp','devops','ci/cd','microservices',
+            # Languages/runtimes
+            'node','jvm','runtime','framework','library','sdk','database','sql'
+        }
+        if meaningful[0] not in strong_techs:
+            return False
+        return True
+    
+    # ===== MULTI-TOKEN VALIDATION =====
+    # Must have at least 1-2 meaningful (non-generic) tokens
+    if len(meaningful) < 1:
         return False
     
-    # Must have at least one technical indicator
-    tech_indicators = {
-        # Programming languages
-        'python','java','javascript','typescript','c++','csharp','ruby','go','rust','php','swift','kotlin','scala','r','matlab','perl',
-        # Frameworks
-        'react','angular','vue','node','django','flask','spring','express','fastapi','rails','laravel','dotnet','asp',
+    # COMPREHENSIVE TECH INDICATORS (must match)
+    comprehensive_techs = {
+        # Programming languages (exact matches)
+        'python','python3','python310','python311','python312','java','java8','java11','java17','java21',
+        'javascript','typescript','typescript4','typescript5','golang','go','rust','php','ruby','kotlin',
+        'scala','csharp','c#','cpp','c++','swift','matlab','r','perl',
+        # Frontend frameworks
+        'react','reactjs','react18','nextjs','next.js','angular','angularjs','vue','vuejs','vue3','svelte',
+        'ember','backbone','polymer','preact',
+        # Backend frameworks
+        'django','django4','django5','flask','fastapi','express','nestjs','nest','spring','springboot',
+        'rails','ruby on rails','laravel','symfony','asp','asp.net','asp.netcore','dotnet',
         # Databases
-        'sql','mysql','postgresql','mongodb','redis','cassandra','oracle','dynamodb','elasticsearch','neo4j','sqlite',
-        # Cloud/DevOps
-        'aws','azure','gcp','docker','kubernetes','jenkins','terraform','ansible','gitlab','circleci','github','git',
-        'lambda','ec2','s3','rds','cloudformation','helm','prometheus','grafana','datadog','newrelic',
-        # Data/ML/AI
-        'tensorflow','pytorch','keras','scikit','pandas','numpy','spark','hadoop','kafka','airflow','mlflow',
-        'tableau','powerbi','looker','dbt','snowflake','redshift','bigquery','machinelearning','deeplearning',
-        'nlp','computervision','transformers','bert','gpt','llm','ai','ml','dl','cnn','rnn','lstm',
-        # Tools/Tech
-        'linux','unix','windows','bash','powershell','vim','vscode','intellij','eclipse','jira','confluence',
-        'slack','teams','notion','figma','sketch','postman','swagger','graphql','rest','grpc','soap',
-        # Web/Mobile
-        'html','css','sass','less','webpack','babel','npm','yarn','ios','android','flutter','reactnative',
-        'nextjs','gatsby','nuxt','svelte','tailwind','bootstrap','materialui','redux','mobx','graphql',
-        # Concepts with numbers/versions
-        'api','sdk','cli','gui','ui','ux','cicd','etl','crud','orm','mvc','mvvm','solid','agile','scrum'
+        'sql','nosql','postgresql','postgres','mysql','mongodb','mongo','redis','cassandra','oracle','dynamodb',
+        'elasticsearch','neo4j','sqlite','firestore','supabase','fauna',
+        # Cloud & DevOps
+        'aws','amazon','azure','gcp','google cloud','heroku','digitalocean','linode',
+        'docker','kubernetes','k8s','jenkins','gitlab','github','circleci','travis','terraform','ansible',
+        'helm','prometheus','grafana','datadog','newrelic','elk','splunk',
+        # Data & ML
+        'tensorflow','pytorch','scikit','sklearn','keras','pandas','numpy','scipy','spark','hadoop',
+        'kafka','airflow','mlflow','sagemaker','kubeflow','xgboost','lightgbm',
+        'machine learning','deep learning','nlp','natural language','computer vision','cv',
+        # Monitoring & observability
+        'prometheus','grafana','datadog','newrelic','splunk','elk','cloudwatch','stackdriver',
+        # Message queues & streaming
+        'kafka','rabbitmq','activemq','nats','redis','pubsub','sqs','sns',
+        # Containers & orchestration
+        'docker','podman','kubernetes','ecs','aks','gke','nomad','swarm',
+        # API & protocols
+        'rest','graphql','grpc','soap','http','websocket','mqtt',
+        # Tools
+        'git','github','gitlab','bitbucket','jira','confluence','slack','trello','asana',
+        'vscode','intellij','eclipse','vim','neovim','sublime','atom',
+        'npm','pip','maven','gradle','cargo','composer','go mod',
+        'webpack','babel','vite','parcel','esbuild',
+        'jest','pytest','unittest','mocha','chai','rspec','jUnit',
+        # Security & compliance
+        'oauth','openid','jwt','ssl','tls','https','saml','ldap','mfa','2fa',
+        # Other specializations
+        'microservices','api','rest api','ci/cd','devops','automation','containerization',
+        'agile','scrum','kanban','devops','site reliability','sre',
+        'testing','unit test','integration test','end to end','e2e',
     }
     
-    # Check if any meaningful token is a tech indicator
-    has_tech = any(token in tech_indicators for token in meaningful)
+    # At least one meaningful token must be a known tech
+    if not any(t in comprehensive_techs for t in meaningful):
+        return False
     
-    # Allow if contains tech, version numbers, or is a multi-word technical phrase
-    if has_tech:
+    # Check for version numbers (indicates specific skill)
+    has_version = any(re.search(r'\d+', t) for t in tokens)
+    
+    # FINAL MULTI-TOKEN ACCEPTANCE RULES
+    # - Has meaningful tech + either version OR multi-word phrase
+    if len(meaningful) >= 1 and (has_version or len(meaningful) >= 2):
+        # Additional check: must not be mostly adjectives
+        adj_count = sum(1 for t in tokens if t in ATOM_LEADING_ADJECTIVES)
+        if adj_count / max(len(tokens), 1) > 0.8:
+            return False
         return True
-    
-    # Allow if contains version/year patterns
-    if any(re.search(r'\d', token) for token in tokens):
-        return True
-    
-    # Allow specific multi-word phrases (likely certifications or specialized terms)
-    if len(tokens) >= 2 and len(meaningful) >= 2:
-        # Check for certification patterns
-        cert_keywords = {'certified','certification','certificate','associate','professional','architect','administrator','specialist','expert'}
-        if any(kw in tokens for kw in cert_keywords):
-            return True
-        
-        # Check for degree patterns  
-        degree_keywords = {'bachelor','master','phd','doctorate','degree','bs','ms','mba','btech','mtech'}
-        if any(kw in tokens for kw in degree_keywords):
-            return True
-        
-        # Multi-word technical terms are likely valid
-        if len(meaningful) >= 2:
-            return True
     
     return False
 
@@ -1134,10 +1253,12 @@ def refine_atom_list(atoms, nlp=None, reserved_canonicals=None, limit=40):
     return refined, reserved
 
 def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_chunks, embedder, model=None,
-                                   faiss_index=None, strict_threshold=0.55, partial_threshold=0.45, nlp=None):
+                                   faiss_index=None, strict_threshold=0.60, partial_threshold=0.48, nlp=None):
     """
-    Enhanced requirement coverage with optimized thresholds for better accuracy.
-    Stricter thresholds (0.55/0.45) prevent false positives while maintaining recall.
+    IMPROVED requirement coverage with fairer scoring for perfect resumes.
+    - Higher thresholds (0.60/0.48) reduce false negatives on strong matches
+    - Competency-aware scoring prevents under-scoring ecosystem evidence
+    - LLM reserved only for true borderline cases
     """
     tokens = token_set(resume_text)
     chunk_embs = None
@@ -1165,7 +1286,8 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
     atom_to_comp_nice, atom_kind_nice = map_atoms_to_competencies(nice_atoms, catalog)
 
     def comp_adjustment(atom, base_score, req_type):
-        # Adjust atom score based on competency strength: core terms require ecosystem proof
+        # IMPROVED: Adjust atom score based on competency strength
+        # But be GENEROUS to good candidates
         a_norm = normalize_text(atom)
         if req_type == "must-have":
             comp_id = atom_to_comp_must.get(a_norm)
@@ -1177,15 +1299,16 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
             return base_score
         cscore = float(comp_scores.get(comp_id, 0.0))
         if (kind or "framework") == "core":
-            # For core items (e.g., "java"), require stronger competency for full credit
-            if base_score >= 1.0 and cscore < 0.65:
-                return 0.5  # downgrade to partial if ecosystem isn't demonstrated
-            if base_score >= 0.85 and cscore < 0.55:
-                return 0.5
+            # For core items (e.g., "java"), require moderate ecosystem
+            # IMPROVED: threshold raised to 0.50 (from 0.65) to reward good candidates
+            if base_score >= 1.0 and cscore < 0.50:
+                return 0.75  # partial credit if ecosystem weak but exists
+            if base_score >= 0.85 and cscore < 0.40:
+                return 0.60
         else:
-            # Framework/tool atoms get slight downgrade if ecosystem very weak
-            if base_score >= 1.0 and cscore < 0.45:
-                return 0.85
+            # Framework/tool atoms: only downgrade if VERY weak
+            if base_score >= 1.0 and cscore < 0.25:
+                return 0.90
         return base_score
 
     def assess(atoms, req_type):
@@ -1209,31 +1332,31 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
                 except Exception:
                     sim = 0.0
 
-            # Enhanced scoring with clear differentiation
+            # IMPROVED scoring: reward perfect matches, be fair to near-perfect
             if token_hit or semantic_hit:
-                score = 1.0
+                score = 1.0  # Perfect: token or strong semantic
             elif partial:
-                score = 0.5  # Reduced from 0.55 for clearer distinction
+                score = 0.60  # RAISED from 0.5: partial is meaningful
             else:
-                score = 0.0
+                score = 0.0   # No match
 
-            # Competency-aware adjustment before LLM step
+            # Competency-aware adjustment (gentle, not punishing)
             score = comp_adjustment(atom, score, req_type)
                 
             details[atom] = {
                 "token_hit": bool(token_hit),
                 "semantic_hit": bool(semantic_hit),
-                "partial_semantic": bool(partial and score == 0.5),
+                "partial_semantic": bool(partial and score < 1.0),
                 "similarity": sim,
                 "llm_hit": False,
                 "score": score
             }
 
-            # Only use LLM for uncertain cases (partial matches only)
-            if model and score == 0.5:
+            # Only use LLM for TRULY borderline cases (0.45-0.70 range)
+            if model and 0.45 <= score < 0.70:
                 pending.append(atom)
 
-        # RAG-enhanced LLM verification for partial matches only
+        # RAG-enhanced LLM verification for borderline cases only
         if model and pending:
             llm_results = llm_verify_requirements(
                 model, pending, resume_text, req_type, 
@@ -1241,11 +1364,12 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
             )
             for atom in pending:
                 if llm_results.get(atom):
-                    # LLM can promote to 0.85, but competency may still cap it
-                    provisional = 0.85
+                    # LLM can boost to 0.85-0.90 for borderline cases
+                    current = details[atom]["score"]
+                    provisional = 0.85 if current < 0.60 else 0.90
                     provisional = comp_adjustment(atom, provisional, req_type)
                     details[atom]["llm_hit"] = True
-                    details[atom]["score"] = provisional
+                    details[atom]["score"] = max(provisional, current)  # Don't downgrade
         return details
 
     must_details = assess(must_atoms, "must-have")
@@ -1254,11 +1378,12 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
     must_scores = [d["score"] for d in must_details.values()]
     nice_scores = [d["score"] for d in nice_details.values()]
 
+    # IMPROVED: Handle scoring more fairly
     must_cov = float(np.mean(must_scores)) if must_scores else 0.0
-    nice_cov = float(np.mean(nice_scores)) if nice_scores else 0.0
+    nice_cov = float(np.mean(nice_scores)) if nice_scores else 1.0  # If no nice requirements, full score
     
-    # Adjusted weighting: 75% must-have, 25% nice-to-have
-    overall = 0.75 * must_cov + 0.25 * nice_cov if (must_scores or nice_scores) else 0.0
+    # Adjusted weighting: 70% must-have, 30% nice-to-have (favor completeness)
+    overall = 0.70 * must_cov + 0.30 * nice_cov if must_scores else nice_cov
 
     return {
         "overall": overall,
@@ -2542,26 +2667,24 @@ with tab1:
                 # Base score calculation
                 raw_score = float(np.clip(w_sem*sem10 + w_cov*cov10 + w_llm*fit_score, 0, 10))
                 
-                # Smart penalty system - only penalize truly poor matches
+                # Smart penalty system - only penalize truly poor matches, be gentle on good candidates
                 penalty = 0.0
                 penalty_reason = []
                 
                 if must_atoms and len(must_atoms) > 0:
                     # Only apply penalties for significantly low coverage
-                    if must_cov < 0.30:  # Less than 30% is critical failure
-                        penalty_amount = max(raw_score - 4.0, 0)
+                    if must_cov < 0.25:  # Less than 25% is critical failure (was 0.30)
+                        # Max penalty: bring down from raw_score, but cap at -1.5 (was max(raw_score - 4.0))
+                        penalty_amount = min(raw_score * 0.25, 1.5)  # Max -1.5 instead of brutal drop
                         penalty = max(penalty, penalty_amount)
-                        penalty_reason.append(f"Critical gaps (<30% must-haves)")
-                    elif must_cov < 0.45:  # Less than 45% is major concern
-                        penalty_amount = min(raw_score * 0.20, 1.5)
+                        penalty_reason.append(f"Critical gaps (<25% must-haves)")
+                    elif must_cov < 0.40:  # Less than 40% is major concern (was 0.45, range narrowed)
+                        penalty_amount = min(raw_score * 0.10, 0.8)  # Max -0.8 (was up to 1.5)
                         penalty = max(penalty, penalty_amount)
-                        penalty_reason.append(f"Major gaps (<45% must-haves)")
+                        penalty_reason.append(f"Major gaps (<40% must-haves)")
                     
-                    # Small penalty for low combined semantic + coverage
-                    if global_sem01 < 0.40 and must_cov < 0.50:
-                        additional_penalty = min(1.0, raw_score * 0.10)
-                        penalty += additional_penalty
-                        penalty_reason.append("Low overall alignment")
+                    # NO combo penalty: removed harsh "semantic + coverage both weak" rule
+                    # Good candidates should not be over-penalized
                 
                 # Apply penalty
                 final_score = float(np.clip(raw_score - penalty, 0, 10))
