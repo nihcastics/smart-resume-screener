@@ -850,69 +850,6 @@ def contains_atom(atom, text_tokens, full_text=""):
     
     return False
 
-def coverage_from_atoms_semantic(must_atoms, nice_atoms, resume_chunks, embedder, threshold=0.30):
-    """Semantic-based coverage: each requirement matched via embedding similarity with fuzzy scoring."""
-    if not resume_chunks or (not must_atoms and not nice_atoms):
-        return 0.0, 0.0, 0.0, [], []
-    try:
-        chunk_embs = embedder.encode(resume_chunks, convert_to_numpy=True, normalize_embeddings=True)
-        if chunk_embs.ndim == 1:
-            chunk_embs = chunk_embs.reshape(1, -1)
-    except Exception:
-        return 0.0, 0.0, 0.0, [], []
-    
-    must_hits, nice_hits = [], []
-    
-    # Process must-have requirements with fuzzy scoring
-    for atom in must_atoms:
-        try:
-            atom_emb = embedder.encode(atom, convert_to_numpy=True, normalize_embeddings=True)
-            if atom_emb.ndim > 1:
-                atom_emb = atom_emb[0]
-            # Compute similarities
-            sims = np.dot(chunk_embs, atom_emb)
-            max_sim = float(np.max(sims)) if sims.size > 0 else 0.0
-            
-            # Stricter fuzzy scoring: less generous partial credit
-            if max_sim >= threshold:
-                score = 1.0  # Full match
-            elif max_sim >= (threshold - 0.08):
-                score = 0.5  # Partial match (50% credit, down from 60%)
-            elif max_sim >= (threshold - 0.12):
-                score = 0.2  # Weak match (20% credit, down from 30%)
-            else:
-                score = 0.0  # No match
-            must_hits.append(score)
-        except Exception:
-            must_hits.append(0.0)
-    
-    # Process nice-to-have requirements with same fuzzy logic
-    for atom in nice_atoms:
-        try:
-            atom_emb = embedder.encode(atom, convert_to_numpy=True, normalize_embeddings=True)
-            if atom_emb.ndim > 1:
-                atom_emb = atom_emb[0]
-            sims = np.dot(chunk_embs, atom_emb)
-            max_sim = float(np.max(sims)) if sims.size > 0 else 0.0
-            
-            # Same stricter fuzzy scoring
-            if max_sim >= threshold:
-                score = 1.0
-            elif max_sim >= (threshold - 0.08):
-                score = 0.5
-            elif max_sim >= (threshold - 0.12):
-                score = 0.2
-            else:
-                score = 0.0
-            nice_hits.append(score)
-        except Exception:
-            nice_hits.append(0.0)
-    
-    must_cov = float(np.mean(must_hits)) if must_hits else 0.0
-    nice_cov = float(np.mean(nice_hits)) if nice_hits else 0.0
-    cov = 0.75*must_cov + 0.25*nice_cov if (must_hits or nice_hits) else 0.0
-    return cov, must_cov, nice_cov, must_hits, nice_hits
-
 def extract_atoms_from_text(text, nlp, max_atoms=60):
     """Dynamic atom candidates from JD (no lexicons): noun-chunks + list parsing + compact phrases."""
     text = text.strip()
@@ -938,38 +875,24 @@ def extract_atoms_from_text(text, nlp, max_atoms=60):
             cands.append(s)
 
     # STRICT filtering: Remove all useless/generic words and phrases
-    generic = set([
-        "experience","skills","tools","technologies","knowledge","projects","project",
-        "responsibilities","requirements","good to have","must have","engineer","engineering",
-        "developer","analyst","internship","intern","fresher","strong","good","excellent",
-        "ability","familiar","able","work","team","communication","problem solving","teamwork",
-        "leadership","management","collaborate","develop","design","build","create","implement",
-        "manage","handle","provide","ensure","maintain","support","help","assist","drive",
-        "lead","track","monitor","report","analyze","evaluate","assess","review","test",
-        "nice","have","nice to have","nice to have requirements","nice to have skills",
-        "foundations","foundation"
-    ])
-    
-    # Filter out items containing stopwords
+    generic = ATOM_GENERIC_TOKENS
+    blocked_phrases = ATOM_BLOCK_PHRASES
+
     filtered = []
     for c in cands:
-        # Skip if entire phrase is in stopwords
-        if c in generic:
+        if not c:
             continue
-        # Skip if it contains too many generic words
-        words = c.split()
-        generic_count = sum(1 for w in words if w in generic)
-        if generic_count >= len(words) - 1:  # Too many stopwords
+        if any(phrase in c for phrase in blocked_phrases):
             continue
-        # Skip adjectives at the beginning that are modifiers
-        if len(words) > 1:
-            first_word = words[0]
-            if first_word in {"strong", "good", "excellent", "basic", "advanced", "intermediate"}:
-                continue
+        tokens = c.split()
+        meaningful = [t for t in tokens if t not in generic]
+        if not meaningful:
+            continue
+        if len(meaningful) == 1 and meaningful[0] in ATOM_WEAK_SINGLE:
+            continue
+        if tokens and tokens[0] in ATOM_LEADING_ADJECTIVES:
+            continue
         filtered.append(c)
-    
-    # Remove "have" and other single-word residuals
-    filtered = [c for c in filtered if c not in {"have", "able", "strong", "good", "nice"}]
     
     freq = Counter(filtered)
     scored = []
@@ -984,6 +907,165 @@ def extract_atoms_from_text(text, nlp, max_atoms=60):
             seen.add(k); dedup.append(k)
         if len(dedup) >= max_atoms: break
     return dedup
+
+# --- Atom refinement helpers ---
+ATOM_GENERIC_TOKENS = set([
+    "experience","experiences","skill","skills","tools","tool","technologies","technology","knowledge",
+    "projects","project","responsibilities","requirements","requirement","engineer","engineering",
+    "developer","analyst","internship","intern","fresher","strong","good","excellent","ability",
+    "familiar","able","work","team","teams","communication","problem","solving","problem-solving",
+    "teamwork","leadership","management","collaborate","develop","design","build","create","implement",
+    "manage","handling","handle","provide","ensuring","ensure","maintain","support","help","assist",
+    "drive","lead","leading","track","tracking","monitor","report","analyze","analyse","evaluate",
+    "assess","review","test","testing","nice","have","having","foundation","foundations","basics",
+    "basic","understanding","concepts","concept","process","processes","practice","practices",
+    "methodology","methodologies","principles","principle","knowledgeable","familiarity","competency",
+    "competencies","capability","capabilities","background"
+])
+
+ATOM_BLOCK_PHRASES = {
+    "nice to have","nice-to-have","nice to know","good to have","good-to-have","good knowledge",
+    "strong knowledge","strong foundation","solid foundation","computer foundations","computer foundation",
+    "soft skills","strong communication","good communication","excellent communication"
+}
+
+ATOM_WEAK_SINGLE = {
+    "foundation","foundations","knowledge","understanding","experience","skill","skills",
+    "competency","competencies","capability","capabilities","background","exposure"
+}
+
+ATOM_LEADING_ADJECTIVES = {
+    "strong","good","excellent","basic","advanced","intermediate","solid","sound","robust"
+}
+
+def _tokenize_atom(atom: str):
+    return re.findall(r"[a-z0-9][a-z0-9+.#-]*", normalize_text(atom))
+
+def _is_valid_atom(atom: str):
+    s = normalize_text(atom)
+    if len(s) < 2:
+        return False
+    if any(phrase in s for phrase in ATOM_BLOCK_PHRASES):
+        return False
+    tokens = _tokenize_atom(s)
+    if not tokens:
+        return False
+    meaningful = [t for t in tokens if t not in ATOM_GENERIC_TOKENS]
+    if not meaningful:
+        return False
+    if len(meaningful) == 1 and meaningful[0] in ATOM_WEAK_SINGLE:
+        return False
+    return True
+
+def _canonical_atom(atom: str, nlp=None):
+    s = normalize_text(atom)
+    if not s:
+        return ""
+    if nlp is not None:
+        try:
+            doc = nlp(s)
+            lemmas = [t.lemma_.lower() for t in doc if re.match(r"[a-z0-9][a-z0-9+.#-]*", t.lemma_.lower())]
+            canned = " ".join(lemmas)
+            if canned:
+                return canned
+        except Exception:
+            pass
+    tokens = _tokenize_atom(s)
+    return " ".join(tokens)
+
+def refine_atom_list(atoms, nlp=None, reserved_canonicals=None, limit=40):
+    reserved = set(reserved_canonicals or [])
+    best = {}
+    order = []
+    for idx, atom in enumerate(atoms):
+        if not isinstance(atom, str):
+            continue
+        atom = normalize_text(atom)
+        if not _is_valid_atom(atom):
+            continue
+        canonical = _canonical_atom(atom, nlp)
+        if not canonical or canonical in reserved:
+            continue
+        current = best.get(canonical)
+        if current is None:
+            best[canonical] = {"value": atom, "index": idx}
+            order.append(canonical)
+        elif len(atom) < len(current["value"]):
+            current["value"] = atom
+    refined = [best[key]["value"] for key in order[:limit]]
+    reserved.update(order[:limit])
+    return refined, reserved
+
+def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_chunks, embedder, model=None,
+                                   strict_threshold=0.43, partial_threshold=0.35):
+    tokens = token_set(resume_text)
+    chunk_embs = None
+    if resume_chunks and embedder:
+        try:
+            chunk_embs = embedder.encode(resume_chunks, convert_to_numpy=True, normalize_embeddings=True)
+            if chunk_embs.ndim == 1:
+                chunk_embs = chunk_embs.reshape(1, -1)
+        except Exception:
+            chunk_embs = None
+
+    def assess(atoms, req_type):
+        details = {}
+        pending = []
+        for atom in atoms:
+            sim = 0.0
+            token_hit = contains_atom(atom, tokens, resume_text)
+            semantic_hit = False
+            partial = False
+            if chunk_embs is not None:
+                try:
+                    atom_emb = embedder.encode(atom, convert_to_numpy=True, normalize_embeddings=True)
+                    if atom_emb.ndim > 1:
+                        atom_emb = atom_emb[0]
+                    sims = np.dot(chunk_embs, atom_emb)
+                    sim = float(np.max(sims)) if sims.size > 0 else 0.0
+                    semantic_hit = sim >= strict_threshold
+                    if not semantic_hit and sim >= partial_threshold:
+                        partial = True
+                except Exception:
+                    sim = 0.0
+
+            score = 1.0 if (token_hit or semantic_hit) else (0.6 if partial else 0.0)
+            details[atom] = {
+                "token_hit": bool(token_hit),
+                "semantic_hit": bool(semantic_hit),
+                "partial_semantic": bool(partial and score == 0.6),
+                "similarity": sim,
+                "llm_hit": False,
+                "score": score
+            }
+
+            if model and score < 1.0:
+                pending.append(atom)
+
+        if model and pending:
+            llm_results = llm_verify_requirements(model, pending, resume_text, req_type)
+            for atom in pending:
+                if llm_results.get(atom):
+                    details[atom]["llm_hit"] = True
+                    details[atom]["score"] = 1.0
+        return details
+
+    must_details = assess(must_atoms, "must-have")
+    nice_details = assess(nice_atoms, "nice-to-have") if nice_atoms else {}
+
+    must_scores = [d["score"] for d in must_details.values()]
+    nice_scores = [d["score"] for d in nice_details.values()]
+
+    must_cov = float(np.mean(must_scores)) if must_scores else 0.0
+    nice_cov = float(np.mean(nice_scores)) if nice_scores else 0.0
+    overall = 0.75 * must_cov + 0.25 * nice_cov if (must_scores or nice_scores) else 0.0
+
+    return {
+        "overall": overall,
+        "must": must_cov,
+        "nice": nice_cov,
+        "details": {"must": must_details, "nice": nice_details}
+    }
 
 # ---- LLM wrappers / prompts ----
 def llm_json(model, prompt):
@@ -1683,24 +1765,20 @@ with tab1:
                 atoms_llm = llm_json(model, atomicize_requirements_prompt(jd, preview)) or {}
                 jd_atoms_raw = extract_atoms_from_text(jd, nlp, max_atoms=60)
 
-                def clean_atoms(xs):
-                    out, seen = [], set()
-                    for a in xs:
-                        if not isinstance(a, str): continue
-                        a = normalize_text(a)
-                        if 2 <= len(a) <= 50 and a not in seen:
-                            seen.add(a); out.append(a)
-                    return out
+                must_candidates = (atoms_llm.get("must_atoms") or []) + jd_atoms_raw[:30]
+                must_atoms, must_canon = refine_atom_list(must_candidates, nlp, limit=35)
 
-                must_atoms = clean_atoms((atoms_llm.get("must_atoms") or []) + jd_atoms_raw[:30])
-                nice_atoms = clean_atoms((atoms_llm.get("nice_atoms") or []) + jd_atoms_raw[30:60])
+                nice_candidates = (atoms_llm.get("nice_atoms") or []) + jd_atoms_raw[30:80]
+                nice_atoms, _ = refine_atom_list(nice_candidates, nlp, reserved_canonicals=must_canon, limit=30)
 
                 # ---------- Coverage (semantic similarity over chunks) ----------
                 show_status(0.58, "📊", "Scoring requirement coverage...", "rgba(16,185,129,.15)", "rgba(5,150,105,.12)")
-                # Stricter threshold: 0.35 (up from 0.28) for better precision
-                cov_final, must_cov, nice_cov, must_hits, nice_hits = coverage_from_atoms_semantic(
-                    must_atoms, nice_atoms, parsed.get("chunks", []), embedder, threshold=0.35
+                coverage_summary = evaluate_requirement_coverage(
+                    must_atoms, nice_atoms, parsed.get("text", ""), parsed.get("chunks", []), embedder, model
                 )
+                cov_final = coverage_summary["overall"]
+                must_cov = coverage_summary["must"]
+                nice_cov = coverage_summary["nice"]
 
                 # ---------- Global semantic ----------
                 show_status(0.68, "🧠", "Computing semantic similarity...", "rgba(236,72,153,.15)", "rgba(219,39,119,.12)")
@@ -1713,7 +1791,8 @@ with tab1:
                     "must_coverage": round(must_cov,3),
                     "nice_coverage": round(nice_cov,3),
                     "must_atoms_count": len(must_atoms),
-                    "nice_atoms_count": len(nice_atoms)
+                    "nice_atoms_count": len(nice_atoms),
+                    "overall": round(cov_final,3)
                 }
                 llm_out = llm_json(model, analysis_prompt(jd, plan, profile, global_sem01, cov_final, cov_parts))
                 fit_score = llm_out.get("fit_score")
@@ -1731,8 +1810,21 @@ with tab1:
                     w_sem, w_cov, w_llm = DEFAULT_WEIGHTS["semantic"], DEFAULT_WEIGHTS["coverage"], DEFAULT_WEIGHTS["llm_fit"]
                     W = w_sem + w_cov + w_llm
                 w_sem, w_cov, w_llm = w_sem/W, w_cov/W, w_llm/W
-                final_score = float(np.clip(w_sem*sem10 + w_cov*cov10 + w_llm*fit_score, 0, 10))
-                components = {"Semantic": round(w_sem*sem10,1), "Coverage": round(w_cov*cov10,1), "LLM Fit": round(w_llm*fit_score,1)}
+                raw_score = float(np.clip(w_sem*sem10 + w_cov*cov10 + w_llm*fit_score, 0, 10))
+                penalty = 0.0
+                if must_atoms:
+                    if must_cov < 0.25:
+                        penalty = max(penalty, raw_score - 3.5)
+                    elif must_cov < 0.4:
+                        penalty = max(penalty, raw_score - 4.8)
+                final_score = float(np.clip(raw_score - penalty, 0, 10))
+                components = {
+                    "Semantic": round(w_sem*sem10,1),
+                    "Coverage": round(w_cov*cov10,1),
+                    "LLM Fit": round(w_llm*fit_score,1)
+                }
+                if penalty > 0.0:
+                    components["Penalty"] = -round(penalty,1)
 
                 # ---------- Package result ----------
                 result = {
@@ -1741,6 +1833,8 @@ with tab1:
                     "coverage_score": round(cov10,1),
                     "llm_fit_score": round(fit_score,1),
                     "coverage_parts": cov_parts,
+                    "coverage_summary": coverage_summary,
+                    "atom_matches": coverage_summary.get("details", {}),
                     "atoms": {"must": must_atoms, "nice": nice_atoms},
                     "plan": plan,
                     "resume_profile": profile,
@@ -2048,85 +2142,53 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
         
-        # Get requirements from analysis
-        must = analysis["atoms"]["must"][:15]  # Show more for comprehensive view
-        nice = analysis["atoms"]["nice"][:10]
-        resume_text = resume.get("text", "")
-        resume_chunks = resume.get("chunks", [])
-        tok = token_set(resume_text)
-        
-        # INTELLIGENT MULTI-LAYER DETECTION SYSTEM
-        # Layer 1: Token-based detection (fast, precise)
-        must_token = {req: contains_atom(req, tok, resume_text) for req in must}
-        nice_token = {req: contains_atom(req, tok, resume_text) for req in nice}
-        
-        # Layer 2: Semantic similarity using embeddings (catches variations)
-        must_semantic = {}
-        nice_semantic = {}
-        if resume_chunks and embedder:
-            try:
-                # Encode all resume chunks once
-                chunk_embs = embedder.encode(resume_chunks, convert_to_numpy=True, normalize_embeddings=True)
-                if chunk_embs.ndim == 1:
-                    chunk_embs = chunk_embs.reshape(1, -1)
-                
-                # Check each must-have requirement
-                for req in must:
-                    if not must_token.get(req, False):  # Only if not found by token matching
-                        req_emb = embedder.encode(req, convert_to_numpy=True, normalize_embeddings=True)
-                        if req_emb.ndim > 1:
-                            req_emb = req_emb[0]
-                        sims = np.dot(chunk_embs, req_emb)
-                        max_sim = float(np.max(sims)) if sims.size > 0 else 0.0
-                        must_semantic[req] = max_sim >= 0.35  # Semantic match threshold
-                
-                # Check each nice-to-have requirement
-                for req in nice:
-                    if not nice_token.get(req, False):
-                        req_emb = embedder.encode(req, convert_to_numpy=True, normalize_embeddings=True)
-                        if req_emb.ndim > 1:
-                            req_emb = req_emb[0]
-                        sims = np.dot(chunk_embs, req_emb)
-                        max_sim = float(np.max(sims)) if sims.size > 0 else 0.0
-                        nice_semantic[req] = max_sim >= 0.35
-            except:
-                pass
-        
-        # Layer 3: LLM verification (catches implied skills and context)
-        llm_must_verify = {}
-        llm_nice_verify = {}
-        try:
-            # Only use LLM for requirements not found by previous methods
-            must_unverified = [r for r in must if not (must_token.get(r, False) or must_semantic.get(r, False))]
-            nice_unverified = [r for r in nice if not (nice_token.get(r, False) or nice_semantic.get(r, False))]
-            
-            if must_unverified and model:
-                llm_must_verify = llm_verify_requirements(model, must_unverified, resume_text, "must-have")
-            if nice_unverified and model:
-                llm_nice_verify = llm_verify_requirements(model, nice_unverified, resume_text, "nice-to-have")
-        except:
-            pass
-        
-        # Final decision: OR of all three methods
-        must_final = {}
-        for req in must:
-            must_final[req] = (must_token.get(req, False) or 
-                              must_semantic.get(req, False) or 
-                              llm_must_verify.get(req, False))
-        
-        nice_final = {}
-        for req in nice:
-            nice_final[req] = (nice_token.get(req, False) or 
-                              nice_semantic.get(req, False) or 
-                              llm_nice_verify.get(req, False))
-        
-        # Calculate metrics
-        must_covered = sum(1 for v in must_final.values() if v)
-        nice_covered = sum(1 for v in nice_final.values() if v)
-        total_covered = must_covered + nice_covered
-        total_req = len(must) + len(nice)
-        coverage_pct = int((total_covered / total_req * 100)) if total_req > 0 else 0
-        must_coverage_pct = int((must_covered / len(must) * 100)) if len(must) > 0 else 0
+        # Get requirement details
+        matches = analysis.get("atom_matches", {})
+        must_atoms = analysis["atoms"]["must"]
+        nice_atoms = analysis["atoms"]["nice"]
+
+        def build_detail_map(atoms, source):
+            detail_map = {}
+            for atom in atoms:
+                info = dict(source.get(atom, {}))
+                info.setdefault("score", 0.0)
+                info.setdefault("token_hit", False)
+                info.setdefault("semantic_hit", False)
+                info.setdefault("partial_semantic", False)
+                info.setdefault("llm_hit", False)
+                info.setdefault("similarity", 0.0)
+                detail_map[atom] = info
+            return detail_map
+
+        must_detail_map = build_detail_map(must_atoms, matches.get("must", {}))
+        nice_detail_map = build_detail_map(nice_atoms, matches.get("nice", {}))
+
+        def split_status(detail_map):
+            full, partial, missing = [], [], []
+            for atom, info in detail_map.items():
+                score = float(info.get("score", 0.0))
+                if score >= 0.95:
+                    full.append((atom, info))
+                elif score >= 0.6:
+                    partial.append((atom, info))
+                else:
+                    missing.append((atom, info))
+            return full, partial, missing
+
+        must_full, must_partial, must_missing = split_status(must_detail_map)
+        nice_full, nice_partial, nice_missing = split_status(nice_detail_map)
+
+        must_score_total = sum(float(info.get("score", 0.0)) for info in must_detail_map.values())
+        nice_score_total = sum(float(info.get("score", 0.0)) for info in nice_detail_map.values())
+
+        total_atoms = len(must_atoms) + len(nice_atoms)
+        total_score = must_score_total + nice_score_total
+        coverage_pct = int(round((total_score / total_atoms) * 100)) if total_atoms else 0
+        must_coverage_pct = int(round((must_score_total / len(must_atoms)) * 100)) if must_atoms else 0
+        nice_pct = int(round((nice_score_total / len(nice_atoms)) * 100)) if nice_atoms else 0
+
+        full_total = len(must_full) + len(nice_full)
+        partial_total = len(must_partial) + len(nice_partial)
         
         # Coverage Overview Cards
         col1, col2, col3 = st.columns([1,1,1])
@@ -2148,7 +2210,7 @@ with tab1:
                                 transition:width 1s ease;box-shadow:0 0 10px #10b98180;"></div>
                 </div>
                 <p style="margin:12px 0 0 0;font-size:13px;color:#94a3b8;">
-                    <strong style="color:#10b981;">{total_covered}</strong> of <strong>{total_req}</strong> requirements met
+                    <strong style="color:#10b981;">{full_total}</strong> full • <strong style="color:#fbbf24;">{partial_total}</strong> partial · <strong>{total_atoms}</strong> total
                 </p>
             </div>
             """, unsafe_allow_html=True)
@@ -2170,13 +2232,12 @@ with tab1:
                                 transition:width 1s ease;box-shadow:0 0 10px #ef444480;"></div>
                 </div>
                 <p style="margin:12px 0 0 0;font-size:13px;color:#94a3b8;">
-                    <strong style="color:#10b981;">{must_covered}</strong> found · <strong style="color:#ef4444;">{len(must) - must_covered}</strong> missing
+                    <strong style="color:#10b981;">{len(must_full)}</strong> full · <strong style="color:#fbbf24;">{len(must_partial)}</strong> partial · <strong style="color:#ef4444;">{len(must_missing)}</strong> missing
                 </p>
             </div>
             """, unsafe_allow_html=True)
         
         with col3:
-            nice_pct = int((nice_covered / len(nice) * 100)) if len(nice) > 0 else 0
             st.markdown(f"""
             <div class="metric-card" style="background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(37,99,235,.1));
                         border:2px solid rgba(59,130,246,.4);border-radius:16px;padding:24px;text-align:center;">
@@ -2193,7 +2254,7 @@ with tab1:
                                 transition:width 1s ease;box-shadow:0 0 10px #3b82f680;"></div>
                 </div>
                 <p style="margin:12px 0 0 0;font-size:13px;color:#94a3b8;">
-                    {f'<strong style="color:#10b981;">{nice_covered}</strong> found · <strong style="color:#3b82f6;">{len(nice) - nice_covered}</strong> missing' if len(nice) > 0 else '<span style="font-style:italic;">No nice-to-have specified</span>'}
+                    {f'<strong style="color:#10b981;">{len(nice_full)}</strong> full · <strong style="color:#fbbf24;">{len(nice_partial)}</strong> partial · <strong style="color:#3b82f6;">{len(nice_missing)}</strong> missing' if len(nice_atoms) > 0 else '<span style="font-style:italic;">No nice-to-have specified</span>'}
                 </p>
             </div>
             """, unsafe_allow_html=True)
@@ -2207,12 +2268,8 @@ with tab1:
         req_tab1, req_tab2 = st.tabs(["🔴 Must-Have Requirements", "⭐ Nice-to-Have"])
         
         with req_tab1:
-            if len(must) > 0:
-                # Create two columns for better organization
-                must_covered_list = [(req, covered) for req, covered in must_final.items() if covered]
-                must_missing_list = [(req, covered) for req, covered in must_final.items() if not covered]
-                
-                if must_covered_list:
+            if len(must_atoms) > 0:
+                if must_full:
                     st.markdown(f"""
                     <div class="metric-card" style="margin-bottom:28px;background:linear-gradient(135deg,rgba(16,185,129,.20),rgba(5,150,105,.18));
                                 border:3px solid rgba(16,185,129,.6);border-radius:24px;padding:28px;
@@ -2225,14 +2282,24 @@ with tab1:
                             </div>
                             <h4 style="margin:0;color:#6ee7b7;font-size:24px;font-weight:900;
                                        font-family:'Space Grotesk',sans-serif;text-transform:uppercase;
-                                       letter-spacing:1.5px;text-shadow:0 3px 15px rgba(16,185,129,.7);">
-                                FOUND ({len(must_covered_list)})
+                        letter-spacing:1.5px;text-shadow:0 3px 15px rgba(16,185,129,.7);">
+                    FOUND ({len(must_full)})
                             </h4>
                         </div>
                         <div style="display:grid;gap:14px;">
                     """, unsafe_allow_html=True)
                     
-                    for idx, (req, _) in enumerate(must_covered_list, 1):
+                    for idx, (req, info) in enumerate(must_full, 1):
+                        signals = []
+                        if info.get("token_hit"):
+                            signals.append("Token match")
+                        if info.get("semantic_hit"):
+                            signals.append("Semantic match")
+                        if info.get("llm_hit"):
+                            signals.append("LLM verified")
+                        if not signals and info.get("similarity", 0.0) > 0:
+                            signals.append(f"Sim {info['similarity']:.2f}")
+                        signal_html = " • ".join(signals) if signals else "Signal not captured"
                         st.markdown(f"""
                         <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
                                     border:2px solid rgba(16,185,129,.4);border-left:5px solid #10b981;
@@ -2246,13 +2313,67 @@ with tab1:
                                          color:#6ee7b7;border-radius:50%;display:flex;align-items:center;justify-content:center;
                                          font-size:20px;font-weight:900;border:2px solid rgba(16,185,129,.6);
                                          box-shadow:0 4px 15px rgba(16,185,129,.4);position:relative;z-index:1;">✓</span>
-                            <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;position:relative;z-index:1;">{req}</span>
+                            <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
+                                <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
+                                <span style="color:#94a3b8;font-size:12px;font-weight:500;">{signal_html}</span>
+                            </div>
                         </div>
                         """, unsafe_allow_html=True)
                     
                     st.markdown("</div></div>", unsafe_allow_html=True)
-                
-                if must_missing_list:
+
+                if must_partial:
+                    st.markdown(f"""
+                    <div class="metric-card" style="margin-top:20px;margin-bottom:28px;background:linear-gradient(135deg,rgba(250,204,21,.22),rgba(251,191,36,.18));
+                                border:3px solid rgba(251,191,36,.6);border-radius:24px;padding:28px;
+                                box-shadow:0 12px 45px rgba(251,191,36,.35),0 0 70px rgba(251,191,36,.25),inset 0 2px 0 rgba(255,255,255,.1);">
+                        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+                            <div style="width:52px;height:52px;background:linear-gradient(135deg,#facc15,#fbbf24);
+                                        border-radius:16px;display:flex;align-items:center;justify-content:center;
+                                        font-size:28px;box-shadow:0 8px 25px rgba(251,191,36,.5);animation:glowPulseSmall 3s ease-in-out infinite;">
+                                △
+                            </div>
+                            <h4 style="margin:0;color:#fde68a;font-size:24px;font-weight:900;
+                                       font-family:'Space Grotesk',sans-serif;text-transform:uppercase;
+                                       letter-spacing:1.5px;text-shadow:0 3px 15px rgba(251,191,36,.7);">
+                                PARTIAL SIGNALS ({len(must_partial)})
+                            </h4>
+                        </div>
+                        <div style="display:grid;gap:14px;">
+                    """, unsafe_allow_html=True)
+
+                    for idx, (req, info) in enumerate(must_partial, 1):
+                        signals = []
+                        if info.get("token_hit"):
+                            signals.append("Token evidence")
+                        if info.get("partial_semantic") or info.get("semantic_hit"):
+                            signals.append(f"Semantic {info.get('similarity',0.0):.2f}")
+                        if info.get("llm_hit"):
+                            signals.append("LLM verified")
+                        signal_html = " • ".join(signals) if signals else "Weak evidence"
+                        st.markdown(f"""
+                        <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
+                                    border:2px solid rgba(251,191,36,.4);border-left:5px solid #fbbf24;
+                                    border-radius:16px;padding:20px 24px;display:flex;align-items:center;gap:16px;
+                                    backdrop-filter:blur(20px);transition:all .4s cubic-bezier(.34,1.56,.64,1);
+                                    box-shadow:0 6px 20px rgba(251,191,36,.2);position:relative;overflow:hidden;">
+                            <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(251,191,36,.08),transparent);
+                                        opacity:0;transition:opacity .4s ease;"></div>
+                            <span style="flex-shrink:0;min-width:40px;height:40px;
+                                         background:linear-gradient(135deg,rgba(251,191,36,.35),rgba(251,191,36,.25));
+                                         color:#fde68a;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                                         font-size:20px;font-weight:900;border:2px solid rgba(251,191,36,.6);
+                                         box-shadow:0 4px 15px rgba(251,191,36,.4);position:relative;z-index:1;">△</span>
+                            <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
+                                <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
+                                <span style="color:#94a3b8;font-size:12px;font-weight:500;">{signal_html}</span>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    st.markdown("</div></div>", unsafe_allow_html=True)
+
+                if must_missing:
                     st.markdown(f"""
                     <div class="metric-card" style="margin-top:28px;background:linear-gradient(135deg,rgba(239,68,68,.20),rgba(220,38,38,.18));
                                 border:3px solid rgba(239,68,68,.6);border-radius:24px;padding:28px;
@@ -2265,14 +2386,21 @@ with tab1:
                             </div>
                             <h4 style="margin:0;color:#fca5a5;font-size:24px;font-weight:900;
                                        font-family:'Space Grotesk',sans-serif;text-transform:uppercase;
-                                       letter-spacing:1.5px;text-shadow:0 3px 15px rgba(239,68,68,.7);">
-                                MISSING ({len(must_missing_list)})
+                        letter-spacing:1.5px;text-shadow:0 3px 15px rgba(239,68,68,.7);">
+                    MISSING ({len(must_missing)})
                             </h4>
                         </div>
                         <div style="display:grid;gap:14px;">
                     """, unsafe_allow_html=True)
                     
-                    for idx, (req, _) in enumerate(must_missing_list, 1):
+                    for idx, (req, info) in enumerate(must_missing, 1):
+                        similarity_note = info.get("similarity", 0.0)
+                        signals = []
+                        if similarity_note > 0.05:
+                            signals.append(f"Best sim {similarity_note:.2f}")
+                        if info.get("token_hit"):
+                            signals.append("tokens present")
+                        signal_html = " • ".join(signals) if signals else "No supporting evidence"
                         st.markdown(f"""
                         <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
                                     border:2px solid rgba(239,68,68,.4);border-left:5px solid #ef4444;
@@ -2286,7 +2414,10 @@ with tab1:
                                          color:#fca5a5;border-radius:50%;display:flex;align-items:center;justify-content:center;
                                          font-size:20px;font-weight:900;border:2px solid rgba(239,68,68,.6);
                                          box-shadow:0 4px 15px rgba(239,68,68,.4);position:relative;z-index:1;">✗</span>
-                            <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;position:relative;z-index:1;">{req}</span>
+                            <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
+                                <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
+                                <span style="color:#94a3b8;font-size:12px;font-weight:500;">{signal_html}</span>
+                            </div>
                         </div>
                         """, unsafe_allow_html=True)
                     
@@ -2295,11 +2426,8 @@ with tab1:
                 st.info("No must-have requirements identified from job description.")
         
         with req_tab2:
-            if len(nice) > 0:
-                nice_covered_list = [(req, covered) for req, covered in nice_final.items() if covered]
-                nice_missing_list = [(req, covered) for req, covered in nice_final.items() if not covered]
-                
-                if nice_covered_list:
+            if len(nice_atoms) > 0:
+                if nice_full:
                     st.markdown(f"""
                     <div class="metric-card" style="margin-bottom:28px;background:linear-gradient(135deg,rgba(139,92,246,.20),rgba(99,102,241,.18));
                                 border:3px solid rgba(139,92,246,.6);border-radius:24px;padding:28px;
@@ -2312,14 +2440,24 @@ with tab1:
                             </div>
                             <h4 style="margin:0;color:#c7d2fe;font-size:24px;font-weight:900;
                                        font-family:'Space Grotesk',sans-serif;text-transform:uppercase;
-                                       letter-spacing:1.5px;text-shadow:0 3px 15px rgba(139,92,246,.7);">
-                                FOUND ({len(nice_covered_list)})
+                        letter-spacing:1.5px;text-shadow:0 3px 15px rgba(139,92,246,.7);">
+                    FOUND ({len(nice_full)})
                             </h4>
                         </div>
                         <div style="display:grid;gap:14px;">
                     """, unsafe_allow_html=True)
                     
-                    for idx, (req, _) in enumerate(nice_covered_list, 1):
+                    for idx, (req, info) in enumerate(nice_full, 1):
+                        signals = []
+                        if info.get("token_hit"):
+                            signals.append("Token match")
+                        if info.get("semantic_hit"):
+                            signals.append("Semantic match")
+                        if info.get("llm_hit"):
+                            signals.append("LLM verified")
+                        if not signals and info.get("similarity", 0.0) > 0:
+                            signals.append(f"Sim {info['similarity']:.2f}")
+                        signal_html = " • ".join(signals) if signals else "Signal not captured"
                         st.markdown(f"""
                         <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
                                     border:2px solid rgba(139,92,246,.4);border-left:5px solid #8b5cf6;
@@ -2333,13 +2471,67 @@ with tab1:
                                          color:#c7d2fe;border-radius:50%;display:flex;align-items:center;justify-content:center;
                                          font-size:20px;font-weight:900;border:2px solid rgba(139,92,246,.6);
                                          box-shadow:0 4px 15px rgba(139,92,246,.4);position:relative;z-index:1;">⭐</span>
-                            <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;position:relative;z-index:1;">{req}</span>
+                            <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
+                                <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
+                                <span style="color:#94a3b8;font-size:12px;font-weight:500;">{signal_html}</span>
+                            </div>
                         </div>
                         """, unsafe_allow_html=True)
                     
                     st.markdown("</div></div>", unsafe_allow_html=True)
-                
-                if nice_missing_list:
+
+                if nice_partial:
+                    st.markdown(f"""
+                    <div class="metric-card" style="margin-top:20px;margin-bottom:28px;background:linear-gradient(135deg,rgba(96,165,250,.22),rgba(59,130,246,.18));
+                                border:3px solid rgba(59,130,246,.6);border-radius:24px;padding:28px;
+                                box-shadow:0 12px 45px rgba(59,130,246,.35),0 0 70px rgba(59,130,246,.25),inset 0 2px 0 rgba(255,255,255,.1);">
+                        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+                            <div style="width:52px;height:52px;background:linear-gradient(135deg,#3b82f6,#60a5fa);
+                                        border-radius:16px;display:flex;align-items:center;justify-content:center;
+                                        font-size:28px;box-shadow:0 8px 25px rgba(59,130,246,.5);animation:glowPulseSmall 3s ease-in-out infinite;">
+                                △
+                            </div>
+                            <h4 style="margin:0;color:#dbeafe;font-size:24px;font-weight:900;
+                                       font-family:'Space Grotesk',sans-serif;text-transform:uppercase;
+                                       letter-spacing:1.5px;text-shadow:0 3px 15px rgba(59,130,246,.7);">
+                                PARTIAL SIGNALS ({len(nice_partial)})
+                            </h4>
+                        </div>
+                        <div style="display:grid;gap:14px;">
+                    """, unsafe_allow_html=True)
+
+                    for idx, (req, info) in enumerate(nice_partial, 1):
+                        signals = []
+                        if info.get("token_hit"):
+                            signals.append("Token evidence")
+                        if info.get("partial_semantic") or info.get("semantic_hit"):
+                            signals.append(f"Semantic {info.get('similarity',0.0):.2f}")
+                        if info.get("llm_hit"):
+                            signals.append("LLM verified")
+                        signal_html = " • ".join(signals) if signals else "Weak evidence"
+                        st.markdown(f"""
+                        <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
+                                    border:2px solid rgba(96,165,250,.4);border-left:5px solid #60a5fa;
+                                    border-radius:16px;padding:20px 24px;display:flex;align-items:center;gap:16px;
+                                    backdrop-filter:blur(20px);transition:all .4s cubic-bezier(.34,1.56,.64,1);
+                                    box-shadow:0 6px 20px rgba(96,165,250,.2);position:relative;overflow:hidden;">
+                            <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(96,165,250,.08),transparent);
+                                        opacity:0;transition:opacity .4s ease;"></div>
+                            <span style="flex-shrink:0;min-width:40px;height:40px;
+                                         background:linear-gradient(135deg,rgba(96,165,250,.35),rgba(96,165,250,.25));
+                                         color:#dbeafe;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                                         font-size:20px;font-weight:900;border:2px solid rgba(96,165,250,.6);
+                                         box-shadow:0 4px 15px rgba(96,165,250,.4);position:relative;z-index:1;">△</span>
+                            <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
+                                <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
+                                <span style="color:#94a3b8;font-size:12px;font-weight:500;">{signal_html}</span>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    st.markdown("</div></div>", unsafe_allow_html=True)
+
+                if nice_missing:
                     st.markdown(f"""
                     <div class="metric-card" style="margin-top:28px;background:linear-gradient(135deg,rgba(99,102,241,.18),rgba(79,70,229,.16));
                                 border:3px solid rgba(99,102,241,.5);border-radius:24px;padding:28px;
@@ -2352,14 +2544,21 @@ with tab1:
                             </div>
                             <h4 style="margin:0;color:#93c5fd;font-size:24px;font-weight:900;
                                        font-family:'Space Grotesk',sans-serif;text-transform:uppercase;
-                                       letter-spacing:1.5px;text-shadow:0 3px 15px rgba(99,102,241,.7);">
-                                NOT FOUND ({len(nice_missing_list)})
+                        letter-spacing:1.5px;text-shadow:0 3px 15px rgba(99,102,241,.7);">
+                    NOT FOUND ({len(nice_missing)})
                             </h4>
                         </div>
                         <div style="display:grid;gap:14px;">
                     """, unsafe_allow_html=True)
                     
-                    for idx, (req, _) in enumerate(nice_missing_list, 1):
+                    for idx, (req, info) in enumerate(nice_missing, 1):
+                        similarity_note = info.get("similarity", 0.0)
+                        signals = []
+                        if similarity_note > 0.05:
+                            signals.append(f"Best sim {similarity_note:.2f}")
+                        if info.get("token_hit"):
+                            signals.append("tokens present")
+                        signal_html = " • ".join(signals) if signals else "No supporting evidence"
                         st.markdown(f"""
                         <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
                                     border:2px solid rgba(99,102,241,.4);border-left:5px solid #6366f1;
@@ -2373,7 +2572,10 @@ with tab1:
                                          color:#93c5fd;border-radius:50%;display:flex;align-items:center;justify-content:center;
                                          font-size:20px;font-weight:900;border:2px solid rgba(99,102,241,.6);
                                          box-shadow:0 4px 15px rgba(99,102,241,.4);position:relative;z-index:1;">○</span>
-                            <span style="color:#cbd5e1;font-size:16px;font-weight:600;line-height:1.6;position:relative;z-index:1;">{req}</span>
+                            <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
+                                <span style="color:#cbd5e1;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
+                                <span style="color:#94a3b8;font-size:12px;font-weight:500;">{signal_html}</span>
+                            </div>
                         </div>
                         """, unsafe_allow_html=True)
                     
