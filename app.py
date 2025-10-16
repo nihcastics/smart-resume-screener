@@ -1374,7 +1374,7 @@ with tab1:
         """, unsafe_allow_html=True)
         
         # Must-Have Requirements
-        st.markdown("""
+        st.markdown(f"""
         <div style="margin-bottom:28px;">
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;
                         border-bottom:2px solid rgba(239,68,68,.3);">
@@ -1386,7 +1386,7 @@ with tab1:
                 <span style="background:rgba(239,68,68,.2);color:#fca5a5;padding:4px 12px;border-radius:12px;
                              font-size:12px;font-weight:700;">{len(must)}</span>
             </div>
-        """.format(len(must)), unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
         
         for idx, (req, is_covered) in enumerate(must_final.items(), 1):
             icon = "✓" if is_covered else "✗"
@@ -1413,7 +1413,7 @@ with tab1:
         
         # Nice-to-Have Requirements
         if len(nice) > 0:
-            st.markdown("""
+            st.markdown(f"""
             <div style="margin-bottom:16px;">
                 <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;
                             border-bottom:2px solid rgba(59,130,246,.3);">
@@ -1425,7 +1425,7 @@ with tab1:
                     <span style="background:rgba(59,130,246,.2);color:#93c5fd;padding:4px 12px;border-radius:12px;
                                  font-size:12px;font-weight:700;">{len(nice)}</span>
                 </div>
-            """.format(len(nice)), unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
             
             for idx, (req, is_covered) in enumerate(nice_final.items(), 1):
                 icon = "✓" if is_covered else "○"
