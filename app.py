@@ -544,30 +544,61 @@ def extract_sections(text):
 def token_set(text):
     return set(re.findall(r'[a-z0-9][a-z0-9+.#-]*', normalize_text(text)))
 
-def contains_atom(atom, text_tokens):
-    """Enhanced detection with better fuzzy matching for compound terms."""
+def contains_atom(atom, text_tokens, full_text=""):
+    """
+    Robust detection with multiple strategies:
+    1. Exact match in full text (case-insensitive)
+    2. All tokens present (subset matching)
+    3. Fuzzy match for compound terms (60% threshold)
+    4. Common abbreviations and variations
+    """
     a = normalize_text(atom)
     if len(a) < 2: return False
     
-    # exact substring check (normalized)
-    text_str = " ".join(sorted(list(text_tokens)))
-    if a in text_str:
-        return True
+    # Strategy 1: Exact substring match in full text
+    if full_text:
+        normalized_full = normalize_text(full_text)
+        if a in normalized_full:
+            return True
     
-    # Check for partial matches with common variations
-    # e.g., "ai ml technologies" -> check for "ai", "ml", "technologies"
+    # Strategy 2: Extract requirement tokens
     a_tok = set(re.findall(r'[a-z0-9][a-z0-9+.#-]*', a))
     if not a_tok: return False
     
-    # Full match: all tokens present
+    # Strategy 3: All tokens present (strict match)
     if a_tok.issubset(text_tokens):
         return True
     
-    # Fuzzy match: at least 70% of tokens present for compound terms
+    # Strategy 4: Fuzzy match for compound terms (lowered to 60% for better recall)
     if len(a_tok) > 1:
         matched = sum(1 for t in a_tok if t in text_tokens)
-        if matched / len(a_tok) >= 0.7:
+        match_ratio = matched / len(a_tok)
+        if match_ratio >= 0.6:  # 60% threshold
             return True
+    
+    # Strategy 5: Common tech abbreviations and variations
+    # e.g., "ai" matches "artificial intelligence", "ml" matches "machine learning"
+    tech_expansions = {
+        'ai': ['artificial', 'intelligence'],
+        'ml': ['machine', 'learning'],
+        'dl': ['deep', 'learning'],
+        'nlp': ['natural', 'language', 'processing'],
+        'cv': ['computer', 'vision'],
+        'db': ['database'],
+        'api': ['application', 'programming', 'interface'],
+        'ci': ['continuous', 'integration'],
+        'cd': ['continuous', 'deployment'],
+        'devops': ['development', 'operations'],
+        'aws': ['amazon', 'web', 'services'],
+        'gcp': ['google', 'cloud', 'platform'],
+        'k8s': ['kubernetes'],
+    }
+    
+    for token in a_tok:
+        if token in tech_expansions:
+            expansion_words = tech_expansions[token]
+            if any(word in text_tokens for word in expansion_words):
+                return True
     
     return False
 
@@ -699,31 +730,57 @@ def llm_json(model, prompt):
 
 def llm_verify_requirements(model, requirements, resume_text, req_type="must-have"):
     """
-    LLM-assisted verification to enhance local model detection.
-    This is a post-processing step that helps catch semantic matches the local model might miss.
+    Enhanced LLM-assisted verification with better prompting.
+    Uses GPT to catch semantic matches, synonyms, and implied skills.
     """
     if not requirements or not resume_text:
         return {}
     
-    req_list = "\n".join([f"- {r}" for r in requirements])
-    prompt = f"""
-Analyze if the following {req_type} requirements are present in the resume.
-For each requirement, return "true" if found (even if implied or using synonyms), "false" otherwise.
+    req_list = "\n".join([f"{i+1}. {r}" for i, r in enumerate(requirements)])
+    prompt = f"""You are an expert technical recruiter analyzing a resume for requirement matches.
 
-REQUIREMENTS:
+TASK: For each requirement below, determine if it's present in the resume (consider synonyms, variations, and related terms).
+
+REQUIREMENTS TO CHECK ({req_type}):
 {req_list}
 
-RESUME EXCERPT (first 2000 chars):
-{resume_text[:2000]}
+RESUME CONTENT:
+{resume_text[:3000]}
 
-Return ONLY JSON format: {{"requirement_text": true/false, ...}}
-Be generous with semantic matches (e.g., "AI/ML" matches "artificial intelligence", "machine learning", "deep learning").
-"""
+MATCHING RULES:
+- "AI" or "ML" matches: artificial intelligence, machine learning, deep learning, neural networks, AI/ML, ML models
+- "Cloud" matches: AWS, Azure, GCP, cloud computing, cloud services, cloud infrastructure
+- "Python" matches: Python, python programming, python development, py
+- "Java" matches: Java, java development, J2EE, Spring
+- Programming languages: match even if mentioned as "experience with X" or "worked on X"
+- Technologies: match if shown in projects, tools, or skills sections
+- Be generous but accurate - if there's reasonable evidence of the skill, mark it as found
+
+Return ONLY valid JSON (no markdown, no explanations):
+{{"requirement1_exact_text": true/false, "requirement2_exact_text": true/false, ...}}
+
+Use the EXACT requirement text as keys."""
     
     try:
         result = llm_json(model, prompt)
-        return result if isinstance(result, dict) else {}
-    except:
+        if not isinstance(result, dict):
+            return {}
+        
+        # Normalize keys to match requirements
+        normalized_result = {}
+        for req in requirements:
+            # Try exact match first
+            if req in result:
+                normalized_result[req] = result[req]
+            else:
+                # Try case-insensitive match
+                for k, v in result.items():
+                    if normalize_text(k) == normalize_text(req):
+                        normalized_result[req] = v
+                        break
+        
+        return normalized_result
+    except Exception as e:
         return {}
 
 def jd_plan_prompt(jd, preview):
@@ -1298,168 +1355,185 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
         
-        must = analysis["atoms"]["must"][:10]
-        nice = analysis["atoms"]["nice"][:6]
+        must = analysis["atoms"]["must"][:12]  # Increased to show more requirements
+        nice = analysis["atoms"]["nice"][:8]
         resume_text = resume.get("text", "")
         tok = token_set(resume_text)
         
-        # Enhanced coverage detection with LLM assistance
-        # Step 1: Local model detection (primary)
-        must_local = {req: contains_atom(req, tok) for req in must}
-        nice_local = {req: contains_atom(req, tok) for req in nice}
+        # ROBUST COVERAGE DETECTION PIPELINE
+        # Step 1: Enhanced local model detection with full text context
+        must_local = {req: contains_atom(req, tok, resume_text) for req in must}
+        nice_local = {req: contains_atom(req, tok, resume_text) for req in nice}
         
-        # Step 2: LLM verification for missed requirements (enhancement)
-        must_missed = [req for req, covered in must_local.items() if not covered]
-        nice_missed = [req for req, covered in nice_local.items() if not covered]
-        
+        # Step 2: LLM verification for ALL requirements (not just missed ones)
+        # This provides a second opinion and catches semantic matches
         llm_must_verify = {}
         llm_nice_verify = {}
         
         try:
-            if must_missed and model:
-                llm_must_verify = llm_verify_requirements(model, must_missed, resume_text, "must-have")
-            if nice_missed and model:
-                llm_nice_verify = llm_verify_requirements(model, nice_missed, resume_text, "nice-to-have")
-        except:
+            if must and model:
+                llm_must_verify = llm_verify_requirements(model, must, resume_text, "must-have")
+            if nice and model:
+                llm_nice_verify = llm_verify_requirements(model, nice, resume_text, "nice-to-have")
+        except Exception as e:
             pass  # Silently fall back to local model only
         
-        # Merge results: Local model takes precedence, LLM enhances
-        must_final = {req: must_local[req] or llm_must_verify.get(req, False) for req in must}
-        nice_final = {req: nice_local[req] or llm_nice_verify.get(req, False) for req in nice}
+        # Step 3: Merge results using OR logic (if EITHER method finds it, it's covered)
+        # This maximizes recall while maintaining accuracy
+        must_final = {}
+        for req in must:
+            local_match = must_local.get(req, False)
+            llm_match = llm_must_verify.get(req, False)
+            must_final[req] = local_match or llm_match
         
-        # Calculate coverage stats
+        nice_final = {}
+        for req in nice:
+            local_match = nice_local.get(req, False)
+            llm_match = llm_nice_verify.get(req, False)
+            nice_final[req] = local_match or llm_match
+        
+        # Step 4: Calculate accurate coverage stats
         must_covered = sum(1 for covered in must_final.values() if covered)
         must_missing = len(must) - must_covered
         nice_covered = sum(1 for covered in nice_final.values() if covered)
         nice_missing = len(nice) - nice_covered
         total_covered = must_covered + nice_covered
         total_req = len(must) + len(nice)
-        coverage_pct = int(total_covered/total_req*100) if total_req > 0 else 0
+        coverage_pct = int((total_covered / total_req * 100)) if total_req > 0 else 0
         
-        # Summary stats - Clean and aligned
+        # Must-have coverage percentage (critical metric)
+        must_coverage_pct = int((must_covered / len(must) * 100)) if len(must) > 0 else 0
+        
+        # Compact Summary Stats Bar
         st.markdown(f"""
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px;">
-            <div class="metric-card" style="background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(5,150,105,.08));
-                        border:2px solid rgba(16,185,129,.35);text-align:center;padding:20px;">
-                <p style="margin:0;font-size:11px;color:#6ee7b7;text-transform:uppercase;letter-spacing:1.2px;font-weight:600;">Total</p>
-                <h3 style="margin:8px 0 4px 0;font-size:36px;color:#10b981;font-weight:900;">{total_req}</h3>
-                <p style="margin:0;font-size:12px;color:#94a3b8;"><span style="color:#10b981;font-weight:700;">{total_covered}</span> / {total_req - total_covered}</p>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;
+                    background:linear-gradient(135deg,rgba(30,41,59,.7),rgba(15,23,42,.8));
+                    border:2px solid rgba(102,126,234,.3);border-radius:16px;padding:20px 28px;margin-bottom:24px;">
+            <div style="text-align:center;">
+                <p style="margin:0;font-size:10px;color:#6ee7b7;text-transform:uppercase;font-weight:600;">Total Req</p>
+                <h3 style="margin:6px 0 0 0;font-size:28px;color:#10b981;font-weight:900;">{total_req}</h3>
             </div>
-            <div class="metric-card" style="background:linear-gradient(135deg,rgba(239,68,68,.12),rgba(220,38,38,.08));
-                        border:2px solid rgba(239,68,68,.35);text-align:center;padding:20px;">
-                <p style="margin:0;font-size:11px;color:#fca5a5;text-transform:uppercase;letter-spacing:1.2px;font-weight:600;">Must-Have</p>
-                <h3 style="margin:8px 0 4px 0;font-size:36px;color:#ef4444;font-weight:900;">{len(must)}</h3>
-                <p style="margin:0;font-size:12px;color:#94a3b8;"><span style="color:#10b981;font-weight:700;">{must_covered}</span> / <span style="color:#ef4444;font-weight:700;">{must_missing}</span></p>
+            <div style="width:2px;height:40px;background:rgba(148,163,184,.2);"></div>
+            <div style="text-align:center;">
+                <p style="margin:0;font-size:10px;color:#10b981;text-transform:uppercase;font-weight:600;">Covered</p>
+                <h3 style="margin:6px 0 0 0;font-size:28px;color:#10b981;font-weight:900;">{total_covered}</h3>
             </div>
-            <div class="metric-card" style="background:linear-gradient(135deg,rgba(59,130,246,.12),rgba(37,99,235,.08));
-                        border:2px solid rgba(59,130,246,.35);text-align:center;padding:20px;">
-                <p style="margin:0;font-size:11px;color:#93c5fd;text-transform:uppercase;letter-spacing:1.2px;font-weight:600;">Nice-to-Have</p>
-                <h3 style="margin:8px 0 4px 0;font-size:36px;color:#3b82f6;font-weight:900;">{len(nice) if len(nice) > 0 else '—'}</h3>
-                <p style="margin:0;font-size:12px;color:#94a3b8;">{'<span style="color:#10b981;font-weight:700;">' + str(nice_covered) + '</span> / <span style="color:#3b82f6;font-weight:700;">' + str(nice_missing) + '</span>' if len(nice) > 0 else 'None'}</p>
+            <div style="width:2px;height:40px;background:rgba(148,163,184,.2);"></div>
+            <div style="text-align:center;">
+                <p style="margin:0;font-size:10px;color:#ef4444;text-transform:uppercase;font-weight:600;">Missing</p>
+                <h3 style="margin:6px 0 0 0;font-size:28px;color:#ef4444;font-weight:900;">{must_missing + nice_missing}</h3>
             </div>
-            <div class="metric-card" style="background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(217,119,6,.08));
-                        border:2px solid rgba(245,158,11,.35);text-align:center;padding:20px;">
-                <p style="margin:0;font-size:11px;color:#fcd34d;text-transform:uppercase;letter-spacing:1.2px;font-weight:600;">Coverage</p>
-                <h3 style="margin:8px 0 4px 0;font-size:36px;color:#f59e0b;font-weight:900;">{coverage_pct}%</h3>
-                <p style="margin:0;font-size:12px;color:#94a3b8;">{'Excellent' if coverage_pct >= 80 else 'Good' if coverage_pct >= 60 else 'Fair' if coverage_pct >= 40 else 'Low'}</p>
+            <div style="width:2px;height:40px;background:rgba(148,163,184,.2);"></div>
+            <div style="text-align:center;">
+                <p style="margin:0;font-size:10px;color:#fca5a5;text-transform:uppercase;font-weight:600;">Must-Have</p>
+                <h3 style="margin:6px 0 0 0;font-size:28px;color:#ef4444;font-weight:900;">{must_coverage_pct}%</h3>
+            </div>
+            <div style="width:2px;height:40px;background:rgba(148,163,184,.2);"></div>
+            <div style="text-align:center;">
+                <p style="margin:0;font-size:10px;color:#fcd34d;text-transform:uppercase;font-weight:600;">Overall</p>
+                <h3 style="margin:6px 0 0 0;font-size:28px;color:#f59e0b;font-weight:900;">{coverage_pct}%</h3>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Clean, well-structured requirements list
-        st.markdown("""
-        <div style="background:linear-gradient(135deg,rgba(30,41,59,.85),rgba(15,23,42,.90));
-                    border:2px solid rgba(102,126,234,.3);border-radius:16px;padding:28px;margin-bottom:32px;
-                    box-shadow:0 10px 40px rgba(0,0,0,.3);">
-        """, unsafe_allow_html=True)
-        
-        # Must-Have Requirements
+        # Floating Grid - Requirements as Tiles
         st.markdown(f"""
-        <div style="margin-bottom:28px;">
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;
-                        border-bottom:2px solid rgba(239,68,68,.3);">
-                <span style="font-size:24px;">🔴</span>
-                <h3 style="margin:0;color:#fca5a5;font-size:18px;font-weight:800;
-                           text-transform:uppercase;letter-spacing:1.2px;font-family:'Poppins',sans-serif;">
-                    Must-Have Requirements
-                </h3>
-                <span style="background:rgba(239,68,68,.2);color:#fca5a5;padding:4px 12px;border-radius:12px;
-                             font-size:12px;font-weight:700;">{len(must)}</span>
+        <div style="margin-bottom:24px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+                <span style="font-size:20px;">🔴</span>
+                <h3 style="margin:0;color:#fca5a5;font-size:16px;font-weight:800;text-transform:uppercase;
+                           letter-spacing:1px;font-family:'Poppins',sans-serif;">Must-Have Requirements</h3>
+                <span style="background:rgba(239,68,68,.2);color:#fca5a5;padding:4px 10px;border-radius:10px;
+                             font-size:11px;font-weight:700;">{len(must)}</span>
             </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
         """, unsafe_allow_html=True)
         
-        for idx, (req, is_covered) in enumerate(must_final.items(), 1):
-            icon = "✓" if is_covered else "✗"
-            icon_color = "#10b981" if is_covered else "#ef4444"
-            bg_color = "rgba(16,185,129,.08)" if is_covered else "rgba(239,68,68,.08)"
-            border_color = "#10b981" if is_covered else "#ef4444"
+        # Must-Have tiles
+        for req, is_covered in must_final.items():
+            if is_covered:
+                bg = "linear-gradient(135deg,rgba(16,185,129,.15),rgba(5,150,105,.1))"
+                border = "rgba(16,185,129,.5)"
+                icon = "✓"
+                icon_bg = "#10b981"
+                text_color = "#f1f5f9"
+            else:
+                bg = "linear-gradient(135deg,rgba(239,68,68,.15),rgba(220,38,38,.1))"
+                border = "rgba(239,68,68,.5)"
+                icon = "✗"
+                icon_bg = "#ef4444"
+                text_color = "#f1f5f9"
             
             st.markdown(f"""
-            <div style="display:flex;align-items:center;gap:16px;padding:14px 18px;margin-bottom:10px;
-                        background:{bg_color};border-left:3px solid {border_color};border-radius:8px;
-                        transition:all .2s ease;">
-                <span style="min-width:28px;height:28px;display:flex;align-items:center;justify-content:center;
-                             background:{icon_color};color:#0f172a;font-weight:900;border-radius:50%;
-                             font-size:16px;flex-shrink:0;">{icon}</span>
-                <span style="flex:1;color:#f1f5f9;font-size:15px;font-weight:600;line-height:1.5;">{req}</span>
-                <span style="color:{icon_color};font-size:11px;font-weight:700;text-transform:uppercase;
-                             padding:6px 10px;background:rgba(0,0,0,.2);border-radius:6px;white-space:nowrap;">
-                    {'Covered' if is_covered else 'Missing'}
-                </span>
+            <div style="background:{bg};border:2px solid {border};border-radius:12px;padding:16px;
+                        position:relative;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.2);
+                        transition:transform .2s,box-shadow .2s;cursor:default;"
+                 onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 20px rgba(0,0,0,.3)'"
+                 onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 12px rgba(0,0,0,.2)'">
+                <div style="position:absolute;top:12px;right:12px;width:32px;height:32px;
+                            background:{icon_bg};border-radius:50%;display:flex;align-items:center;
+                            justify-content:center;font-size:16px;color:#0f172a;font-weight:900;
+                            box-shadow:0 2px 8px {icon_bg}60;">{icon}</div>
+                <p style="margin:0;color:{text_color};font-size:14px;font-weight:600;line-height:1.4;
+                           padding-right:40px;min-height:40px;display:flex;align-items:center;">{req}</p>
             </div>
             """, unsafe_allow_html=True)
         
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div></div>", unsafe_allow_html=True)
         
-        # Nice-to-Have Requirements
+        # Nice-to-Have tiles
         if len(nice) > 0:
             st.markdown(f"""
-            <div style="margin-bottom:16px;">
-                <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;
-                            border-bottom:2px solid rgba(59,130,246,.3);">
-                    <span style="font-size:24px;">⭐</span>
-                    <h3 style="margin:0;color:#93c5fd;font-size:18px;font-weight:800;
-                               text-transform:uppercase;letter-spacing:1.2px;font-family:'Poppins',sans-serif;">
-                        Nice-to-Have
-                    </h3>
-                    <span style="background:rgba(59,130,246,.2);color:#93c5fd;padding:4px 12px;border-radius:12px;
-                                 font-size:12px;font-weight:700;">{len(nice)}</span>
+            <div style="margin-bottom:24px;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;margin-top:28px;">
+                    <span style="font-size:20px;">⭐</span>
+                    <h3 style="margin:0;color:#93c5fd;font-size:16px;font-weight:800;text-transform:uppercase;
+                               letter-spacing:1px;font-family:'Poppins',sans-serif;">Nice-to-Have</h3>
+                    <span style="background:rgba(59,130,246,.2);color:#93c5fd;padding:4px 10px;border-radius:10px;
+                                 font-size:11px;font-weight:700;">{len(nice)}</span>
                 </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
             """, unsafe_allow_html=True)
             
-            for idx, (req, is_covered) in enumerate(nice_final.items(), 1):
-                icon = "✓" if is_covered else "○"
-                icon_color = "#10b981" if is_covered else "#3b82f6"
-                bg_color = "rgba(16,185,129,.08)" if is_covered else "rgba(59,130,246,.06)"
-                border_color = "#10b981" if is_covered else "#3b82f6"
+            for req, is_covered in nice_final.items():
+                if is_covered:
+                    bg = "linear-gradient(135deg,rgba(16,185,129,.15),rgba(5,150,105,.1))"
+                    border = "rgba(16,185,129,.5)"
+                    icon = "✓"
+                    icon_bg = "#10b981"
+                    text_color = "#f1f5f9"
+                else:
+                    bg = "linear-gradient(135deg,rgba(59,130,246,.12),rgba(37,99,235,.08))"
+                    border = "rgba(59,130,246,.4)"
+                    icon = "○"
+                    icon_bg = "#3b82f6"
+                    text_color = "#cbd5e1"
                 
                 st.markdown(f"""
-                <div style="display:flex;align-items:center;gap:16px;padding:14px 18px;margin-bottom:10px;
-                            background:{bg_color};border-left:3px solid {border_color};border-radius:8px;
-                            transition:all .2s ease;">
-                    <span style="min-width:28px;height:28px;display:flex;align-items:center;justify-content:center;
-                                 background:{icon_color};color:#0f172a;font-weight:900;border-radius:50%;
-                                 font-size:16px;flex-shrink:0;">{icon}</span>
-                    <span style="flex:1;color:#cbd5e1;font-size:15px;font-weight:600;line-height:1.5;">{req}</span>
-                    <span style="color:{icon_color};font-size:11px;font-weight:700;text-transform:uppercase;
-                                 padding:6px 10px;background:rgba(0,0,0,.2);border-radius:6px;white-space:nowrap;">
-                        {'Covered' if is_covered else 'Not Found'}
-                    </span>
+                <div style="background:{bg};border:2px solid {border};border-radius:12px;padding:16px;
+                            position:relative;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.2);
+                            transition:transform .2s,box-shadow .2s;cursor:default;"
+                     onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 20px rgba(0,0,0,.3)'"
+                     onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 12px rgba(0,0,0,.2)'">
+                    <div style="position:absolute;top:12px;right:12px;width:32px;height:32px;
+                                background:{icon_bg};border-radius:50%;display:flex;align-items:center;
+                                justify-content:center;font-size:16px;color:#0f172a;font-weight:900;
+                                box-shadow:0 2px 8px {icon_bg}60;">{icon}</div>
+                    <p style="margin:0;color:{text_color};font-size:14px;font-weight:600;line-height:1.4;
+                               padding-right:40px;min-height:40px;display:flex;align-items:center;">{req}</p>
                 </div>
                 """, unsafe_allow_html=True)
             
-            st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("</div></div>", unsafe_allow_html=True)
         else:
             st.markdown("""
-            <div style="padding:24px;background:rgba(59,130,246,.06);border:2px dashed rgba(59,130,246,.25);
-                        border-radius:8px;text-align:center;">
-                <p style="margin:0;color:#7a8b99;font-size:14px;font-style:italic;">
-                    No nice-to-have requirements specified for this position
+            <div style="margin-top:24px;padding:20px;background:rgba(59,130,246,.06);
+                        border:2px dashed rgba(59,130,246,.25);border-radius:12px;text-align:center;">
+                <p style="margin:0;color:#7a8b99;font-size:13px;font-style:italic;">
+                    ⭐ No nice-to-have requirements specified
                 </p>
             </div>
             """, unsafe_allow_html=True)
-        
-        st.markdown("</div>", unsafe_allow_html=True)
         
         # ===== Beautiful Candidate Assessment =====
         st.markdown("""
