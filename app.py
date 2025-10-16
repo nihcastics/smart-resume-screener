@@ -1986,107 +1986,185 @@ Return ONLY valid JSON. No markdown, no explanations.
 """
 
 def atomicize_requirements_prompt(jd, resume_preview):
-    return f"""You are a precision technical requirement extraction system. Your mission: extract EVERY concrete technical requirement from the job description with ZERO omissions.
+    return f"""You are an EXPERT technical requirement extraction system. Your PRIMARY MISSION: Extract EVERY SINGLE technical requirement, skill, and qualification from the job description with ABSOLUTE COMPLETENESS.
+
+⚠️ CRITICAL INSTRUCTION: Read the ENTIRE job description word-by-word. Extract ALL technical terms, technologies, tools, frameworks, skills, and qualifications mentioned ANYWHERE in the text. DO NOT skip sections. DO NOT summarize. EXTRACT EVERYTHING.
 
 Return ONLY valid JSON with these exact keys:
-- must_atoms: Array of CRITICAL technical requirements (15-40 items, 2-6 words each)
-- nice_atoms: Array of OPTIONAL/BONUS technical requirements (8-25 items, 2-6 words each)
+- must_atoms: Array of CRITICAL/REQUIRED technical requirements (20-50 items, 2-8 words each)
+- nice_atoms: Array of OPTIONAL/BONUS technical requirements (10-35 items, 2-8 words each)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ EXTRACTION PROTOCOL - ZERO TOLERANCE FOR OMISSIONS
+⚡ COMPREHENSIVE EXTRACTION PROTOCOL - 100% COMPLETENESS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-✅ MUST EXTRACT (with high granularity):
-  → Programming languages with versions: "Python 3.9+", "Java 11+", "JavaScript ES6"
-  → Frameworks & libraries: "React 18", "Spring Boot", "Django", "Flask", "FastAPI"
-  → Databases: "PostgreSQL 14", "MongoDB", "Redis", "MySQL", "DynamoDB"
-  → Cloud platforms & services: "AWS", "Azure", "GCP", "AWS Lambda", "S3", "EC2"
-  → DevOps tools: "Docker", "Kubernetes", "Jenkins", "GitHub Actions", "Terraform"
-  → Experience quantifiers: "5+ years Python", "3+ years AWS", "10+ years backend"
-  → Certifications: "AWS Solutions Architect", "CKA", "PMP", "CISSP"
-  → Required education: "Bachelor Computer Science", "Master Data Science"
-  → Methodologies (if specific): "Scrum", "Kanban", "Agile", "TDD", "CI/CD"
-  → ML/AI specific: "TensorFlow", "PyTorch", "scikit-learn", "Transformers", "LLMs"
-  → Architecture patterns: "Microservices", "REST API", "GraphQL", "Event-driven"
+✅ MUST EXTRACT EVERYTHING (Scan ENTIRE JD):
+  1. Programming Languages: "Python", "Java", "JavaScript", "TypeScript", "Go", "Rust", "C++", "C#"
+     → Include versions if stated: "Python 3.9+", "Java 11+", "Node.js 18+"
+  
+  2. Frameworks & Libraries: "React", "Angular", "Vue", "Django", "Flask", "FastAPI", "Spring Boot", "Express"
+     → Include versions: "React 18", "Django 4.x", "Spring Boot 3.0"
+  
+  3. Databases & Storage: "PostgreSQL", "MySQL", "MongoDB", "Redis", "Cassandra", "DynamoDB", "Elasticsearch"
+     → Include types: "SQL databases", "NoSQL", "Graph databases"
+  
+  4. Cloud Platforms & Services:
+     → Platforms: "AWS", "Azure", "Google Cloud", "GCP"
+     → Services: "AWS Lambda", "S3", "EC2", "RDS", "Azure Functions", "Cloud Run"
+     → Extract BOTH general ("AWS") AND specific services ("Lambda", "S3")
+  
+  5. DevOps & Infrastructure: "Docker", "Kubernetes", "Terraform", "Ansible", "Jenkins", "GitHub Actions", "GitLab CI"
+     → CI/CD tools, container orchestration, IaC tools
+  
+  6. Experience Years & Quantifiers:
+     → "5+ years Python", "3+ years backend", "10+ years software development"
+     → "Senior level", "Mid-level", "3-5 years experience"
+  
+  7. Certifications: "AWS Certified", "CKA", "CKAD", "Azure Certified", "PMP", "CISSP"
+  
+  8. Education: "Bachelor's degree", "Master's degree", "Computer Science", "related field"
+  
+  9. Methodologies & Practices: "Agile", "Scrum", "Kanban", "TDD", "BDD", "CI/CD", "DevOps"
+  
+  10. ML/AI/Data Science: "TensorFlow", "PyTorch", "scikit-learn", "Pandas", "NumPy", "Transformers", "LLMs", "NLP"
+  
+  11. Architecture & Design: "Microservices", "REST API", "GraphQL", "Event-driven", "Serverless", "Distributed systems"
+  
+  12. Development Tools: "Git", "GitHub", "VS Code", "IntelliJ", "Postman", "Jira", "Confluence"
+  
+  13. Testing & Quality: "Jest", "pytest", "JUnit", "Selenium", "Cypress", "unit testing", "integration testing"
+  
+  14. Security: "OAuth", "JWT", "SSL/TLS", "OWASP", "Security best practices", "penetration testing"
+  
+  15. Frontend Technologies: "HTML", "CSS", "JavaScript", "Webpack", "Babel", "SASS", "Tailwind CSS"
+  
+  16. Backend Technologies: "Node.js", "Express", "Nest.js", "Django", "Flask", "Spring", "ASP.NET"
+  
+  17. Message Queues & Streaming: "Kafka", "RabbitMQ", "AWS SQS", "Redis Pub/Sub", "Apache Spark"
+  
+  18. Monitoring & Logging: "Prometheus", "Grafana", "ELK Stack", "Datadog", "New Relic", "CloudWatch"
 
-❌ NEVER EXTRACT (noise/fluff):
-  → Soft skills: "communication", "teamwork", "leadership", "problem-solving"
-  → Vague qualifiers: "strong", "excellent", "good knowledge of", "experience with"
-  → Generic verbs: "design", "develop", "build", "work with", "collaborate"
-  → Responsibilities: "work with team", "report to manager", "attend meetings"
-  → Vague terms: "cloud platforms" (say AWS/Azure/GCP), "databases" (say PostgreSQL/MongoDB)
+❌ NEVER EXTRACT (Pure soft skills/fluff ONLY - extract everything technical):
+  → Pure soft skills WITHOUT technical context: "communication", "teamwork", "leadership" (ONLY if standalone)
+  → Generic verbs without tech: "design", "develop" (but KEEP "design patterns", "system design")
+  → Vague qualifiers alone: "strong", "excellent" (but KEEP "strong Python skills" → extract "Python")
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 CLASSIFICATION RULES
+📋 CLASSIFICATION RULES (Read JD CAREFULLY)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-MUST_ATOMS (Critical/Required):
-  • Appears in "Required", "Must have", "Essential", "Mandatory" sections
-  • Experience years explicitly stated as required
-  • Core technologies for the role (e.g., Python for Python Developer)
-  • Minimum education/certifications stated as requirements
+MUST_ATOMS (Critical/Required) - Extract if found in:
+  ✅ Sections labeled: "Required", "Must have", "Essential", "Mandatory", "Required Skills", "Requirements"
+  ✅ Phrases like: "you must", "required to", "need to have", "essential", "necessary"
+  ✅ Core technologies mentioned in job title or role description
+  ✅ Minimum experience years explicitly required (e.g., "5+ years required")
+  ✅ Education requirements stated as mandatory
+  ✅ Certifications marked as required
+  ✅ Technologies mentioned in "Responsibilities" section (assume required for role)
+  ✅ Technologies in "What you'll do" or "Day-to-day" (needed to perform job)
 
-NICE_ATOMS (Optional/Bonus):
-  • Appears in "Nice to have", "Preferred", "Bonus", "Plus" sections
-  • Secondary/supporting technologies
-  • Additional certifications beyond minimum
-  • Complementary skills that enhance fit but aren't dealbreakers
+NICE_ATOMS (Optional/Bonus) - Extract if found in:
+  ✅ Sections labeled: "Nice to have", "Preferred", "Bonus", "Plus", "Good to have", "Desirable"
+  ✅ Phrases like: "would be a plus", "bonus if you have", "nice to have", "preferred but not required"
+  ✅ Secondary/complementary technologies
+  ✅ Advanced certifications beyond minimum
+  ✅ Additional experience beyond required minimum
+
+⚠️ AMBIGUOUS CASES (Default Classification):
+  → If JD doesn't clearly separate required vs preferred: Extract ALL technologies as MUST_ATOMS
+  → If technology appears in multiple sections: Use most restrictive classification (Required > Preferred)
+  → If unclear, favor MUST_ATOMS for core role technologies
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 EXTRACTION EXAMPLES
+🎯 DETAILED EXTRACTION EXAMPLES (Study These Carefully)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Example 1 - Backend Role:
-INPUT: "Required: 5+ years Python, Django/Flask, PostgreSQL, AWS (Lambda, S3), Docker. Nice: React, TypeScript. Bachelor's CS required. Excellent communication skills."
+Example 1 - Backend Role (Comprehensive):
+INPUT: "Required: 5+ years Python, Django or Flask, PostgreSQL, AWS (Lambda, S3, EC2), Docker, REST APIs. Experience with microservices architecture. Nice: React, TypeScript, Redis. Bachelor's CS required."
 
 OUTPUT:
 {{
-  "must_atoms": ["5+ years python", "django", "flask", "postgresql", "aws", "aws lambda", "aws s3", "docker", "bachelor computer science"],
-  "nice_atoms": ["react", "typescript"]
+  "must_atoms": ["5+ years python", "python", "django", "flask", "postgresql", "aws", "aws lambda", "aws s3", "aws ec2", "docker", "rest api", "microservices", "microservices architecture", "bachelor computer science"],
+  "nice_atoms": ["react", "typescript", "redis"]
 }}
-✅ All tech extracted, soft skills ignored
+✅ Extracted: Core language + frameworks + DB + cloud (general + specific services) + architecture + education
+✅ Split "Django or Flask" into separate atoms for better matching
+✅ Extracted both "aws" (general) and specific services ("aws lambda", "aws s3")
 
-Example 2 - Full Stack Role:
-INPUT: "Must have: Node.js, Express, React 18, MongoDB, AWS, 3+ years experience. Good to have: TypeScript, Next.js, GraphQL, Kubernetes. Strong team player with problem-solving skills."
+Example 2 - Full Stack Role (No Clear Sections):
+INPUT: "Looking for Full Stack Developer with Node.js, Express, React 18, MongoDB, AWS, 3+ years experience. TypeScript, Next.js, GraphQL, Kubernetes a plus."
 
 OUTPUT:
 {{
-  "must_atoms": ["node.js", "express", "react 18", "mongodb", "aws", "3+ years experience"],
+  "must_atoms": ["node.js", "express", "react 18", "react", "mongodb", "aws", "3+ years experience", "full stack"],
   "nice_atoms": ["typescript", "next.js", "graphql", "kubernetes"]
 }}
-✅ Comprehensive extraction without soft skills
+✅ "a plus" indicates nice-to-have
+✅ Extracted both "react 18" and "react" for flexibility
 
-Example 3 - ML Engineer:
-INPUT: "Required: Python, TensorFlow/PyTorch, scikit-learn, deep learning, NLP, Docker, Kubernetes, AWS/GCP. 5+ years ML experience. MS in CS preferred. Nice: MLflow, Airflow, Spark."
+Example 3 - ML Engineer (Detailed):
+INPUT: "Required: Python, TensorFlow or PyTorch, scikit-learn, deep learning, NLP, Docker, Kubernetes, AWS or GCP, SQL, pandas, NumPy. 5+ years ML. MS CS preferred. Bonus: MLflow, Airflow, Spark, LLMs."
 
 OUTPUT:
 {{
-  "must_atoms": ["python", "tensorflow", "pytorch", "scikit-learn", "deep learning", "nlp", "docker", "kubernetes", "aws", "gcp", "5+ years ml"],
-  "nice_atoms": ["ms computer science", "mlflow", "airflow", "spark"]
+  "must_atoms": ["python", "tensorflow", "pytorch", "scikit-learn", "deep learning", "nlp", "docker", "kubernetes", "aws", "gcp", "sql", "pandas", "numpy", "5+ years ml", "machine learning"],
+  "nice_atoms": ["ms computer science", "master computer science", "mlflow", "airflow", "spark", "llms", "large language models"]
 }}
-✅ Note: MS moved to nice_atoms since marked "preferred"
+✅ Split "TensorFlow or PyTorch" into both options
+✅ Extracted all data science libraries mentioned
+✅ Added synonyms for better matching: "llms" + "large language models"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📝 YOUR TASK
+📝 YOUR EXTRACTION TASK - EXECUTE WITH PRECISION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-JOB DESCRIPTION (extract ALL technical requirements from this):
-{jd[:3000]}
+JOB DESCRIPTION (Read ENTIRE text below - scan EVERY line for technical terms):
+{jd[:4500]}
 
-RESUME PREVIEW (context only, DO NOT extract from resume):
+RESUME PREVIEW (For context ONLY - DO NOT extract from this, only from JD above):
 {resume_preview[:800]}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ CRITICAL REMINDERS
+⚠️ MANDATORY EXTRACTION RULES - NO EXCEPTIONS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• Extract EVERY technical term mentioned (completeness is critical)
-• Be specific: "PostgreSQL 14" not "database", "AWS Lambda" not "cloud"
-• Include experience years when stated: "5+ years python"
-• Keep items 2-6 words max
-• Output ONLY valid JSON, no markdown/explanations
-• Classify correctly: required → must_atoms, optional → nice_atoms
 
-BEGIN EXTRACTION NOW:
+1. COMPLETENESS: Extract EVERY technical term, technology, tool, framework, skill mentioned in JD
+   → Scan Requirements, Responsibilities, Qualifications, About sections - miss NOTHING
+   
+2. GRANULARITY: Extract both general AND specific terms
+   → "AWS" (general) + "Lambda" + "S3" + "EC2" (specific services)
+   → "databases" + "PostgreSQL" + "MongoDB" (both)
+   
+3. VARIATIONS: Include version numbers and variations
+   → "Python", "Python 3.9+", "Python 3.x" if mentioned
+   → "react", "react 18", "reactjs" (create variations for matching)
+   
+4. EXPERIENCE YEARS: Capture ALL experience requirements
+   → "5+ years Python", "3+ years experience", "senior level", "mid-level"
+   
+5. EDUCATION & CERTS: Extract ALL mentioned
+   → "bachelor degree", "bachelor computer science", "BS CS"
+   → "AWS certified", "aws solutions architect"
+   
+6. SPLIT ALTERNATIVES: When JD says "A or B", extract BOTH
+   → "Django or Flask" → ["django", "flask"]
+   → "AWS/GCP/Azure" → ["aws", "gcp", "azure"]
+   
+7. PROPER LENGTH: Keep atoms 2-8 words (was 2-6, now expanded for complex terms)
+   → "AWS Lambda", "machine learning", "bachelor computer science"
+   
+8. CLASSIFICATION: Follow sections in JD carefully
+   → "Required"/"Must" → must_atoms
+   → "Nice to have"/"Preferred" → nice_atoms
+   → If ambiguous → must_atoms (err on side of completeness)
+   
+9. OUTPUT FORMAT: ONLY valid JSON, no markdown, no explanations, no preamble
+   
+10. TARGET COUNTS: 
+    → must_atoms: 20-50 items (more items = better coverage)
+    → nice_atoms: 10-35 items
+
+BEGIN COMPREHENSIVE EXTRACTION NOW (Extract EVERYTHING technical from JD):
 """
 
 def analysis_prompt(jd, plan, profile, coverage_summary, cue_alignment, global_sem, cov_final):
@@ -2150,50 +2228,68 @@ Required JSON keys:
 ⚖️ SCORING FRAMEWORK (Strict Adherence Required)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Score 9-10 (Outstanding - Top 5%):
-  ✓ Must-have coverage ≥ 0.85 (85%+ of critical requirements met)
-  ✓ Semantic similarity ≥ 0.75 (strong contextual alignment)
-  ✓ Demonstrates depth: multiple projects, measurable impact, recent experience
-  ✓ Bonus skills present, exceeds role requirements
-  ✓ Clear evidence of progression and leadership
+Score 9-10 (Exceptional - Top 5%) ⭐⭐⭐⭐⭐:
+  ✓ Must-have coverage ≥ 0.85 (85%+ critical requirements met)
+  ✓ Semantic similarity ≥ 0.75 (exceptional contextual alignment)
+  ✓ Demonstrates depth: multiple relevant projects, measurable impact, recent experience
+  ✓ Exceeds requirements: bonus skills present, additional certifications
+  ✓ Clear evidence of progression, leadership, or specialized expertise
+  ✓ Quantifiable achievements directly relevant to role
+  → HIRE: Top-tier candidate, move fast
 
-Score 7-8 (Strong Fit - Top 20%):
-  ✓ Must-have coverage ≥ 0.70 (70%+ critical requirements)
-  ✓ Semantic similarity ≥ 0.60 (good alignment)
-  ✓ Core competencies solid, minor gaps in secondary areas
-  ✓ Relevant experience, some quantifiable achievements
+Score 7-8 (Strong Fit - Top 20%) ⭐⭐⭐⭐:
+  ✓ Must-have coverage ≥ 0.70 (70-85% critical requirements)
+  ✓ Semantic similarity ≥ 0.60 (strong alignment)
+  ✓ Core competencies solid, only minor gaps in secondary areas
+  ✓ Relevant experience with some quantifiable achievements
   ✓ Can ramp up quickly with minimal training
+  ✓ Good technical foundation with proven track record
+  → STRONG CONSIDERATION: Solid candidate, likely to succeed
 
-Score 5-6 (Moderate Fit - Consider with Caution):
-  ✓ Must-have coverage 0.50-0.69 (50-69% critical requirements)
-  ✓ Semantic similarity 0.45-0.59 (partial alignment)
-  ✓ Has foundation but missing key skills or depth
-  ✓ May require significant training/onboarding
-  ✓ Experience somewhat relevant but not exact match
+Score 5-6 (Moderate Fit - Borderline) ⭐⭐⭐:
+  ~ Must-have coverage 0.55-0.69 (55-70% critical requirements)
+  ~ Semantic similarity 0.50-0.59 (moderate alignment)
+  ~ Has foundation but missing several key skills or lacking depth
+  ~ May require moderate training/onboarding (2-3 months)
+  ~ Experience somewhat relevant but not exact match
+  ~ Could work in right circumstances (team support, training budget)
+  → PROCEED WITH CAUTION: Interview carefully, assess learning ability
 
-Score 3-4 (Weak Fit - High Risk):
-  ✗ Must-have coverage 0.30-0.49 (30-49% critical requirements)
-  ✗ Semantic similarity 0.30-0.44 (weak alignment)
-  ✗ Missing multiple core requirements
-  ✗ Limited relevant experience or outdated skills
-  ✗ Would require extensive retraining
+Score 3-4 (Weak Fit - High Risk) ⭐:
+  ✗ Must-have coverage 0.40-0.54 (40-55% critical requirements)
+  ✗ Semantic similarity 0.35-0.49 (weak alignment)
+  ✗ Missing multiple core requirements (>45% gaps)
+  ✗ Limited relevant experience or outdated/tangential skills
+  ✗ Would require extensive retraining (4-6+ months)
+  ✗ Significant risk of failure or slow productivity ramp
+  → LIKELY REJECT: Only consider if desperate or unique circumstances
 
-Score 0-2 (Not Viable - Reject):
-  ✗ Must-have coverage < 0.30 (< 30% critical requirements)
-  ✗ Semantic similarity < 0.30 (poor alignment)
+Score 0-2 (Not Viable - Reject) ❌:
+  ✗ Must-have coverage < 0.40 (< 40% critical requirements)
+  ✗ Semantic similarity < 0.35 (poor alignment)
   ✗ Fundamentally wrong profile for role
-  ✗ Lacks basic qualifications
-  ✗ No clear path to success in this role
+  ✗ Lacks basic qualifications (>60% gaps in must-haves)
+  ✗ No clear path to success, would need 6+ months training
+  ✗ Better fit for different role or seniority level
+  → REJECT: Clear mismatch, don't proceed
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 MANDATORY PENALTIES (Override score downward if applicable)
+🎯 MANDATORY SCORE CAPS (Hard Limits - Override Upward)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-• Must_coverage < 0.50 → Maximum score = 5 (regardless of other factors)
-• Must_coverage < 0.30 → Maximum score = 3 (severe gaps)
-• Missing ≥3 core technologies → Maximum score = 6
-• Experience years < 50% of required → Reduce score by 1-2 points
-• No quantifiable achievements → Maximum score = 7
+Apply these HARD CAPS regardless of other positive factors:
+
+• Must_coverage < 0.25 → MAXIMUM score = 3 (critical failure, >75% gaps)
+• Must_coverage < 0.40 → MAXIMUM score = 4 (major gaps, >60% missing)
+• Must_coverage < 0.55 → MAXIMUM score = 6 (significant gaps, >45% missing)
+• Must_coverage < 0.70 → MAXIMUM score = 7 (noticeable gaps, >30% missing)
+
+Additional Penalties (subtract from base score):
+• Both must_coverage < 0.50 AND semantic < 0.50 → Subtract 1.0 point (compound weakness)
+• Missing ≥3 critical core technologies (e.g., primary language, main framework, key tool) → Subtract 0.5-1.0 points
+• Experience years < 50% of required (e.g., 2 years vs 5+ required) → Subtract 1.0 point
+• No quantifiable achievements AND must_coverage < 0.60 → Maximum score = 6
+• Semantic similarity < 0.35 (very poor contextual fit) → Subtract 0.8 points
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📈 EVALUATION DATA
@@ -3333,7 +3429,7 @@ with tab1:
                     fit_score = round(10 * (0.35*global_sem01 + 0.65*cov_final), 1)
                 fit_score = float(np.clip(fit_score, 0, 10))
 
-                # ---------- STRICTER Balanced Scoring with Realistic Penalties ----------
+                # ---------- ACCURATE & REALISTIC Scoring System ----------
                 weights = plan.get("scoring_weights", DEFAULT_WEIGHTS)
                 sem10, cov10 = round(10*global_sem01,1), round(10*cov_final,1)
                 w_sem, w_cov, w_llm = float(weights["semantic"]), float(weights["coverage"]), float(weights["llm_fit"])
@@ -3343,43 +3439,63 @@ with tab1:
                     W = w_sem + w_cov + w_llm
                 w_sem, w_cov, w_llm = w_sem/W, w_cov/W, w_llm/W
                 
-                # Base score calculation with stricter calibration
+                # Base score: weighted combination aligned with actual performance
+                # Coverage is most important (concrete skills), then semantic (context fit), then LLM (qualitative)
                 raw_score = float(np.clip(w_sem*sem10 + w_cov*cov10 + w_llm*fit_score, 0, 10))
                 
-                # Apply realistic calibration: scale down inflated scores
-                # Most candidates shouldn't score above 8 unless truly exceptional
-                if raw_score >= 8.5:
-                    raw_score = 8.0 + (raw_score - 8.5) * 0.4  # Compress 8.5-10 → 8.0-8.6
-                elif raw_score >= 7.5:
-                    raw_score = 7.0 + (raw_score - 7.5) * 0.8  # Compress 7.5-8.5 → 7.0-8.0
-                
-                # Stricter penalty system for realistic assessment
+                # REALISTIC PENALTIES based on must-have coverage (most critical factor)
                 penalty = 0.0
                 penalty_reason = []
                 
                 if must_atoms and len(must_atoms) > 0:
-                    # Stricter thresholds and penalties
-                    if must_cov < 0.30:  # Less than 30% is critical failure
-                        penalty_amount = min(raw_score * 0.40, 2.5)  # Up to -2.5 points
-                        penalty = max(penalty, penalty_amount)
-                        penalty_reason.append(f"Critical skill gaps (<30% must-haves)")
-                    elif must_cov < 0.50:  # Less than 50% is major concern
-                        penalty_amount = min(raw_score * 0.25, 1.8)  # Up to -1.8 points
-                        penalty = max(penalty, penalty_amount)
-                        penalty_reason.append(f"Major skill gaps (<50% must-haves)")
-                    elif must_cov < 0.65:  # Less than 65% is moderate concern
-                        penalty_amount = min(raw_score * 0.15, 1.2)  # Up to -1.2 points
-                        penalty = max(penalty, penalty_amount)
-                        penalty_reason.append(f"Moderate gaps (<65% must-haves)")
+                    # Align scoring with actual must-have performance
+                    # Coverage thresholds define score caps
+                    if must_cov < 0.25:  # < 25% = Critical failure
+                        # Cap score at 3.0, apply harsh penalty
+                        max_allowed = 3.0
+                        if raw_score > max_allowed:
+                            penalty = raw_score - max_allowed
+                            penalty_reason.append(f"Critical gaps (<25% must-haves) → capped at {max_allowed}")
+                    elif must_cov < 0.40:  # 25-40% = Major concerns
+                        # Cap score at 4.5, apply significant penalty
+                        max_allowed = 4.5
+                        if raw_score > max_allowed:
+                            penalty = raw_score - max_allowed
+                            penalty_reason.append(f"Major gaps (<40% must-haves) → capped at {max_allowed}")
+                    elif must_cov < 0.55:  # 40-55% = Moderate concerns
+                        # Cap score at 6.0
+                        max_allowed = 6.0
+                        if raw_score > max_allowed:
+                            penalty = raw_score - max_allowed
+                            penalty_reason.append(f"Moderate gaps (<55% must-haves) → capped at {max_allowed}")
+                    elif must_cov < 0.70:  # 55-70% = Minor gaps
+                        # Cap score at 7.5
+                        max_allowed = 7.5
+                        if raw_score > max_allowed:
+                            penalty = raw_score - max_allowed
+                            penalty_reason.append(f"Minor gaps (<70% must-haves) → capped at {max_allowed}")
                     
-                    # Additional penalty for weak semantic + coverage combo
-                    if must_cov < 0.55 and global_sem01 < 0.55:
-                        combo_penalty = 0.8
+                    # Additional penalty for BOTH weak coverage AND weak semantic alignment
+                    if must_cov < 0.50 and global_sem01 < 0.50:
+                        # Both dimensions weak = compound problem
+                        combo_penalty = 1.0
                         penalty += combo_penalty
-                        penalty_reason.append("Weak alignment + gaps")
+                        penalty_reason.append("Weak skills + context misalignment")
+                    
+                    # Penalty for very low semantic score even with decent coverage
+                    # (Has skills on paper but context doesn't match role)
+                    if global_sem01 < 0.35 and must_cov >= 0.55:
+                        semantic_penalty = 0.8
+                        penalty += semantic_penalty
+                        penalty_reason.append("Poor contextual fit for role")
                 
-                # Apply penalty
+                # Apply penalty with floor at 0
                 final_score = float(np.clip(raw_score - penalty, 0, 10))
+                
+                # Final calibration: compress very high scores (>8.5) to be more realistic
+                # Most candidates shouldn't score 9-10 unless truly exceptional
+                if final_score >= 8.5:
+                    final_score = 8.0 + (final_score - 8.5) * 0.5  # 8.5-10 → 8.0-8.75
                 
                 # Build component breakdown
                 components = {
