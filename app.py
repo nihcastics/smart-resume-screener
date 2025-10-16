@@ -1383,7 +1383,7 @@ with tab1:
             priority_num += 1
         
         # Render beautiful table
-        st.markdown(f"""
+        table_html = f"""
         <table class="coverage-table">
             <thead>
                 <tr>
@@ -1397,7 +1397,8 @@ with tab1:
                 {''.join(table_rows)}
             </tbody>
         </table>
-        """, unsafe_allow_html=True)
+        """
+        st.markdown(table_html, unsafe_allow_html=True)
         
         # Coverage summary stats
         must_covered = sum(1 for a in must if contains_atom(a, tok))
