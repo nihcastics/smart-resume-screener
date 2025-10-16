@@ -634,13 +634,27 @@ def init_mongodb():
         uri = os.getenv("MONGO_URI", "")
     
     uri = uri.strip() if uri else ""
-    if not uri: return None, None, False
+    if not uri: 
+        print("⚠️ MongoDB URI not found - skipping database connection")
+        return None, None, False
+    
     try:
-        client = MongoClient(uri, serverSelectionTimeoutMS=3000, connectTimeoutMS=3000)
+        # Increase timeouts for better reliability
+        client = MongoClient(
+            uri, 
+            serverSelectionTimeoutMS=10000,  # Increased to 10 seconds
+            connectTimeoutMS=10000,
+            socketTimeoutMS=10000,
+            retryWrites=True,
+            w='majority'
+        )
+        # Test connection
         client.admin.command('ping')
-        db = client["resume_db"]
+        db = client["resume_screener_db"]  # More descriptive database name
+        print("✅ MongoDB connected successfully!")
         return db["resumes"], db["analyses"], True
-    except Exception:
+    except Exception as e:
+        print(f"❌ MongoDB connection failed: {e}")
         return None, None, False
 
 # --- NLP / utils ---
@@ -1073,33 +1087,59 @@ def _sanitize_for_mongo(value):
     return str(value)
 
 def save_to_db(resume_doc, jd, analysis, resumes_collection, analyses_collection, mongo_ok):
+    if not mongo_ok:
+        print("⚠️ MongoDB not connected - skipping database save")
+        return
+    
     rid = None
     try:
-        if mongo_ok and resumes_collection:
-            rdoc = {k:resume_doc[k] for k in ["name","email","phone"]}
-            rdoc["file_name"] = resume_doc.get("file_name","unknown")
-            rdoc["timestamp"] = time.time()
+        # Save resume document
+        if resumes_collection:
+            rdoc = {
+                "name": resume_doc.get("name", "Unknown"),
+                "email": resume_doc.get("email", "N/A"),
+                "phone": resume_doc.get("phone", "N/A"),
+                "file_name": resume_doc.get("file_name", "unknown"),
+                "timestamp": time.time()
+            }
             r = resumes_collection.insert_one(rdoc)
             rid = str(r.inserted_id)
-        if mongo_ok and analyses_collection:
-            adoc = {"resume_id":rid,
-                    "candidate":resume_doc.get("name","Unknown"),
-                    "email":resume_doc.get("email","N/A"),
-                    "file_name":resume_doc.get("file_name","unknown"),
-                    "job_desc":jd,
-                    "analysis":_sanitize_for_mongo(analysis),
-                    "timestamp":time.time()}
-            analyses_collection.insert_one(adoc)
+            print(f"✅ Resume saved to DB with ID: {rid}")
+        
+        # Save analysis document
+        if analyses_collection:
+            adoc = {
+                "resume_id": rid,
+                "candidate": resume_doc.get("name", "Unknown"),
+                "email": resume_doc.get("email", "N/A"),
+                "file_name": resume_doc.get("file_name", "unknown"),
+                "job_desc": jd[:500] if len(jd) > 500 else jd,  # Store first 500 chars of JD
+                "job_desc_full": jd,  # Store full JD
+                "analysis": _sanitize_for_mongo(analysis),
+                "timestamp": time.time(),
+                "overall_score": analysis.get("overall_score", 0),
+                "coverage_pct": analysis.get("coverage", {}).get("percentage", 0)
+            }
+            result = analyses_collection.insert_one(adoc)
+            print(f"✅ Analysis saved to DB with ID: {result.inserted_id}")
+            st.success(f"💾 Analysis saved to database successfully!")
     except Exception as exc:
-        st.warning(f"MongoDB persistence skipped: {exc}")
+        print(f"❌ MongoDB save error: {exc}")
+        st.warning(f"⚠️ Could not save to database: {str(exc)[:100]}")
 
 def get_recent(analyses_collection, mongo_ok, limit=20):
     items = []
+    if not mongo_ok or not analyses_collection:
+        print("⚠️ MongoDB not available - cannot fetch recent analyses")
+        return items
+    
     try:
-        if mongo_ok and analyses_collection:
-            for x in analyses_collection.find({}, sort=[("timestamp",-1)]).limit(limit):
-                items.append(x)
-    except: pass
+        cursor = analyses_collection.find({}).sort("timestamp", -1).limit(limit)
+        for x in cursor:
+            items.append(x)
+        print(f"✅ Retrieved {len(items)} recent analyses from database")
+    except Exception as e:
+        print(f"❌ Error fetching recent analyses: {e}")
     return items
 
 # =======================
@@ -1682,12 +1722,12 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
         
-        # Detailed Requirements Breakdown
+        # IMMERSIVE Requirements Breakdown
         st.markdown("""
-        <div style="margin-top:32px;"></div>
+        <div style="margin-top:48px;"></div>
         """, unsafe_allow_html=True)
         
-        # Tabbed view for requirements
+        # Premium Tabbed view for requirements
         tab1, tab2 = st.tabs(["🔴 Must-Have Requirements", "⭐ Nice-to-Have"])
         
         with tab1:
@@ -1698,45 +1738,83 @@ with tab1:
                 
                 if must_covered_list:
                     st.markdown(f"""
-                    <div style="margin-bottom:20px;">
-                        <h4 style="color:#10b981;font-size:15px;font-weight:700;margin-bottom:12px;">
-                            ✓ Found ({len(must_covered_list)})
-                        </h4>
-                    </div>
+                    <div class="metric-card" style="margin-bottom:28px;background:linear-gradient(135deg,rgba(16,185,129,.20),rgba(5,150,105,.18));
+                                border:3px solid rgba(16,185,129,.6);border-radius:24px;padding:28px;
+                                box-shadow:0 12px 45px rgba(16,185,129,.35),0 0 70px rgba(16,185,129,.25),inset 0 2px 0 rgba(255,255,255,.1);">
+                        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+                            <div style="width:52px;height:52px;background:linear-gradient(135deg,#10b981,#059669);
+                                        border-radius:16px;display:flex;align-items:center;justify-content:center;
+                                        font-size:28px;box-shadow:0 8px 25px rgba(16,185,129,.5);animation:glowPulseSmall 3s ease-in-out infinite;">
+                                ✓
+                            </div>
+                            <h4 style="margin:0;color:#6ee7b7;font-size:24px;font-weight:900;
+                                       font-family:'Space Grotesk',sans-serif;text-transform:uppercase;
+                                       letter-spacing:1.5px;text-shadow:0 3px 15px rgba(16,185,129,.7);">
+                                FOUND ({len(must_covered_list)})
+                            </h4>
+                        </div>
+                        <div style="display:grid;gap:14px;">
                     """, unsafe_allow_html=True)
                     
                     for idx, (req, _) in enumerate(must_covered_list, 1):
                         st.markdown(f"""
-                        <div style="background:rgba(16,185,129,.08);border-left:4px solid #10b981;
-                                    border-radius:8px;padding:14px 18px;margin-bottom:8px;
-                                    display:flex;align-items:center;gap:12px;">
-                            <span style="min-width:24px;height:24px;background:#10b981;color:#0f172a;
-                                         border-radius:50%;display:flex;align-items:center;justify-content:center;
-                                         font-size:14px;font-weight:900;">✓</span>
-                            <span style="color:#f1f5f9;font-size:14px;font-weight:600;">{req}</span>
+                        <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
+                                    border:2px solid rgba(16,185,129,.4);border-left:5px solid #10b981;
+                                    border-radius:16px;padding:20px 24px;display:flex;align-items:center;gap:16px;
+                                    backdrop-filter:blur(20px);transition:all .4s cubic-bezier(.34,1.56,.64,1);
+                                    box-shadow:0 6px 20px rgba(16,185,129,.2);position:relative;overflow:hidden;">
+                            <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(16,185,129,.08),transparent);
+                                        opacity:0;transition:opacity .4s ease;"></div>
+                            <span style="flex-shrink:0;min-width:40px;height:40px;
+                                         background:linear-gradient(135deg,rgba(16,185,129,.35),rgba(16,185,129,.25));
+                                         color:#6ee7b7;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                                         font-size:20px;font-weight:900;border:2px solid rgba(16,185,129,.6);
+                                         box-shadow:0 4px 15px rgba(16,185,129,.4);position:relative;z-index:1;">✓</span>
+                            <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;position:relative;z-index:1;">{req}</span>
                         </div>
                         """, unsafe_allow_html=True)
+                    
+                    st.markdown("</div></div>", unsafe_allow_html=True)
                 
                 if must_missing_list:
                     st.markdown(f"""
-                    <div style="margin:24px 0 12px 0;">
-                        <h4 style="color:#ef4444;font-size:15px;font-weight:700;margin-bottom:12px;">
-                            ✗ Missing ({len(must_missing_list)})
-                        </h4>
-                    </div>
+                    <div class="metric-card" style="margin-top:28px;background:linear-gradient(135deg,rgba(239,68,68,.20),rgba(220,38,38,.18));
+                                border:3px solid rgba(239,68,68,.6);border-radius:24px;padding:28px;
+                                box-shadow:0 12px 45px rgba(239,68,68,.35),0 0 70px rgba(239,68,68,.25),inset 0 2px 0 rgba(255,255,255,.1);">
+                        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+                            <div style="width:52px;height:52px;background:linear-gradient(135deg,#ef4444,#dc2626);
+                                        border-radius:16px;display:flex;align-items:center;justify-content:center;
+                                        font-size:28px;box-shadow:0 8px 25px rgba(239,68,68,.5);animation:glowPulseSmall 3s ease-in-out infinite;">
+                                ✗
+                            </div>
+                            <h4 style="margin:0;color:#fca5a5;font-size:24px;font-weight:900;
+                                       font-family:'Space Grotesk',sans-serif;text-transform:uppercase;
+                                       letter-spacing:1.5px;text-shadow:0 3px 15px rgba(239,68,68,.7);">
+                                MISSING ({len(must_missing_list)})
+                            </h4>
+                        </div>
+                        <div style="display:grid;gap:14px;">
                     """, unsafe_allow_html=True)
                     
                     for idx, (req, _) in enumerate(must_missing_list, 1):
                         st.markdown(f"""
-                        <div style="background:rgba(239,68,68,.08);border-left:4px solid #ef4444;
-                                    border-radius:8px;padding:14px 18px;margin-bottom:8px;
-                                    display:flex;align-items:center;gap:12px;">
-                            <span style="min-width:24px;height:24px;background:#ef4444;color:#0f172a;
-                                         border-radius:50%;display:flex;align-items:center;justify-content:center;
-                                         font-size:14px;font-weight:900;">✗</span>
-                            <span style="color:#f1f5f9;font-size:14px;font-weight:600;">{req}</span>
+                        <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
+                                    border:2px solid rgba(239,68,68,.4);border-left:5px solid #ef4444;
+                                    border-radius:16px;padding:20px 24px;display:flex;align-items:center;gap:16px;
+                                    backdrop-filter:blur(20px);transition:all .4s cubic-bezier(.34,1.56,.64,1);
+                                    box-shadow:0 6px 20px rgba(239,68,68,.2);position:relative;overflow:hidden;">
+                            <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(239,68,68,.08),transparent);
+                                        opacity:0;transition:opacity .4s ease;"></div>
+                            <span style="flex-shrink:0;min-width:40px;height:40px;
+                                         background:linear-gradient(135deg,rgba(239,68,68,.35),rgba(239,68,68,.25));
+                                         color:#fca5a5;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                                         font-size:20px;font-weight:900;border:2px solid rgba(239,68,68,.6);
+                                         box-shadow:0 4px 15px rgba(239,68,68,.4);position:relative;z-index:1;">✗</span>
+                            <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;position:relative;z-index:1;">{req}</span>
                         </div>
                         """, unsafe_allow_html=True)
+                    
+                    st.markdown("</div></div>", unsafe_allow_html=True)
             else:
                 st.info("No must-have requirements identified from job description.")
         
@@ -1747,45 +1825,83 @@ with tab1:
                 
                 if nice_covered_list:
                     st.markdown(f"""
-                    <div style="margin-bottom:20px;">
-                        <h4 style="color:#10b981;font-size:15px;font-weight:700;margin-bottom:12px;">
-                            ✓ Found ({len(nice_covered_list)})
-                        </h4>
-                    </div>
+                    <div class="metric-card" style="margin-bottom:28px;background:linear-gradient(135deg,rgba(139,92,246,.20),rgba(99,102,241,.18));
+                                border:3px solid rgba(139,92,246,.6);border-radius:24px;padding:28px;
+                                box-shadow:0 12px 45px rgba(139,92,246,.35),0 0 70px rgba(139,92,246,.25),inset 0 2px 0 rgba(255,255,255,.1);">
+                        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+                            <div style="width:52px;height:52px;background:linear-gradient(135deg,#8b5cf6,#6366f1);
+                                        border-radius:16px;display:flex;align-items:center;justify-content:center;
+                                        font-size:28px;box-shadow:0 8px 25px rgba(139,92,246,.5);animation:glowPulseSmall 3s ease-in-out infinite;">
+                                ⭐
+                            </div>
+                            <h4 style="margin:0;color:#c7d2fe;font-size:24px;font-weight:900;
+                                       font-family:'Space Grotesk',sans-serif;text-transform:uppercase;
+                                       letter-spacing:1.5px;text-shadow:0 3px 15px rgba(139,92,246,.7);">
+                                FOUND ({len(nice_covered_list)})
+                            </h4>
+                        </div>
+                        <div style="display:grid;gap:14px;">
                     """, unsafe_allow_html=True)
                     
                     for idx, (req, _) in enumerate(nice_covered_list, 1):
                         st.markdown(f"""
-                        <div style="background:rgba(16,185,129,.08);border-left:4px solid #10b981;
-                                    border-radius:8px;padding:14px 18px;margin-bottom:8px;
-                                    display:flex;align-items:center;gap:12px;">
-                            <span style="min-width:24px;height:24px;background:#10b981;color:#0f172a;
-                                         border-radius:50%;display:flex;align-items:center;justify-content:center;
-                                         font-size:14px;font-weight:900;">✓</span>
-                            <span style="color:#cbd5e1;font-size:14px;font-weight:600;">{req}</span>
+                        <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
+                                    border:2px solid rgba(139,92,246,.4);border-left:5px solid #8b5cf6;
+                                    border-radius:16px;padding:20px 24px;display:flex;align-items:center;gap:16px;
+                                    backdrop-filter:blur(20px);transition:all .4s cubic-bezier(.34,1.56,.64,1);
+                                    box-shadow:0 6px 20px rgba(139,92,246,.2);position:relative;overflow:hidden;">
+                            <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(139,92,246,.08),transparent);
+                                        opacity:0;transition:opacity .4s ease;"></div>
+                            <span style="flex-shrink:0;min-width:40px;height:40px;
+                                         background:linear-gradient(135deg,rgba(139,92,246,.35),rgba(139,92,246,.25));
+                                         color:#c7d2fe;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                                         font-size:20px;font-weight:900;border:2px solid rgba(139,92,246,.6);
+                                         box-shadow:0 4px 15px rgba(139,92,246,.4);position:relative;z-index:1;">⭐</span>
+                            <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;position:relative;z-index:1;">{req}</span>
                         </div>
                         """, unsafe_allow_html=True)
+                    
+                    st.markdown("</div></div>", unsafe_allow_html=True)
                 
                 if nice_missing_list:
                     st.markdown(f"""
-                    <div style="margin:24px 0 12px 0;">
-                        <h4 style="color:#3b82f6;font-size:15px;font-weight:700;margin-bottom:12px;">
-                            ○ Not Found ({len(nice_missing_list)})
-                        </h4>
-                    </div>
+                    <div class="metric-card" style="margin-top:28px;background:linear-gradient(135deg,rgba(99,102,241,.18),rgba(79,70,229,.16));
+                                border:3px solid rgba(99,102,241,.5);border-radius:24px;padding:28px;
+                                box-shadow:0 12px 45px rgba(99,102,241,.3),0 0 70px rgba(99,102,241,.2),inset 0 2px 0 rgba(255,255,255,.1);">
+                        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+                            <div style="width:52px;height:52px;background:linear-gradient(135deg,#6366f1,#4f46e5);
+                                        border-radius:16px;display:flex;align-items:center;justify-content:center;
+                                        font-size:28px;box-shadow:0 8px 25px rgba(99,102,241,.5);animation:glowPulseSmall 3s ease-in-out infinite;">
+                                ○
+                            </div>
+                            <h4 style="margin:0;color:#93c5fd;font-size:24px;font-weight:900;
+                                       font-family:'Space Grotesk',sans-serif;text-transform:uppercase;
+                                       letter-spacing:1.5px;text-shadow:0 3px 15px rgba(99,102,241,.7);">
+                                NOT FOUND ({len(nice_missing_list)})
+                            </h4>
+                        </div>
+                        <div style="display:grid;gap:14px;">
                     """, unsafe_allow_html=True)
                     
                     for idx, (req, _) in enumerate(nice_missing_list, 1):
                         st.markdown(f"""
-                        <div style="background:rgba(59,130,246,.06);border-left:4px solid #3b82f6;
-                                    border-radius:8px;padding:14px 18px;margin-bottom:8px;
-                                    display:flex;align-items:center;gap:12px;">
-                            <span style="min-width:24px;height:24px;background:#3b82f6;color:#0f172a;
-                                         border-radius:50%;display:flex;align-items:center;justify-content:center;
-                                         font-size:14px;font-weight:900;">○</span>
-                            <span style="color:#cbd5e1;font-size:14px;font-weight:600;">{req}</span>
+                        <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
+                                    border:2px solid rgba(99,102,241,.4);border-left:5px solid #6366f1;
+                                    border-radius:16px;padding:20px 24px;display:flex;align-items:center;gap:16px;
+                                    backdrop-filter:blur(20px);transition:all .4s cubic-bezier(.34,1.56,.64,1);
+                                    box-shadow:0 6px 20px rgba(99,102,241,.2);position:relative;overflow:hidden;">
+                            <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(99,102,241,.08),transparent);
+                                        opacity:0;transition:opacity .4s ease;"></div>
+                            <span style="flex-shrink:0;min-width:40px;height:40px;
+                                         background:linear-gradient(135deg,rgba(99,102,241,.35),rgba(99,102,241,.25));
+                                         color:#93c5fd;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                                         font-size:20px;font-weight:900;border:2px solid rgba(99,102,241,.6);
+                                         box-shadow:0 4px 15px rgba(99,102,241,.4);position:relative;z-index:1;">○</span>
+                            <span style="color:#cbd5e1;font-size:16px;font-weight:600;line-height:1.6;position:relative;z-index:1;">{req}</span>
                         </div>
                         """, unsafe_allow_html=True)
+                    
+                    st.markdown("</div></div>", unsafe_allow_html=True)
             else:
                 st.info("⭐ No nice-to-have requirements specified for this position.")
         
