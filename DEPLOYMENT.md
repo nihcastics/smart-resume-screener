@@ -1,31 +1,59 @@
 # Deployment Guide
 
-## ⚠️ Important: Streamlit Apps on Vercel
+## ⚠️ Important: Streamlit Apps CANNOT Run on Vercel
 
-Vercel is **not recommended** for Streamlit applications because:
-- Streamlit requires WebSocket connections
-- Vercel's serverless functions have timeout limits
-- Streamlit needs a persistent server
+**Vercel does NOT support Streamlit applications** because:
+- ❌ Streamlit requires WebSocket connections
+- ❌ Vercel's serverless functions have memory/timeout limits
+- ❌ Streamlit needs a persistent Python server (not Node.js)
+- ❌ Error: `ERR_OUT_OF_RANGE` buffer overflow in Node.js runtime
 
-## ✅ Recommended: Streamlit Community Cloud (FREE)
+**Do not attempt Vercel deployment - it will fail.**
 
-### Steps to Deploy on Streamlit Community Cloud:
+---
 
-1. **Visit**: https://streamlit.io/cloud
-2. **Sign in** with your GitHub account
-3. **Click "New app"**
-4. **Select**:
-   - Repository: `nihcastics/smart-resume-screener`
-   - Branch: `main`
-   - Main file path: `app.py`
-5. **Advanced Settings** → Add your secrets:
-   ```toml
-   GOOGLE_API_KEY = "your_google_api_key"
-   MONGODB_URI = "your_mongodb_connection_string"
-   ```
-6. **Click "Deploy"**
+## ✅ RECOMMENDED: Streamlit Community Cloud (FREE)
 
-Your app will be live at: `https://nihcastics-smart-resume-screener.streamlit.app`
+### 📝 Step-by-Step Deployment on Streamlit Community Cloud:
+
+#### Step 1: Access Streamlit Cloud
+- Visit: **https://share.streamlit.io**
+- Click **"Sign in"** button
+- Choose **"Continue with GitHub"**
+
+#### Step 2: Create New App
+- Click the **"New app"** button in top-right
+- OR visit: https://share.streamlit.io/deploy
+
+#### Step 3: Configure Your App
+Fill in the deployment form:
+
+**Repository:**
+- Repository: `nihcastics/smart-resume-screener`
+- Branch: `main`
+- Main file path: `app.py`
+
+#### Step 4: Add Environment Secrets
+- Click **"Advanced settings"**
+- In the **"Secrets"** section, paste:
+
+```toml
+GOOGLE_API_KEY = "your_actual_google_gemini_api_key_here"
+MONGODB_URI = "your_actual_mongodb_connection_string_here"
+```
+
+⚠️ **Important**: Replace with your actual API keys from your local `.env` file!
+
+#### Step 5: Deploy!
+- Click **"Deploy!"** button
+- Wait 2-3 minutes for initial deployment
+- Your app will be live at: `https://nihcastics-smart-resume-screener.streamlit.app`
+
+#### Step 6: Manage Your App
+- View logs in real-time
+- Auto-redeploys on every git push to `main`
+- Edit secrets anytime in app settings
+- Monitor usage in dashboard
 
 ### Features:
 - ✅ FREE hosting
@@ -56,28 +84,6 @@ Your app will be live at: `https://nihcastics-smart-resume-screener.streamlit.ap
 
 ### Option 3: Heroku (Paid)
 Requires Procfile and setup.sh - more complex setup
-
----
-
-## For Vercel (Not Recommended for Streamlit)
-
-If you still want to try Vercel despite limitations:
-
-1. Install Vercel CLI:
-   ```bash
-   npm i -g vercel
-   ```
-
-2. Deploy:
-   ```bash
-   cd "c:\Users\jenny\Downloads\Final Resume Screener\smart-resume-screener"
-   vercel
-   ```
-
-3. Follow prompts
-4. Add environment variables in Vercel dashboard
-
-**Note**: The app may not work properly due to Streamlit's architecture.
 
 ---
 
