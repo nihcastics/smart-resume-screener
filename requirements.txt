@@ -1,17 +1,10 @@
-# Core dependencies
 streamlit
-numpy<2.0.0
-python-dotenv
-
-# ML/NLP libraries (install in order)
-torch==2.1.0
-sentence-transformers==2.7.0
+pymupdf
 spacy==3.7.1
-https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
-
-# Other dependencies
-faiss-cpu==1.8.0
-pymupdf==1.23.0
-plotly==5.18.0
-google-generativeai==0.3.0
-pymongo==4.6.0
+en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
+sentence-transformers
+faiss-cpu
+python-dotenv
+plotly
+google-generativeai
+pymongo
