@@ -393,11 +393,21 @@ DEFAULT_WEIGHTS = {"semantic":0.35, "coverage":0.50, "llm_fit":0.15}
 @st.cache_resource(show_spinner=False)
 def load_models():
     # Try Streamlit secrets first (for cloud deployment), then fall back to environment variables
-    api_key = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", "")).strip()
+    try:
+        api_key = st.secrets["GEMINI_API_KEY"]
+    except (KeyError, AttributeError):
+        api_key = os.getenv("GEMINI_API_KEY", "")
+    
+    api_key = api_key.strip() if api_key else ""
     if not api_key: return None, None, None, False
     genai.configure(api_key=api_key)
 
-    preferred = st.secrets.get("GEMINI_MODEL_NAME", os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")).strip() or "gemini-2.5-flash"
+    try:
+        preferred = st.secrets.get("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+    except (KeyError, AttributeError):
+        preferred = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+    
+    preferred = (preferred.strip() if preferred else "gemini-2.5-flash") or "gemini-2.5-flash"
     fallbacks = [
         preferred, "gemini-2.5-pro", "gemini-flash-latest", "gemini-pro-latest",
         "gemini-1.5-pro-latest", "gemini-1.5-flash-latest", "gemini-1.0-pro"
@@ -442,7 +452,12 @@ def load_models():
 @st.cache_resource(show_spinner=False)
 def init_mongodb():
     # Try Streamlit secrets first (for cloud deployment), then fall back to environment variables
-    uri = st.secrets.get("MONGO_URI", os.getenv("MONGO_URI", "")).strip()
+    try:
+        uri = st.secrets["MONGO_URI"]
+    except (KeyError, AttributeError):
+        uri = os.getenv("MONGO_URI", "")
+    
+    uri = uri.strip() if uri else ""
     if not uri: return None, None, False
     try:
         client = MongoClient(uri, serverSelectionTimeoutMS=3000, connectTimeoutMS=3000)
