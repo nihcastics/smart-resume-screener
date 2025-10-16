@@ -2204,9 +2204,9 @@ with tab1:
         """, unsafe_allow_html=True)
         
         # Premium Tabbed view for requirements
-        tab1, tab2 = st.tabs(["🔴 Must-Have Requirements", "⭐ Nice-to-Have"])
+        req_tab1, req_tab2 = st.tabs(["🔴 Must-Have Requirements", "⭐ Nice-to-Have"])
         
-        with tab1:
+        with req_tab1:
             if len(must) > 0:
                 # Create two columns for better organization
                 must_covered_list = [(req, covered) for req, covered in must_final.items() if covered]
@@ -2294,7 +2294,7 @@ with tab1:
             else:
                 st.info("No must-have requirements identified from job description.")
         
-        with tab2:
+        with req_tab2:
             if len(nice) > 0:
                 nice_covered_list = [(req, covered) for req, covered in nice_final.items() if covered]
                 nice_missing_list = [(req, covered) for req, covered in nice_final.items() if not covered]
