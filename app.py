@@ -253,6 +253,18 @@ p,span,div{color:#94a3b8!important;line-height:1.8!important;font-size:1.05rem!i
     transform:scale(1.02) translateY(-4px);
     box-shadow:0 20px 60px rgba(139,92,246,.3),0 0 80px rgba(236,72,153,.2);
 }
+/* Ensure file uploader button is always clickable */
+.stFileUploader button{
+    pointer-events:auto!important;
+    cursor:pointer!important;
+    opacity:1!important;
+}
+.stFileUploader section{
+    pointer-events:auto!important;
+}
+.stFileUploader label{
+    pointer-events:auto!important;
+}
 
 /* ===== GLOWING TEXT AREA ===== */
 .stTextArea textarea{
@@ -1208,7 +1220,49 @@ if not models_ok:
         """)
     st.warning("⚠️ File upload is available below, but analysis requires model setup.")
 else:
-    st.success("✅ AI models loaded successfully!", icon="🎉")
+    # Beautiful animated success message that fades out
+    st.markdown("""
+    <div class="success-banner" style="
+        background:linear-gradient(135deg,rgba(16,185,129,.25),rgba(5,150,105,.20));
+        border:3px solid rgba(16,185,129,.6);
+        border-radius:24px;
+        padding:24px 40px;
+        text-align:center;
+        box-shadow:0 12px 45px rgba(16,185,129,.35),0 0 70px rgba(16,185,129,.25);
+        margin-bottom:24px;
+        animation:fadeInOut 4s ease-in-out forwards;
+        backdrop-filter:blur(20px);
+    ">
+        <div style="display:flex;align-items:center;justify-content:center;gap:16px;">
+            <span style="font-size:36px;animation:bounce 1s ease-in-out infinite;">🎉</span>
+            <span style="
+                font-size:22px;
+                font-weight:900;
+                color:#6ee7b7;
+                font-family:'Space Grotesk',sans-serif;
+                text-shadow:0 2px 15px rgba(16,185,129,.8);
+                letter-spacing:1px;
+            ">✅ AI MODELS LOADED SUCCESSFULLY!</span>
+            <span style="font-size:36px;animation:bounce 1s ease-in-out infinite;animation-delay:0.2s;">🚀</span>
+        </div>
+    </div>
+    <style>
+        @keyframes fadeInOut {
+            0% { opacity:0; transform:translateY(-20px); }
+            15% { opacity:1; transform:translateY(0); }
+            85% { opacity:1; transform:translateY(0); }
+            100% { opacity:0; transform:translateY(-20px); display:none; }
+        }
+        @keyframes bounce {
+            0%, 100% { transform:translateY(0); }
+            50% { transform:translateY(-10px); }
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Small delay to show the animation
+    import time
+    time.sleep(0.1)
 
 # ===== HERO HEADER =====
 st.markdown("""
@@ -1242,16 +1296,35 @@ with tab1:
     c1,c2 = st.columns([1,1], gap="large")
     with c1:
         section("Upload Resume (PDF)", "📤")
+        
+        # Clear instruction
+        st.markdown("""
+        <div style="margin-bottom:16px;padding:14px 22px;background:rgba(139,92,246,.12);
+                    border-radius:16px;border-left:4px solid #8b5cf6;">
+            <p style="margin:0;color:#c7d2fe;font-size:15px;font-weight:600;">
+                📁 Click "Browse files" button below or drag & drop your PDF
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # File uploader with NO restrictions
         up = st.file_uploader(
             "Upload Resume PDF", 
             type=['pdf'], 
             label_visibility="collapsed",
-            accept_multiple_files=False,
-            key="resume_uploader",
-            help="Click or drag and drop a PDF file here"
+            accept_multiple_files=False
         )
+        
         if up:
-            st.success(f"✓ Loaded: {up.name} ({len(up.getvalue())//1024} KB)")
+            st.markdown(f"""
+            <div style="margin-top:16px;padding:14px 22px;background:rgba(16,185,129,.12);
+                        border-radius:16px;border-left:4px solid #10b981;">
+                <p style="margin:0;color:#6ee7b7;font-size:15px;font-weight:700;">
+                    ✓ Loaded: {up.name} ({len(up.getvalue())//1024} KB)
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+    
     with c2:
         section("Job Description", "📝")
         jd = st.text_area(
@@ -1262,24 +1335,25 @@ with tab1:
             key="job_description"
         )
 
-    st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
     
-    # Show button status
-    can_analyze = up is not None and jd and len(jd) >= 50 and models_ok
+    # Show button status with clear messages
+    can_analyze = models_ok and up is not None and jd and len(jd) >= 50
     
     if not models_ok:
-        st.error("⚠️ Cannot analyze - AI models not loaded. See setup instructions above.")
-    elif not can_analyze:
-        if not up:
-            st.info("👆 Upload a resume PDF to begin")
-        elif not jd or len(jd) < 50:
-            st.info("👆 Add a detailed job description (minimum 50 characters)")
+        st.warning("⚠️ **AI models not loaded** - Please check setup instructions above")
+    elif not up:
+        st.info("👆 **Step 1:** Upload a resume PDF file using the button above")
+    elif not jd or len(jd) < 50:
+        st.info("👆 **Step 2:** Add a detailed job description (minimum 50 characters)")
+    else:
+        st.success("✅ **Ready!** Click the button below to start analysis.")
     
+    # Button without disabled attribute (let user click anytime)
     go_analyze = st.button(
         "🚀 Analyze Resume", 
         use_container_width=True,
-        type="primary",
-        disabled=not can_analyze
+        type="primary"
     )
 
     if go_analyze:
