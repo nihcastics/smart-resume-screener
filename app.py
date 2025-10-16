@@ -32,7 +32,8 @@ from dotenv import load_dotenv
 import json, time, re, tempfile, html
 from datetime import datetime
 from collections import Counter
-from pymongo import MongoClient
+import psycopg2
+from psycopg2.extras import Json, RealDictCursor
 import plotly.graph_objects as go
 import plotly.express as px
 
@@ -758,36 +759,79 @@ def load_models():
     return model, nlp, embedder, True
 
 @st.cache_resource(show_spinner=False)
-def init_mongodb():
+def init_postgresql():
+    """Initialize PostgreSQL connection and create tables if they don't exist."""
     # Try Streamlit secrets first (for cloud deployment), then fall back to environment variables
     try:
-        uri = st.secrets["MONGO_URI"]
+        db_url = st.secrets["DATABASE_URL"]
     except (KeyError, AttributeError):
-        uri = os.getenv("MONGO_URI", "")
+        db_url = os.getenv("DATABASE_URL", "")
     
-    uri = uri.strip() if uri else ""
-    if not uri: 
-        print("⚠️ MongoDB URI not found - skipping database connection")
-        return None, None, False
+    db_url = db_url.strip() if db_url else ""
+    if not db_url: 
+        print("⚠️ DATABASE_URL not found - skipping database connection")
+        print("💡 To enable database: Set DATABASE_URL in .env or Streamlit secrets")
+        print("   Free options: Supabase, Neon, Railway, ElephantSQL")
+        return None, False
     
     try:
-        # Increase timeouts for better reliability
-        client = MongoClient(
-            uri, 
-            serverSelectionTimeoutMS=10000,  # Increased to 10 seconds
-            connectTimeoutMS=10000,
-            socketTimeoutMS=10000,
-            retryWrites=True,
-            w='majority'
-        )
-        # Test connection
-        client.admin.command('ping')
-        db = client["resume_screener_db"]  # More descriptive database name
-        print("✅ MongoDB connected successfully!")
-        return db["resumes"], db["analyses"], True
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(db_url)
+        conn.autocommit = False  # Use transactions
+        
+        # Create tables if they don't exist
+        with conn.cursor() as cur:
+            # Resumes table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS resumes (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT,
+                    email TEXT,
+                    phone TEXT,
+                    text TEXT,
+                    chunks JSONB,
+                    entities JSONB,
+                    technical_skills JSONB,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Analyses table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS analyses (
+                    id SERIAL PRIMARY KEY,
+                    resume_id INTEGER REFERENCES resumes(id) ON DELETE CASCADE,
+                    jd_text TEXT,
+                    plan JSONB,
+                    profile JSONB,
+                    coverage JSONB,
+                    cue_alignment JSONB,
+                    final_analysis JSONB,
+                    semantic_score REAL,
+                    coverage_score REAL,
+                    llm_fit_score REAL,
+                    final_score REAL,
+                    fit_score INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Create indexes for better performance
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_resumes_email ON resumes(email);
+                CREATE INDEX IF NOT EXISTS idx_resumes_created ON resumes(created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_analyses_created ON analyses(created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_analyses_resume ON analyses(resume_id);
+            """)
+            
+        conn.commit()
+        print("✅ PostgreSQL connected successfully!")
+        print(f"📊 Database ready with tables: resumes, analyses")
+        return conn, True
     except Exception as e:
-        print(f"❌ MongoDB connection failed: {e}")
-        return None, None, False
+        print(f"❌ PostgreSQL connection failed: {e}")
+        print(f"💡 Check your DATABASE_URL format: postgresql://user:password@host:port/dbname")
+        return None, False
 
 # --- NLP / utils ---
 def normalize_text(s):
@@ -2792,75 +2836,117 @@ def parse_resume_pdf(path, nlp, embedder):
         "technical_skills": technical_skills
     }
 
-# ---- Mongo helpers ----
-def _sanitize_for_mongo(value):
+# ---- PostgreSQL helpers ----
+def _sanitize_for_postgres(value):
+    """Convert Python types to PostgreSQL-compatible JSON types."""
     import numpy as _np
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     if isinstance(value, (_np.integer,)): return int(value)
     if isinstance(value, (_np.floating,)): return float(value)
     if isinstance(value, _np.ndarray): return value.tolist()
-    if isinstance(value, (list, tuple)): return [_sanitize_for_mongo(v) for v in value]
-    if isinstance(value, dict): return {str(k): _sanitize_for_mongo(v) for k,v in value.items()}
+    if isinstance(value, (list, tuple)): return [_sanitize_for_postgres(v) for v in value]
+    if isinstance(value, dict): return {str(k): _sanitize_for_postgres(v) for k,v in value.items()}
     return str(value)
 
-def save_to_db(resume_doc, jd, analysis, resumes_collection, analyses_collection, mongo_ok):
-    if not mongo_ok:
-        print("⚠️ MongoDB not connected - skipping database save")
+def save_to_db(resume_doc, jd, analysis, db_conn, db_ok):
+    """Save resume and analysis to PostgreSQL database."""
+    if not db_ok or not db_conn:
+        print("⚠️ PostgreSQL not connected - skipping database save")
         return
     
-    rid = None
+    resume_id = None
     try:
-        # Save resume document
-        if resumes_collection:
-            rdoc = {
-                "name": resume_doc.get("name", "Unknown"),
-                "email": resume_doc.get("email", "N/A"),
-                "phone": resume_doc.get("phone", "N/A"),
-                "file_name": resume_doc.get("file_name", "unknown"),
-                "timestamp": time.time()
-            }
-            r = resumes_collection.insert_one(rdoc)
-            rid = str(r.inserted_id)
-            print(f"✅ Resume saved to DB with ID: {rid}")
-        
-        # Save analysis document with correct field mapping
-        if analyses_collection:
-            adoc = {
-                "resume_id": rid,
-                "candidate": resume_doc.get("name", "Unknown"),
-                "email": resume_doc.get("email", "N/A"),
-                "file_name": resume_doc.get("file_name", "unknown"),
-                "job_desc": jd[:500] if len(jd) > 500 else jd,
-                "job_desc_full": jd,
-                "analysis": _sanitize_for_mongo(analysis),
-                "timestamp": time.time(),
-                # Fix: Use correct field names from analysis dict
-                "overall_score": analysis.get("score", 0),
-                "coverage_pct": analysis.get("coverage_score", 0)
-            }
-            result = analyses_collection.insert_one(adoc)
-            print(f"✅ Analysis saved to DB with ID: {result.inserted_id}")
-            st.success(f"💾 Analysis saved to database successfully!")
+        with db_conn.cursor() as cur:
+            # Save resume document
+            cur.execute("""
+                INSERT INTO resumes (name, email, phone, text, chunks, entities, technical_skills)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                resume_doc.get("name", "Unknown"),
+                resume_doc.get("email", "N/A"),
+                resume_doc.get("phone", "N/A"),
+                resume_doc.get("text", "")[:10000],  # Limit text size
+                Json(_sanitize_for_postgres(resume_doc.get("chunks", []))),
+                Json(_sanitize_for_postgres(resume_doc.get("entities", {}))),
+                Json(_sanitize_for_postgres(resume_doc.get("technical_skills", [])))
+            ))
+            resume_id = cur.fetchone()[0]
+            print(f"✅ Resume saved to DB with ID: {resume_id}")
+            
+            # Save analysis document
+            cur.execute("""
+                INSERT INTO analyses (
+                    resume_id, jd_text, plan, profile, coverage, cue_alignment,
+                    final_analysis, semantic_score, coverage_score, llm_fit_score,
+                    final_score, fit_score
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                resume_id,
+                jd[:5000],  # Limit JD text size
+                Json(_sanitize_for_postgres(analysis.get("plan", {}))),
+                Json(_sanitize_for_postgres(analysis.get("profile", {}))),
+                Json(_sanitize_for_postgres(analysis.get("coverage", {}))),
+                Json(_sanitize_for_postgres(analysis.get("cue_alignment", {}))),
+                Json(_sanitize_for_postgres(analysis.get("final_analysis", {}))),
+                float(analysis.get("semantic", 0.0)),
+                float(analysis.get("coverage_score", 0.0)),
+                float(analysis.get("llm_fit", 0.0)),
+                float(analysis.get("score", 0.0)),
+                int(analysis.get("final_analysis", {}).get("fit_score", 0))
+            ))
+            analysis_id = cur.fetchone()[0]
+            
+        db_conn.commit()
+        print(f"✅ Analysis saved to DB with ID: {analysis_id}")
+        st.success(f"💾 Analysis saved to database successfully!")
+        return resume_id, analysis_id
     except Exception as exc:
-        print(f"❌ MongoDB save error: {exc}")
+        db_conn.rollback()
+        print(f"❌ PostgreSQL save error: {exc}")
         import traceback
         traceback.print_exc()
         st.warning(f"⚠️ Could not save to database: {str(exc)[:100]}")
+        return None, None
 
-def get_recent(analyses_collection, mongo_ok, limit=20):
+def get_recent(db_conn, db_ok, limit=20):
+    """Fetch recent analyses from PostgreSQL."""
     items = []
-    if not mongo_ok or not analyses_collection:
-        print("⚠️ MongoDB not available - cannot fetch recent analyses")
+    if not db_ok or not db_conn:
+        print("⚠️ PostgreSQL not available - cannot fetch recent analyses")
         return items
     
     try:
-        cursor = analyses_collection.find({}).sort("timestamp", -1).limit(limit)
-        for x in cursor:
-            items.append(x)
+        with db_conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT 
+                    a.id,
+                    a.created_at,
+                    r.name as candidate,
+                    r.email,
+                    a.final_score,
+                    a.fit_score,
+                    a.semantic_score,
+                    a.coverage_score,
+                    LEFT(a.jd_text, 200) as job_desc_preview
+                FROM analyses a
+                JOIN resumes r ON a.resume_id = r.id
+                ORDER BY a.created_at DESC
+                LIMIT %s
+            """, (limit,))
+            items = cur.fetchall()
+            # Convert datetime to timestamp for compatibility
+            for item in items:
+                if 'created_at' in item and item['created_at']:
+                    item['timestamp'] = item['created_at'].timestamp()
         print(f"✅ Retrieved {len(items)} recent analyses from database")
     except Exception as e:
         print(f"❌ Error fetching recent analyses: {e}")
+        import traceback
+        traceback.print_exc()
     return items
 
 # =======================
@@ -2880,10 +2966,10 @@ with st.spinner('🔄 Initializing AI models and database...'):
         model, nlp, embedder, models_ok = None, None, None, False
     
     try:
-        resumes_collection, analyses_collection, mongo_ok = init_mongodb()
+        db_conn, db_ok = init_postgresql()
     except Exception as e:
-        st.warning(f"⚠️ MongoDB connection failed: {str(e)[:100]}")
-        resumes_collection, analyses_collection, mongo_ok = None, None, False
+        st.warning(f"⚠️ PostgreSQL connection failed: {str(e)[:100]}")
+        db_conn, db_ok = None, False
 
 # Show status but don't stop the app
 if not models_ok:
@@ -3519,7 +3605,7 @@ with tab1:
                     "timestamp": time.time()
                 }
 
-                save_to_db(parsed, jd, result, resumes_collection, analyses_collection, mongo_ok)
+                save_to_db(parsed, jd, result, db_conn, db_ok)
                 st.session_state.analysis_history.insert(0, result)
                 st.session_state.analysis_history = st.session_state.analysis_history[:100]
                 st.session_state.current_analysis = (parsed, result)
@@ -4851,7 +4937,7 @@ with tab2:
     st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
     
     # Combine all recent activities
-    recent_db = get_recent(analyses_collection, mongo_ok, limit=15)
+    recent_db = get_recent(db_conn, db_ok, limit=15)
     all_activities = []
     
     # Add uploads

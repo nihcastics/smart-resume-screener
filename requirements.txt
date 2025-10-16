@@ -8,5 +8,5 @@ faiss-cpu
 python-dotenv
 plotly
 google-generativeai
-pymongo
+psycopg2-binary
 pyflakes
