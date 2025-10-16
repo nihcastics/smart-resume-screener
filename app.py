@@ -477,49 +477,38 @@ hr::before{
     font-size:15px!important;
 }
 
-/* ===== IMMERSIVE SMOOTH PROGRESS BAR ===== */
+/* ===== FUNCTIONAL PROGRESS BAR ===== */
 .stProgress{
-    position:relative;
-    margin:20px 0;
+    margin:16px 0;
 }
 .stProgress>div{
-    background:linear-gradient(90deg,rgba(99,102,241,.1),rgba(139,92,246,.1))!important;
-    border-radius:16px!important;
+    background:linear-gradient(90deg,rgba(99,102,241,.15),rgba(139,92,246,.12));
+    border-radius:14px!important;
     overflow:visible!important;
-    box-shadow:inset 0 1px 4px rgba(0,0,0,.3),0 2px 12px rgba(99,102,241,.15)!important;
+    box-shadow:inset 0 1px 3px rgba(0,0,0,.3),0 2px 12px rgba(99,102,241,.2);
     height:10px!important;
 }
 .stProgress>div>div{
-    background:linear-gradient(90deg,#6366f1,#8b5cf6,#ec4899,#8b5cf6)!important;
-    background-size:300% 100%!important;
-    border-radius:16px!important;
-    box-shadow:0 6px 25px rgba(99,102,241,.6),0 0 35px rgba(139,92,246,.5),0 0 50px rgba(236,72,153,.3)!important;
-    animation:smoothProgress 2s ease-in-out infinite!important;
+    background:linear-gradient(90deg,#6366f1,#8b5cf6,#ec4899,#8b5cf6,#6366f1);
+    background-size:200% 100%;
+    border-radius:14px!important;
+    box-shadow:0 4px 18px rgba(99,102,241,.6),0 0 25px rgba(236,72,153,.4),inset 0 1px 3px rgba(255,255,255,.2);
     position:relative!important;
     height:10px!important;
+    transition:width 0.2s ease-out!important;
 }
 .stProgress>div>div::after{
     content:'';
     position:absolute;
     top:50%;
-    right:0;
-    transform:translate(40%,-50%);
-    width:20px;
-    height:20px;
-    background:radial-gradient(circle at 30% 30%,rgba(236,72,153,1) 0%,rgba(139,92,246,.9) 30%,rgba(99,102,241,.6) 60%,transparent 80%);
+    right:-9px;
+    transform:translateY(-50%);
+    width:18px;
+    height:18px;
+    background:radial-gradient(circle at 40% 40%,rgba(236,72,153,1),rgba(139,92,246,.8) 35%,rgba(99,102,241,.4) 65%,transparent 100%);
     border-radius:50%;
-    box-shadow:0 0 25px rgba(236,72,153,1),0 0 50px rgba(139,92,246,.8),0 0 80px rgba(99,102,241,.5),inset -2px -2px 8px rgba(0,0,0,.3);
-    animation:glowTip 1.5s ease-in-out infinite;
-}
-@keyframes smoothProgress{
-    0%{background-position:0% 0%;filter:brightness(1)}
-    50%{background-position:100% 0%;filter:brightness(1.2)}
-    100%{background-position:0% 0%;filter:brightness(1)}
-}
-@keyframes glowTip{
-    0%{opacity:0.8;box-shadow:0 0 20px rgba(236,72,153,.8),0 0 40px rgba(139,92,246,.6),0 0 65px rgba(99,102,241,.3)}
-    50%{opacity:1;box-shadow:0 0 30px rgba(236,72,153,1),0 0 60px rgba(139,92,246,.8),0 0 100px rgba(99,102,241,.5)}
-    100%{opacity:0.8;box-shadow:0 0 20px rgba(236,72,153,.8),0 0 40px rgba(139,92,246,.6),0 0 65px rgba(99,102,241,.3)}
+    box-shadow:0 0 18px rgba(236,72,153,1),0 0 35px rgba(139,92,246,.8),0 0 55px rgba(99,102,241,.5);
+    z-index:10;
 }
 
 /* ===== PREMIUM GLOWING SCROLLBAR ===== */
