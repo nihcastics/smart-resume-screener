@@ -1347,193 +1347,272 @@ with tab1:
         
         # ===== Requirement Coverage =====
         st.markdown("""
-        <div style="text-align:center;margin:40px 0 28px 0;">
-            <h3 class="section-header" style="display:inline-block;padding:12px 32px;background:rgba(16,185,129,.1);
-                       border-radius:16px;border:2px solid rgba(16,185,129,.3);">
-                ✅ Requirement Coverage
+        <div style="text-align:center;margin:40px 0 24px 0;">
+            <h3 class="section-header" style="display:inline-block;padding:14px 36px;
+                       background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(5,150,105,.08));
+                       border-radius:16px;border:2px solid rgba(16,185,129,.35);
+                       box-shadow:0 4px 16px rgba(16,185,129,.2);">
+                ✅ Requirement Coverage Analysis
             </h3>
         </div>
         """, unsafe_allow_html=True)
         
-        must = analysis["atoms"]["must"][:12]  # Increased to show more requirements
-        nice = analysis["atoms"]["nice"][:8]
+        # Get requirements from analysis
+        must = analysis["atoms"]["must"][:15]  # Show more for comprehensive view
+        nice = analysis["atoms"]["nice"][:10]
         resume_text = resume.get("text", "")
+        resume_chunks = resume.get("chunks", [])
         tok = token_set(resume_text)
         
-        # ROBUST COVERAGE DETECTION PIPELINE
-        # Step 1: Enhanced local model detection with full text context
-        must_local = {req: contains_atom(req, tok, resume_text) for req in must}
-        nice_local = {req: contains_atom(req, tok, resume_text) for req in nice}
+        # INTELLIGENT MULTI-LAYER DETECTION SYSTEM
+        # Layer 1: Token-based detection (fast, precise)
+        must_token = {req: contains_atom(req, tok, resume_text) for req in must}
+        nice_token = {req: contains_atom(req, tok, resume_text) for req in nice}
         
-        # Step 2: LLM verification for ALL requirements (not just missed ones)
-        # This provides a second opinion and catches semantic matches
+        # Layer 2: Semantic similarity using embeddings (catches variations)
+        must_semantic = {}
+        nice_semantic = {}
+        if resume_chunks and embedder:
+            try:
+                # Encode all resume chunks once
+                chunk_embs = embedder.encode(resume_chunks, convert_to_numpy=True, normalize_embeddings=True)
+                if chunk_embs.ndim == 1:
+                    chunk_embs = chunk_embs.reshape(1, -1)
+                
+                # Check each must-have requirement
+                for req in must:
+                    if not must_token.get(req, False):  # Only if not found by token matching
+                        req_emb = embedder.encode(req, convert_to_numpy=True, normalize_embeddings=True)
+                        if req_emb.ndim > 1:
+                            req_emb = req_emb[0]
+                        sims = np.dot(chunk_embs, req_emb)
+                        max_sim = float(np.max(sims)) if sims.size > 0 else 0.0
+                        must_semantic[req] = max_sim >= 0.35  # Semantic match threshold
+                
+                # Check each nice-to-have requirement
+                for req in nice:
+                    if not nice_token.get(req, False):
+                        req_emb = embedder.encode(req, convert_to_numpy=True, normalize_embeddings=True)
+                        if req_emb.ndim > 1:
+                            req_emb = req_emb[0]
+                        sims = np.dot(chunk_embs, req_emb)
+                        max_sim = float(np.max(sims)) if sims.size > 0 else 0.0
+                        nice_semantic[req] = max_sim >= 0.35
+            except:
+                pass
+        
+        # Layer 3: LLM verification (catches implied skills and context)
         llm_must_verify = {}
         llm_nice_verify = {}
-        
         try:
-            if must and model:
-                llm_must_verify = llm_verify_requirements(model, must, resume_text, "must-have")
-            if nice and model:
-                llm_nice_verify = llm_verify_requirements(model, nice, resume_text, "nice-to-have")
-        except Exception as e:
-            pass  # Silently fall back to local model only
+            # Only use LLM for requirements not found by previous methods
+            must_unverified = [r for r in must if not (must_token.get(r, False) or must_semantic.get(r, False))]
+            nice_unverified = [r for r in nice if not (nice_token.get(r, False) or nice_semantic.get(r, False))]
+            
+            if must_unverified and model:
+                llm_must_verify = llm_verify_requirements(model, must_unverified, resume_text, "must-have")
+            if nice_unverified and model:
+                llm_nice_verify = llm_verify_requirements(model, nice_unverified, resume_text, "nice-to-have")
+        except:
+            pass
         
-        # Step 3: Merge results using OR logic (if EITHER method finds it, it's covered)
-        # This maximizes recall while maintaining accuracy
+        # Final decision: OR of all three methods
         must_final = {}
         for req in must:
-            local_match = must_local.get(req, False)
-            llm_match = llm_must_verify.get(req, False)
-            must_final[req] = local_match or llm_match
+            must_final[req] = (must_token.get(req, False) or 
+                              must_semantic.get(req, False) or 
+                              llm_must_verify.get(req, False))
         
         nice_final = {}
         for req in nice:
-            local_match = nice_local.get(req, False)
-            llm_match = llm_nice_verify.get(req, False)
-            nice_final[req] = local_match or llm_match
+            nice_final[req] = (nice_token.get(req, False) or 
+                              nice_semantic.get(req, False) or 
+                              llm_nice_verify.get(req, False))
         
-        # Step 4: Calculate accurate coverage stats
-        must_covered = sum(1 for covered in must_final.values() if covered)
-        must_missing = len(must) - must_covered
-        nice_covered = sum(1 for covered in nice_final.values() if covered)
-        nice_missing = len(nice) - nice_covered
+        # Calculate metrics
+        must_covered = sum(1 for v in must_final.values() if v)
+        nice_covered = sum(1 for v in nice_final.values() if v)
         total_covered = must_covered + nice_covered
         total_req = len(must) + len(nice)
         coverage_pct = int((total_covered / total_req * 100)) if total_req > 0 else 0
-        
-        # Must-have coverage percentage (critical metric)
         must_coverage_pct = int((must_covered / len(must) * 100)) if len(must) > 0 else 0
         
-        # Compact Summary Stats Bar
-        st.markdown(f"""
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;
-                    background:linear-gradient(135deg,rgba(30,41,59,.7),rgba(15,23,42,.8));
-                    border:2px solid rgba(102,126,234,.3);border-radius:16px;padding:20px 28px;margin-bottom:24px;">
-            <div style="text-align:center;">
-                <p style="margin:0;font-size:10px;color:#6ee7b7;text-transform:uppercase;font-weight:600;">Total Req</p>
-                <h3 style="margin:6px 0 0 0;font-size:28px;color:#10b981;font-weight:900;">{total_req}</h3>
-            </div>
-            <div style="width:2px;height:40px;background:rgba(148,163,184,.2);"></div>
-            <div style="text-align:center;">
-                <p style="margin:0;font-size:10px;color:#10b981;text-transform:uppercase;font-weight:600;">Covered</p>
-                <h3 style="margin:6px 0 0 0;font-size:28px;color:#10b981;font-weight:900;">{total_covered}</h3>
-            </div>
-            <div style="width:2px;height:40px;background:rgba(148,163,184,.2);"></div>
-            <div style="text-align:center;">
-                <p style="margin:0;font-size:10px;color:#ef4444;text-transform:uppercase;font-weight:600;">Missing</p>
-                <h3 style="margin:6px 0 0 0;font-size:28px;color:#ef4444;font-weight:900;">{must_missing + nice_missing}</h3>
-            </div>
-            <div style="width:2px;height:40px;background:rgba(148,163,184,.2);"></div>
-            <div style="text-align:center;">
-                <p style="margin:0;font-size:10px;color:#fca5a5;text-transform:uppercase;font-weight:600;">Must-Have</p>
-                <h3 style="margin:6px 0 0 0;font-size:28px;color:#ef4444;font-weight:900;">{must_coverage_pct}%</h3>
-            </div>
-            <div style="width:2px;height:40px;background:rgba(148,163,184,.2);"></div>
-            <div style="text-align:center;">
-                <p style="margin:0;font-size:10px;color:#fcd34d;text-transform:uppercase;font-weight:600;">Overall</p>
-                <h3 style="margin:6px 0 0 0;font-size:28px;color:#f59e0b;font-weight:900;">{coverage_pct}%</h3>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        # Coverage Overview Cards
+        col1, col2, col3 = st.columns([1,1,1])
         
-        # Floating Grid - Requirements as Tiles
-        st.markdown(f"""
-        <div style="margin-bottom:24px;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-                <span style="font-size:20px;">🔴</span>
-                <h3 style="margin:0;color:#fca5a5;font-size:16px;font-weight:800;text-transform:uppercase;
-                           letter-spacing:1px;font-family:'Poppins',sans-serif;">Must-Have Requirements</h3>
-                <span style="background:rgba(239,68,68,.2);color:#fca5a5;padding:4px 10px;border-radius:10px;
-                             font-size:11px;font-weight:700;">{len(must)}</span>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
-        """, unsafe_allow_html=True)
-        
-        # Must-Have tiles
-        for req, is_covered in must_final.items():
-            if is_covered:
-                bg = "linear-gradient(135deg,rgba(16,185,129,.15),rgba(5,150,105,.1))"
-                border = "rgba(16,185,129,.5)"
-                icon = "✓"
-                icon_bg = "#10b981"
-                text_color = "#f1f5f9"
-            else:
-                bg = "linear-gradient(135deg,rgba(239,68,68,.15),rgba(220,38,38,.1))"
-                border = "rgba(239,68,68,.5)"
-                icon = "✗"
-                icon_bg = "#ef4444"
-                text_color = "#f1f5f9"
-            
+        with col1:
             st.markdown(f"""
-            <div style="background:{bg};border:2px solid {border};border-radius:12px;padding:16px;
-                        position:relative;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.2);
-                        transition:transform .2s,box-shadow .2s;cursor:default;"
-                 onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 20px rgba(0,0,0,.3)'"
-                 onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 12px rgba(0,0,0,.2)'">
-                <div style="position:absolute;top:12px;right:12px;width:32px;height:32px;
-                            background:{icon_bg};border-radius:50%;display:flex;align-items:center;
-                            justify-content:center;font-size:16px;color:#0f172a;font-weight:900;
-                            box-shadow:0 2px 8px {icon_bg}60;">{icon}</div>
-                <p style="margin:0;color:{text_color};font-size:14px;font-weight:600;line-height:1.4;
-                           padding-right:40px;min-height:40px;display:flex;align-items:center;">{req}</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("</div></div>", unsafe_allow_html=True)
-        
-        # Nice-to-Have tiles
-        if len(nice) > 0:
-            st.markdown(f"""
-            <div style="margin-bottom:24px;">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;margin-top:28px;">
-                    <span style="font-size:20px;">⭐</span>
-                    <h3 style="margin:0;color:#93c5fd;font-size:16px;font-weight:800;text-transform:uppercase;
-                               letter-spacing:1px;font-family:'Poppins',sans-serif;">Nice-to-Have</h3>
-                    <span style="background:rgba(59,130,246,.2);color:#93c5fd;padding:4px 10px;border-radius:10px;
-                                 font-size:11px;font-weight:700;">{len(nice)}</span>
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(5,150,105,.1));
+                        border:2px solid rgba(16,185,129,.4);border-radius:16px;padding:24px;text-align:center;">
+                <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px;">
+                    <div style="width:48px;height:48px;background:#10b981;border-radius:12px;
+                                display:flex;align-items:center;justify-content:center;font-size:24px;">✓</div>
+                    <div style="text-align:left;">
+                        <p style="margin:0;font-size:11px;color:#6ee7b7;text-transform:uppercase;font-weight:700;">Coverage</p>
+                        <h3 style="margin:4px 0 0 0;font-size:32px;color:#10b981;font-weight:900;">{coverage_pct}%</h3>
+                    </div>
                 </div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
-            """, unsafe_allow_html=True)
-            
-            for req, is_covered in nice_final.items():
-                if is_covered:
-                    bg = "linear-gradient(135deg,rgba(16,185,129,.15),rgba(5,150,105,.1))"
-                    border = "rgba(16,185,129,.5)"
-                    icon = "✓"
-                    icon_bg = "#10b981"
-                    text_color = "#f1f5f9"
-                else:
-                    bg = "linear-gradient(135deg,rgba(59,130,246,.12),rgba(37,99,235,.08))"
-                    border = "rgba(59,130,246,.4)"
-                    icon = "○"
-                    icon_bg = "#3b82f6"
-                    text_color = "#cbd5e1"
-                
-                st.markdown(f"""
-                <div style="background:{bg};border:2px solid {border};border-radius:12px;padding:16px;
-                            position:relative;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.2);
-                            transition:transform .2s,box-shadow .2s;cursor:default;"
-                     onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 20px rgba(0,0,0,.3)'"
-                     onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 12px rgba(0,0,0,.2)'">
-                    <div style="position:absolute;top:12px;right:12px;width:32px;height:32px;
-                                background:{icon_bg};border-radius:50%;display:flex;align-items:center;
-                                justify-content:center;font-size:16px;color:#0f172a;font-weight:900;
-                                box-shadow:0 2px 8px {icon_bg}60;">{icon}</div>
-                    <p style="margin:0;color:{text_color};font-size:14px;font-weight:600;line-height:1.4;
-                               padding-right:40px;min-height:40px;display:flex;align-items:center;">{req}</p>
+                <div style="height:6px;background:rgba(16,185,129,.2);border-radius:10px;overflow:hidden;">
+                    <div style="width:{coverage_pct}%;height:100%;background:#10b981;border-radius:10px;
+                                transition:width 1s ease;box-shadow:0 0 10px #10b98180;"></div>
                 </div>
-                """, unsafe_allow_html=True)
-            
-            st.markdown("</div></div>", unsafe_allow_html=True)
-        else:
-            st.markdown("""
-            <div style="margin-top:24px;padding:20px;background:rgba(59,130,246,.06);
-                        border:2px dashed rgba(59,130,246,.25);border-radius:12px;text-align:center;">
-                <p style="margin:0;color:#7a8b99;font-size:13px;font-style:italic;">
-                    ⭐ No nice-to-have requirements specified
+                <p style="margin:12px 0 0 0;font-size:13px;color:#94a3b8;">
+                    <strong style="color:#10b981;">{total_covered}</strong> of <strong>{total_req}</strong> requirements met
                 </p>
             </div>
             """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown(f"""
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(239,68,68,.15),rgba(220,38,38,.1));
+                        border:2px solid rgba(239,68,68,.4);border-radius:16px;padding:24px;text-align:center;">
+                <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px;">
+                    <div style="width:48px;height:48px;background:#ef4444;border-radius:12px;
+                                display:flex;align-items:center;justify-content:center;font-size:24px;">🔴</div>
+                    <div style="text-align:left;">
+                        <p style="margin:0;font-size:11px;color:#fca5a5;text-transform:uppercase;font-weight:700;">Must-Have</p>
+                        <h3 style="margin:4px 0 0 0;font-size:32px;color:#ef4444;font-weight:900;">{must_coverage_pct}%</h3>
+                    </div>
+                </div>
+                <div style="height:6px;background:rgba(239,68,68,.2);border-radius:10px;overflow:hidden;">
+                    <div style="width:{must_coverage_pct}%;height:100%;background:#ef4444;border-radius:10px;
+                                transition:width 1s ease;box-shadow:0 0 10px #ef444480;"></div>
+                </div>
+                <p style="margin:12px 0 0 0;font-size:13px;color:#94a3b8;">
+                    <strong style="color:#10b981;">{must_covered}</strong> found · <strong style="color:#ef4444;">{len(must) - must_covered}</strong> missing
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            nice_pct = int((nice_covered / len(nice) * 100)) if len(nice) > 0 else 0
+            st.markdown(f"""
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(37,99,235,.1));
+                        border:2px solid rgba(59,130,246,.4);border-radius:16px;padding:24px;text-align:center;">
+                <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px;">
+                    <div style="width:48px;height:48px;background:#3b82f6;border-radius:12px;
+                                display:flex;align-items:center;justify-content:center;font-size:24px;">⭐</div>
+                    <div style="text-align:left;">
+                        <p style="margin:0;font-size:11px;color:#93c5fd;text-transform:uppercase;font-weight:700;">Nice-to-Have</p>
+                        <h3 style="margin:4px 0 0 0;font-size:32px;color:#3b82f6;font-weight:900;">{nice_pct}%</h3>
+                    </div>
+                </div>
+                <div style="height:6px;background:rgba(59,130,246,.2);border-radius:10px;overflow:hidden;">
+                    <div style="width:{nice_pct}%;height:100%;background:#3b82f6;border-radius:10px;
+                                transition:width 1s ease;box-shadow:0 0 10px #3b82f680;"></div>
+                </div>
+                <p style="margin:12px 0 0 0;font-size:13px;color:#94a3b8;">
+                    {f'<strong style="color:#10b981;">{nice_covered}</strong> found · <strong style="color:#3b82f6;">{len(nice) - nice_covered}</strong> missing' if len(nice) > 0 else '<span style="font-style:italic;">No nice-to-have specified</span>'}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Detailed Requirements Breakdown
+        st.markdown("""
+        <div style="margin-top:32px;"></div>
+        """, unsafe_allow_html=True)
+        
+        # Tabbed view for requirements
+        tab1, tab2 = st.tabs(["🔴 Must-Have Requirements", "⭐ Nice-to-Have"])
+        
+        with tab1:
+            if len(must) > 0:
+                # Create two columns for better organization
+                must_covered_list = [(req, covered) for req, covered in must_final.items() if covered]
+                must_missing_list = [(req, covered) for req, covered in must_final.items() if not covered]
+                
+                if must_covered_list:
+                    st.markdown(f"""
+                    <div style="margin-bottom:20px;">
+                        <h4 style="color:#10b981;font-size:15px;font-weight:700;margin-bottom:12px;">
+                            ✓ Found ({len(must_covered_list)})
+                        </h4>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    for idx, (req, _) in enumerate(must_covered_list, 1):
+                        st.markdown(f"""
+                        <div style="background:rgba(16,185,129,.08);border-left:4px solid #10b981;
+                                    border-radius:8px;padding:14px 18px;margin-bottom:8px;
+                                    display:flex;align-items:center;gap:12px;">
+                            <span style="min-width:24px;height:24px;background:#10b981;color:#0f172a;
+                                         border-radius:50%;display:flex;align-items:center;justify-content:center;
+                                         font-size:14px;font-weight:900;">✓</span>
+                            <span style="color:#f1f5f9;font-size:14px;font-weight:600;">{req}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                
+                if must_missing_list:
+                    st.markdown(f"""
+                    <div style="margin:24px 0 12px 0;">
+                        <h4 style="color:#ef4444;font-size:15px;font-weight:700;margin-bottom:12px;">
+                            ✗ Missing ({len(must_missing_list)})
+                        </h4>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    for idx, (req, _) in enumerate(must_missing_list, 1):
+                        st.markdown(f"""
+                        <div style="background:rgba(239,68,68,.08);border-left:4px solid #ef4444;
+                                    border-radius:8px;padding:14px 18px;margin-bottom:8px;
+                                    display:flex;align-items:center;gap:12px;">
+                            <span style="min-width:24px;height:24px;background:#ef4444;color:#0f172a;
+                                         border-radius:50%;display:flex;align-items:center;justify-content:center;
+                                         font-size:14px;font-weight:900;">✗</span>
+                            <span style="color:#f1f5f9;font-size:14px;font-weight:600;">{req}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.info("No must-have requirements identified from job description.")
+        
+        with tab2:
+            if len(nice) > 0:
+                nice_covered_list = [(req, covered) for req, covered in nice_final.items() if covered]
+                nice_missing_list = [(req, covered) for req, covered in nice_final.items() if not covered]
+                
+                if nice_covered_list:
+                    st.markdown(f"""
+                    <div style="margin-bottom:20px;">
+                        <h4 style="color:#10b981;font-size:15px;font-weight:700;margin-bottom:12px;">
+                            ✓ Found ({len(nice_covered_list)})
+                        </h4>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    for idx, (req, _) in enumerate(nice_covered_list, 1):
+                        st.markdown(f"""
+                        <div style="background:rgba(16,185,129,.08);border-left:4px solid #10b981;
+                                    border-radius:8px;padding:14px 18px;margin-bottom:8px;
+                                    display:flex;align-items:center;gap:12px;">
+                            <span style="min-width:24px;height:24px;background:#10b981;color:#0f172a;
+                                         border-radius:50%;display:flex;align-items:center;justify-content:center;
+                                         font-size:14px;font-weight:900;">✓</span>
+                            <span style="color:#cbd5e1;font-size:14px;font-weight:600;">{req}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                
+                if nice_missing_list:
+                    st.markdown(f"""
+                    <div style="margin:24px 0 12px 0;">
+                        <h4 style="color:#3b82f6;font-size:15px;font-weight:700;margin-bottom:12px;">
+                            ○ Not Found ({len(nice_missing_list)})
+                        </h4>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    for idx, (req, _) in enumerate(nice_missing_list, 1):
+                        st.markdown(f"""
+                        <div style="background:rgba(59,130,246,.06);border-left:4px solid #3b82f6;
+                                    border-radius:8px;padding:14px 18px;margin-bottom:8px;
+                                    display:flex;align-items:center;gap:12px;">
+                            <span style="min-width:24px;height:24px;background:#3b82f6;color:#0f172a;
+                                         border-radius:50%;display:flex;align-items:center;justify-content:center;
+                                         font-size:14px;font-weight:900;">○</span>
+                            <span style="color:#cbd5e1;font-size:14px;font-weight:600;">{req}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.info("⭐ No nice-to-have requirements specified for this position.")
         
         # ===== Beautiful Candidate Assessment =====
         st.markdown("""
