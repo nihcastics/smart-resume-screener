@@ -619,8 +619,8 @@ def section(title, emoji=""):
         unsafe_allow_html=True
     )
 
-# --- Config (optimized weights for better accuracy) ---
-DEFAULT_WEIGHTS = {"semantic":0.30, "coverage":0.55, "llm_fit":0.15}
+# --- Config (balanced weights for accurate scoring) ---
+DEFAULT_WEIGHTS = {"semantic":0.35, "coverage":0.50, "llm_fit":0.15}
 
 # --- Models / DB ---
 @st.cache_resource(show_spinner=False)
@@ -773,9 +773,8 @@ def build_index(embedder, chunks):
 
 def compute_global_semantic(embedder, resume_embs, jd_text):
     """
-    Enhanced global semantic similarity with optimized scoring.
-    Uses top-k averaging for robust similarity estimation.
-    Optimized threshold calibration for better discrimination.
+    Optimized global semantic similarity with balanced scoring.
+    Uses top-k averaging for robust similarity estimation without over-penalizing.
     """
     if resume_embs is None or len(resume_embs)==0: 
         return 0.0
@@ -787,17 +786,19 @@ def compute_global_semantic(embedder, resume_embs, jd_text):
         if sims.size == 0: 
             return 0.0
         
-        # Enhanced scoring: use top-7 for better representation
-        k = min(7, sims.size)
+        # Use top-10 chunks for more comprehensive comparison
+        k = min(10, sims.size)
         topk = np.sort(sims)[-k:]
         
-        # Weighted average: give more weight to top chunks
-        weights = np.linspace(0.5, 1.0, k)  # Linear weighting from 0.5 to 1.0
-        score = float(np.average(topk, weights=weights))
+        # Weighted average: emphasize top chunks but not too much
+        if k > 1:
+            weights = np.linspace(0.6, 1.0, k)  # Gentler weighting
+            score = float(np.average(topk, weights=weights))
+        else:
+            score = float(np.mean(topk))
         
-        # Optimized calibration: apply 0.94 factor for better discrimination
-        # This creates better separation between good and excellent matches
-        calibrated = score * 0.94
+        # Minimal calibration: 0.98 factor (previously 0.94, too harsh)
+        calibrated = score * 0.98
         
         return float(np.clip(calibrated, 0.0, 1.0))
     except Exception:
@@ -941,54 +942,157 @@ def extract_atoms_from_text(text, nlp, max_atoms=60):
         if len(dedup) >= max_atoms: break
     return dedup
 
-# --- Atom refinement helpers ---
+# --- Atom refinement helpers - SIGNIFICANTLY EXPANDED ---
 ATOM_GENERIC_TOKENS = set([
-    "experience","experiences","skill","skills","tools","tool","technologies","technology","knowledge",
-    "projects","project","responsibilities","requirements","requirement","engineer","engineering",
-    "developer","analyst","internship","intern","fresher","strong","good","excellent","ability",
-    "familiar","able","work","team","teams","communication","problem","solving","problem-solving",
-    "teamwork","leadership","management","collaborate","develop","design","build","create","implement",
-    "manage","handling","handle","provide","ensuring","ensure","maintain","support","help","assist",
-    "drive","lead","leading","track","tracking","monitor","report","analyze","analyse","evaluate",
-    "assess","review","test","testing","nice","have","having","foundation","foundations","basics",
-    "basic","understanding","concepts","concept","process","processes","practice","practices",
-    "methodology","methodologies","principles","principle","knowledgeable","familiarity","competency",
-    "competencies","capability","capabilities","background"
+    # Experience/skill descriptors
+    "experience","experiences","experienced","skill","skills","skilled","tools","tool","technologies",
+    "technology","knowledge","knowledgeable","projects","project","responsibilities","responsibility",
+    "requirements","requirement","required","prefer","preferred","preferably",
+    # Job roles (too generic)
+    "engineer","engineering","developer","development","analyst","analysis","internship","intern",
+    "fresher","graduate","undergraduate","candidate","candidates","professional","professionals",
+    # Qualifiers
+    "strong","stronger","strongest","good","better","best","excellent","exceptional","outstanding",
+    "ability","abilities","able","capable","proficient","proficiency","competent","competency",
+    "familiar","familiarity","comfortable","understanding","understands","comprehension",
+    # Action verbs
+    "work","working","worked","team","teams","teaming","communication","communicate","communicating",
+    "problem","problems","solving","solve","solved","teamwork","leadership","lead","leading",
+    "management","manage","managing","managed","collaborate","collaboration","collaborating",
+    "develop","developing","developed","design","designing","designed","build","building","built",
+    "create","creating","created","implement","implementing","implemented","maintain","maintaining",
+    "support","supporting","supported","help","helping","helped","assist","assisting","assisted",
+    "drive","driving","driven","track","tracking","tracked","monitor","monitoring","monitored",
+    "report","reporting","reported","analyze","analyzing","analyzed","analyse","analysing","analysed",
+    "evaluate","evaluating","evaluated","assess","assessing","assessed","review","reviewing","reviewed",
+    "test","testing","tested","ensure","ensuring","ensured","provide","providing","provided",
+    # Generic concepts
+    "nice","have","having","foundation","foundations","basics","basic","understanding","concept",
+    "concepts","process","processes","practice","practices","methodology","methodologies","principles",
+    "principle","background","backgrounds","exposure","working","knowledge","competency","competencies",
+    "capability","capabilities","qualification","qualifications","plus","bonus","ideal","ideally",
+    # Time/measurement (when isolated)
+    "year","years","month","months","level","levels","degree","minimum","maximum","at","least",
+    # Connectors/prepositions (when standalone)
+    "with","without","using","use","used","via","through","across","within","including","such","like",
+    "related","relevant","appropriate","suitable","equivalent","similar","other","others","various",
+    "multiple","several","any","all","some","both","either","neither","each","every","general"
 ])
 
 ATOM_BLOCK_PHRASES = {
-    "nice to have","nice-to-have","nice to know","good to have","good-to-have","good knowledge",
-    "strong knowledge","strong foundation","solid foundation","computer foundations","computer foundation",
-    "soft skills","strong communication","good communication","excellent communication"
+    # Soft skill phrases
+    "nice to have","nice-to-have","nice to know","good to have","good-to-have","would be nice",
+    "good knowledge","strong knowledge","strong foundation","solid foundation","deep understanding",
+    "computer foundations","computer foundation","soft skills","strong communication","interpersonal skills",
+    "good communication","excellent communication","communication skills","problem solving skills",
+    "problem-solving skills","analytical skills","critical thinking","attention to detail",
+    # Generic requirement phrases
+    "experience with","experience in","knowledge of","understanding of","familiarity with",
+    "exposure to","working knowledge","hands-on experience","practical experience","proven experience",
+    "ability to","able to","capable of","proficiency in","proficient in","competency in","skilled in",
+    "expertise in","background in","track record","demonstrated ability","strong understanding",
+    # Job responsibilities (not skills)
+    "responsible for","work with","collaborate with","partner with","interact with","communicate with",
+    "develop and","design and","build and","create and","implement and","maintain and","support and",
+    "work closely","team environment","fast-paced environment","dynamic environment","agile environment",
+    # Vague qualifiers
+    "preferred qualifications","nice to haves","bonus points","plus points","additional skills",
+    "good understanding","solid grasp","thorough understanding","comprehensive knowledge",
+    "general knowledge","basic understanding","foundational knowledge","core concepts"
 }
 
 ATOM_WEAK_SINGLE = {
-    "foundation","foundations","knowledge","understanding","experience","skill","skills",
-    "competency","competencies","capability","capabilities","background","exposure"
+    "foundation","foundations","knowledge","understanding","experience","skill","skills","skillset",
+    "competency","competencies","capability","capabilities","background","exposure","proficiency",
+    "familiarity","expertise","qualification","qualifications","certification","certifications",
+    "training","education","degree","masters","bachelor","phd","diploma","course","courses"
 }
 
 ATOM_LEADING_ADJECTIVES = {
-    "strong","good","excellent","basic","advanced","intermediate","solid","sound","robust"
+    "strong","good","excellent","basic","advanced","intermediate","solid","sound","robust",
+    "deep","thorough","comprehensive","extensive","broad","general","specific","detailed",
+    "proven","demonstrated","hands-on","practical","theoretical","applied","relevant","appropriate"
 }
 
 def _tokenize_atom(atom: str):
     return re.findall(r"[a-z0-9][a-z0-9+.#-]*", normalize_text(atom))
 
 def _is_valid_atom(atom: str):
+    """Strict validation to filter out gibberish and generic phrases."""
     s = normalize_text(atom)
     if len(s) < 2:
         return False
+    
+    # Block known bad phrases
     if any(phrase in s for phrase in ATOM_BLOCK_PHRASES):
         return False
+    
     tokens = _tokenize_atom(s)
     if not tokens:
         return False
+    
+    # Check for meaningful content
     meaningful = [t for t in tokens if t not in ATOM_GENERIC_TOKENS]
     if not meaningful:
         return False
+    
+    # Single weak tokens are invalid
     if len(meaningful) == 1 and meaningful[0] in ATOM_WEAK_SINGLE:
         return False
-    return True
+    
+    # Must have at least one technical indicator
+    tech_indicators = {
+        # Programming languages
+        'python','java','javascript','typescript','c++','csharp','ruby','go','rust','php','swift','kotlin','scala','r','matlab','perl',
+        # Frameworks
+        'react','angular','vue','node','django','flask','spring','express','fastapi','rails','laravel','dotnet','asp',
+        # Databases
+        'sql','mysql','postgresql','mongodb','redis','cassandra','oracle','dynamodb','elasticsearch','neo4j','sqlite',
+        # Cloud/DevOps
+        'aws','azure','gcp','docker','kubernetes','jenkins','terraform','ansible','gitlab','circleci','github','git',
+        'lambda','ec2','s3','rds','cloudformation','helm','prometheus','grafana','datadog','newrelic',
+        # Data/ML/AI
+        'tensorflow','pytorch','keras','scikit','pandas','numpy','spark','hadoop','kafka','airflow','mlflow',
+        'tableau','powerbi','looker','dbt','snowflake','redshift','bigquery','machinelearning','deeplearning',
+        'nlp','computervision','transformers','bert','gpt','llm','ai','ml','dl','cnn','rnn','lstm',
+        # Tools/Tech
+        'linux','unix','windows','bash','powershell','vim','vscode','intellij','eclipse','jira','confluence',
+        'slack','teams','notion','figma','sketch','postman','swagger','graphql','rest','grpc','soap',
+        # Web/Mobile
+        'html','css','sass','less','webpack','babel','npm','yarn','ios','android','flutter','reactnative',
+        'nextjs','gatsby','nuxt','svelte','tailwind','bootstrap','materialui','redux','mobx','graphql',
+        # Concepts with numbers/versions
+        'api','sdk','cli','gui','ui','ux','cicd','etl','crud','orm','mvc','mvvm','solid','agile','scrum'
+    }
+    
+    # Check if any meaningful token is a tech indicator
+    has_tech = any(token in tech_indicators for token in meaningful)
+    
+    # Allow if contains tech, version numbers, or is a multi-word technical phrase
+    if has_tech:
+        return True
+    
+    # Allow if contains version/year patterns
+    if any(re.search(r'\d', token) for token in tokens):
+        return True
+    
+    # Allow specific multi-word phrases (likely certifications or specialized terms)
+    if len(tokens) >= 2 and len(meaningful) >= 2:
+        # Check for certification patterns
+        cert_keywords = {'certified','certification','certificate','associate','professional','architect','administrator','specialist','expert'}
+        if any(kw in tokens for kw in cert_keywords):
+            return True
+        
+        # Check for degree patterns  
+        degree_keywords = {'bachelor','master','phd','doctorate','degree','bs','ms','mba','btech','mtech'}
+        if any(kw in tokens for kw in degree_keywords):
+            return True
+        
+        # Multi-word technical terms are likely valid
+        if len(meaningful) >= 2:
+            return True
+    
+    return False
 
 def _canonical_atom(atom: str, nlp=None):
     s = normalize_text(atom)
@@ -1030,10 +1134,10 @@ def refine_atom_list(atoms, nlp=None, reserved_canonicals=None, limit=40):
     return refined, reserved
 
 def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_chunks, embedder, model=None,
-                                   faiss_index=None, strict_threshold=0.48, partial_threshold=0.38):
+                                   faiss_index=None, strict_threshold=0.55, partial_threshold=0.45):
     """
-    Enhanced requirement coverage with optimized thresholds and RAG-powered LLM verification.
-    Stricter thresholds (0.48/0.38) for better precision.
+    Enhanced requirement coverage with optimized thresholds for better accuracy.
+    Stricter thresholds (0.55/0.45) prevent false positives while maintaining recall.
     """
     tokens = token_set(resume_text)
     chunk_embs = None
@@ -1066,28 +1170,28 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
                 except Exception:
                     sim = 0.0
 
-            # Enhanced scoring with better differentiation
+            # Enhanced scoring with clear differentiation
             if token_hit or semantic_hit:
                 score = 1.0
             elif partial:
-                score = 0.55  # Reduced from 0.6 for stricter evaluation
+                score = 0.5  # Reduced from 0.55 for clearer distinction
             else:
                 score = 0.0
                 
             details[atom] = {
                 "token_hit": bool(token_hit),
                 "semantic_hit": bool(semantic_hit),
-                "partial_semantic": bool(partial and score == 0.55),
+                "partial_semantic": bool(partial and score == 0.5),
                 "similarity": sim,
                 "llm_hit": False,
                 "score": score
             }
 
-            # Only use LLM for uncertain cases (not clear hits or clear misses)
-            if model and 0.0 < score < 1.0:
+            # Only use LLM for uncertain cases (partial matches only)
+            if model and score == 0.5:
                 pending.append(atom)
 
-        # RAG-enhanced LLM verification for uncertain requirements
+        # RAG-enhanced LLM verification for partial matches only
         if model and pending:
             llm_results = llm_verify_requirements(
                 model, pending, resume_text, req_type, 
@@ -1096,7 +1200,7 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
             for atom in pending:
                 if llm_results.get(atom):
                     details[atom]["llm_hit"] = True
-                    details[atom]["score"] = 1.0
+                    details[atom]["score"] = 0.85  # Between partial and full for LLM-verified
         return details
 
     must_details = assess(must_atoms, "must-have")
@@ -1108,8 +1212,8 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
     must_cov = float(np.mean(must_scores)) if must_scores else 0.0
     nice_cov = float(np.mean(nice_scores)) if nice_scores else 0.0
     
-    # Adjusted weighting: 70% must-have, 30% nice-to-have (more emphasis on must-haves)
-    overall = 0.70 * must_cov + 0.30 * nice_cov if (must_scores or nice_scores) else 0.0
+    # Adjusted weighting: 75% must-have, 25% nice-to-have
+    overall = 0.75 * must_cov + 0.25 * nice_cov if (must_scores or nice_scores) else 0.0
 
     return {
         "overall": overall,
@@ -1290,63 +1394,83 @@ Return ONLY valid JSON. No markdown, no explanations.
 
 def atomicize_requirements_prompt(jd, resume_preview):
     return f"""
-You are a technical requirement extraction expert. Extract CORE TECHNICAL REQUIREMENTS ONLY.
+You are a technical requirement extraction expert. Extract ONLY CONCRETE TECHNICAL REQUIREMENTS.
 
 Return ONLY JSON with:
-- must_atoms: Array of 18-35 CRITICAL technical skills/requirements (2-5 words each)
-- nice_atoms: Array of 10-25 BONUS/OPTIONAL technical skills (2-5 words each)
+- must_atoms: Array of 15-30 CRITICAL technical skills/requirements (2-5 words each)
+- nice_atoms: Array of 8-20 BONUS/OPTIONAL technical skills (2-5 words each)
 
-**EXTRACTION RULES** (CRITICAL):
-1. Extract ONLY: programming languages, frameworks, tools, platforms, databases, specific technologies
-2. Include version numbers when specified: "Python 3.9+", "Java 11", "React 18"
-3. Include experience years when stated: "5+ years Python", "3+ years DevOps"
-4. Keep items CONCRETE and SHORT (2-5 words max)
-5. IGNORE soft skills: communication, teamwork, leadership, problem-solving
-6. IGNORE responsibilities: "design solutions", "collaborate with team", "develop features"
-7. IGNORE qualifiers: "strong", "excellent", "good knowledge of", "experience with"
-8. Extract certifications as-is: "AWS Solutions Architect", "PMP Certified"
+**CRITICAL EXTRACTION RULES**:
+1. Extract ONLY: specific technologies, programming languages, frameworks, tools, platforms, databases, certifications
+2. Include version numbers: "Python 3.9+", "Java 11+", "React 18", "Node.js 16+"
+3. Include experience requirements with context: "5+ years Python", "3+ years AWS"
+4. Keep CONCRETE and SHORT (2-5 words max)
+5. **NEVER extract**: soft skills, responsibilities, qualifiers, generic terms
+6. **IGNORE completely**: communication, teamwork, leadership, problem-solving, collaboration
+7. **IGNORE qualifiers**: "strong", "excellent", "good knowledge of", "experience with", "ability to"
+8. **IGNORE job responsibilities**: "design solutions", "work with team", "develop features"
+9. Extract certifications: "AWS Solutions Architect", "PMP", "CKA", "CISSP"
+10. Extract education ONLY if explicitly required: "Bachelor Computer Science", "Master degree"
 
-**FEW-SHOT EXAMPLES**:
+**STRICT FILTERING** - DO NOT EXTRACT:
+❌ "strong communication skills"
+❌ "team player"
+❌ "problem solving"
+❌ "ability to work independently"
+❌ "good knowledge of"
+❌ "experience with databases" (too vague - need specific: PostgreSQL, MongoDB)
+❌ "cloud platforms" (too vague - need specific: AWS, Azure, GCP)
+❌ "programming languages" (too vague - need specific: Python, Java, JavaScript)
+❌ "agile methodologies" (too vague - unless specific: Scrum, Kanban)
+❌ "design and develop"
+❌ "collaborate with stakeholders"
+
+**CORRECT EXAMPLES**:
 
 Example 1:
-JD: "5+ years of experience in Python development. Strong knowledge of Django and Flask frameworks. Proficiency in AWS services (Lambda, S3, DynamoDB). Good communication skills. Bachelor's degree required."
+JD: "5+ years of Python development experience. Strong knowledge of Django and Flask. Proficiency in AWS (Lambda, S3, DynamoDB). Excellent problem-solving skills. Bachelor's degree in Computer Science required."
 
 GOOD OUTPUT:
-{{"must_atoms": ["5+ years python", "django", "flask", "aws lambda", "aws s3", "aws dynamodb", "bachelor degree"], "nice_atoms": []}}
+{{"must_atoms": ["5+ years python", "django", "flask", "aws lambda", "aws s3", "aws dynamodb", "bachelor computer science"], "nice_atoms": []}}
 
-BAD OUTPUT (AVOID):
-{{"must_atoms": ["strong knowledge", "python development", "good communication", "proficiency in aws"], ...}}
-❌ Why bad: "strong knowledge" is qualifier, "python development" too vague, "good communication" is soft skill
+BAD OUTPUT (DO NOT DO THIS):
+{{"must_atoms": ["strong knowledge", "python development experience", "excellent problem-solving", "proficiency in aws"], ...}}
+❌ Why bad: Contains qualifiers and vague terms
 
 Example 2:
-JD: "Required: Java 11+, Spring Boot, Kubernetes, Docker, CI/CD pipelines. Nice to have: React, TypeScript, MongoDB. Must have excellent problem-solving abilities and work well in teams."
+JD: "Required: Java 11+, Spring Boot, Kubernetes, Docker, CI/CD. Nice to have: React, TypeScript, MongoDB. Must have excellent communication skills and work well in teams."
 
 GOOD OUTPUT:
 {{"must_atoms": ["java 11", "spring boot", "kubernetes", "docker", "ci/cd"], "nice_atoms": ["react", "typescript", "mongodb"]}}
 
-BAD OUTPUT (AVOID):
-{{"must_atoms": ["excellent problem-solving", "work well in teams", "java development experience"], ...}}
-❌ Why bad: Problem-solving and teamwork are soft skills, not technical requirements
+BAD OUTPUT (DO NOT DO THIS):
+{{"must_atoms": ["java development", "excellent communication skills", "work well in teams", "cloud native"], ...}}
+❌ Why bad: Includes soft skills and vague terms
 
 Example 3:
-JD: "We need someone with expertise in machine learning, deep learning frameworks (TensorFlow, PyTorch), NLP, and computer vision. Experience deploying models to production using MLflow and Docker. Knowledge of cloud platforms like AWS or GCP is a plus."
+JD: "We need a machine learning engineer with expertise in TensorFlow, PyTorch, and scikit-learn. Experience deploying models to production using Docker and Kubernetes. Knowledge of MLOps tools like MLflow. Good understanding of deep learning and NLP. AWS or GCP experience is a plus."
 
 GOOD OUTPUT:
-{{"must_atoms": ["machine learning", "deep learning", "tensorflow", "pytorch", "nlp", "computer vision", "mlflow", "docker", "model deployment"], "nice_atoms": ["aws", "gcp"]}}
+{{"must_atoms": ["machine learning", "tensorflow", "pytorch", "scikit-learn", "docker", "kubernetes", "mlops", "mlflow", "deep learning", "nlp"], "nice_atoms": ["aws", "gcp"]}}
+
+BAD OUTPUT (DO NOT DO THIS):
+{{"must_atoms": ["expertise in ml", "good understanding", "knowledge of mlops", "experience deploying models"], ...}}
+❌ Why bad: Contains qualifiers and vague phrases
 
 **NOW EXTRACT FROM THIS JOB DESCRIPTION**:
 {jd[:2500]}
 
-**RESUME PREVIEW** (for context ONLY - do NOT extract atoms from resume):
+**RESUME PREVIEW** (for context ONLY - do NOT extract from resume):
 {resume_preview[:800]}
 
-**REMEMBER**:
-- Extract NOUNS (technologies, tools, frameworks), NOT verbs or adjectives
-- Be SPECIFIC: "PostgreSQL" not "database knowledge"
-- IGNORE soft skills completely
-- Keep each atom 2-5 words maximum
+**FINAL REMINDERS**:
+- Extract NOUNS (technologies, tools), NOT verbs or adjectives
+- Be ULTRA SPECIFIC: "PostgreSQL 14" not "database experience"
+- COMPLETELY IGNORE all soft skills
+- Keep 2-5 words per atom maximum
+- If a requirement is vague, skip it or make it specific
 
-Return ONLY valid JSON. No explanations or markdown.
+Return ONLY valid JSON. No markdown, no explanations.
 """
 
 def analysis_prompt(jd, plan, profile, global_sem, cov_final, cov_parts):
@@ -2174,11 +2298,12 @@ with tab1:
                 llm_out = llm_json(model, analysis_prompt(jd, plan, profile, global_sem01, cov_final, cov_parts))
                 fit_score = llm_out.get("fit_score")
                 if not isinstance(fit_score, (int, float)):
-                    # Enhanced fallback with better calibration
-                    fit_score = round(10 * (0.40*global_sem01 + 0.60*cov_final), 1)
+                    # Enhanced fallback: better balance between semantic and coverage
+                    # Favor coverage more as it's more concrete
+                    fit_score = round(10 * (0.35*global_sem01 + 0.65*cov_final), 1)
                 fit_score = float(np.clip(fit_score, 0, 10))
 
-                # ---------- Optimized Final Scoring with Enhanced Penalties ----------
+                # ---------- Balanced Final Scoring with Smart Penalties ----------
                 weights = plan.get("scoring_weights", DEFAULT_WEIGHTS)
                 sem10, cov10 = round(10*global_sem01,1), round(10*cov_final,1)
                 w_sem, w_cov, w_llm = float(weights["semantic"]), float(weights["coverage"]), float(weights["llm_fit"])
@@ -2191,30 +2316,26 @@ with tab1:
                 # Base score calculation
                 raw_score = float(np.clip(w_sem*sem10 + w_cov*cov10 + w_llm*fit_score, 0, 10))
                 
-                # Enhanced penalty system for more accurate scoring
+                # Smart penalty system - only penalize truly poor matches
                 penalty = 0.0
                 penalty_reason = []
                 
-                if must_atoms:
-                    # Stricter must-have coverage penalties
-                    if must_cov < 0.20:
-                        penalty_amount = max(raw_score - 3.0, 0)
+                if must_atoms and len(must_atoms) > 0:
+                    # Only apply penalties for significantly low coverage
+                    if must_cov < 0.30:  # Less than 30% is critical failure
+                        penalty_amount = max(raw_score - 4.0, 0)
                         penalty = max(penalty, penalty_amount)
-                        penalty_reason.append(f"Critical skill gaps (<20% must-haves)")
-                    elif must_cov < 0.35:
-                        penalty_amount = max(raw_score - 4.5, 0)
+                        penalty_reason.append(f"Critical gaps (<30% must-haves)")
+                    elif must_cov < 0.45:  # Less than 45% is major concern
+                        penalty_amount = min(raw_score * 0.20, 1.5)
                         penalty = max(penalty, penalty_amount)
-                        penalty_reason.append(f"Major skill gaps (<35% must-haves)")
-                    elif must_cov < 0.50:
-                        penalty_amount = min(raw_score * 0.25, 2.0)
-                        penalty = max(penalty, penalty_amount)
-                        penalty_reason.append(f"Moderate skill gaps (<50% must-haves)")
+                        penalty_reason.append(f"Major gaps (<45% must-haves)")
                     
-                    # Additional penalty for very low semantic alignment
-                    if global_sem01 < 0.35 and must_cov < 0.50:
-                        additional_penalty = min(1.5, raw_score * 0.15)
+                    # Small penalty for low combined semantic + coverage
+                    if global_sem01 < 0.40 and must_cov < 0.50:
+                        additional_penalty = min(1.0, raw_score * 0.10)
                         penalty += additional_penalty
-                        penalty_reason.append("Low semantic + coverage match")
+                        penalty_reason.append("Low overall alignment")
                 
                 # Apply penalty
                 final_score = float(np.clip(raw_score - penalty, 0, 10))
@@ -2570,9 +2691,9 @@ with tab1:
             full, partial, missing = [], [], []
             for atom, info in detail_map.items():
                 score = float(info.get("score", 0.0))
-                if score >= 0.95:
+                if score >= 0.85:  # Full or LLM-verified
                     full.append((atom, info))
-                elif score >= 0.55:
+                elif score >= 0.5:  # Partial match
                     partial.append((atom, info))
                 else:
                     missing.append((atom, info))
