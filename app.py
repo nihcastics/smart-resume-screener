@@ -44,27 +44,29 @@ st.set_page_config(layout="wide", page_title="Smart Resume Screener", page_icon=
 
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 /* ===== GLOBAL RESET & BASE ===== */
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif}
-html,body,[class*="css"],.main,.stApp{background:#0a0e27!important;overflow-x:hidden}
+html,body,[class*="css"],.main,.stApp{background:#060812!important;overflow-x:hidden}
 
-/* ===== ANIMATED GRADIENT BACKGROUND ===== */
+/* ===== IMMERSIVE ANIMATED GRADIENT BACKGROUND ===== */
 .stApp{
-    background:linear-gradient(-45deg,#0a0e27,#1a1f3a,#16213e,#0f1728)!important;
-    background-size:400% 400%!important;
-    animation:gradientShift 15s ease infinite!important;
+    background:linear-gradient(-45deg,#0d0221,#0f0624,#1a0933,#150a2e,#0d0221)!important;
+    background-size:600% 600%!important;
+    animation:cosmicShift 20s ease-in-out infinite!important;
     position:relative;
     min-height:100vh;
 }
-@keyframes gradientShift{
+@keyframes cosmicShift{
     0%{background-position:0% 50%}
+    25%{background-position:50% 75%}
     50%{background-position:100% 50%}
+    75%{background-position:50% 25%}
     100%{background-position:0% 50%}
 }
 
-/* ===== FLOATING PARTICLES EFFECT ===== */
+/* ===== FLOATING GLOW PARTICLES ===== */
 .stApp::before{
     content:'';
     position:fixed;
@@ -72,48 +74,55 @@ html,body,[class*="css"],.main,.stApp{background:#0a0e27!important;overflow-x:hi
     left:0;
     width:100%;
     height:100%;
-    background-image:radial-gradient(circle at 20% 50%,rgba(102,126,234,.06) 0%,transparent 50%),
-                     radial-gradient(circle at 80% 80%,rgba(118,75,162,.06) 0%,transparent 50%),
-                     radial-gradient(circle at 40% 20%,rgba(16,185,129,.04) 0%,transparent 50%);
+    background-image:radial-gradient(circle at 20% 30%,rgba(139,92,246,.12) 0%,transparent 40%),
+                     radial-gradient(circle at 80% 70%,rgba(236,72,153,.10) 0%,transparent 45%),
+                     radial-gradient(circle at 50% 50%,rgba(99,102,241,.08) 0%,transparent 50%),
+                     radial-gradient(circle at 10% 80%,rgba(16,185,129,.06) 0%,transparent 40%);
     pointer-events:none;
     z-index:0;
-    animation:particleFloat 20s ease-in-out infinite;
+    animation:glowPulse 25s ease-in-out infinite;
 }
-@keyframes particleFloat{
-    0%,100%{transform:translate(0,0) scale(1)}
-    33%{transform:translate(30px,-30px) scale(1.1)}
-    66%{transform:translate(-20px,20px) scale(0.9)}
+@keyframes glowPulse{
+    0%,100%{opacity:1;transform:translate(0,0) scale(1)}
+    25%{opacity:.85;transform:translate(40px,-40px) scale(1.15)}
+    50%{opacity:.95;transform:translate(-30px,30px) scale(1.05)}
+    75%{opacity:.9;transform:translate(30px,20px) scale(1.1)}
 }
 
-/* ===== TYPOGRAPHY ===== */
-h1,h2,h3{font-family:'Poppins',sans-serif!important;color:#f1f5f9!important;font-weight:800!important;letter-spacing:-.03em!important;text-shadow:0 2px 10px rgba(0,0,0,.3)}
-h4,h5,h6{font-family:'Poppins',sans-serif!important;color:#e2e8f0!important;font-weight:700!important}
-p,span,div{color:#94a3b8!important;line-height:1.7!important}
+/* ===== MODERN TYPOGRAPHY WITH BETTER HIERARCHY ===== */
+h1{font-family:'Space Grotesk',sans-serif!important;color:#f8fafc!important;font-weight:800!important;font-size:3.5rem!important;letter-spacing:-.04em!important;text-shadow:0 4px 20px rgba(139,92,246,.6),0 0 60px rgba(236,72,153,.3)}
+h2{font-family:'Space Grotesk',sans-serif!important;color:#f1f5f9!important;font-weight:700!important;font-size:2.25rem!important;letter-spacing:-.03em!important;text-shadow:0 3px 15px rgba(99,102,241,.5)}
+h3{font-family:'Space Grotesk',sans-serif!important;color:#e2e8f0!important;font-weight:700!important;font-size:1.75rem!important;letter-spacing:-.02em!important;text-shadow:0 2px 12px rgba(139,92,246,.4)}
+h4,h5,h6{font-family:'Space Grotesk',sans-serif!important;color:#cbd5e1!important;font-weight:600!important;text-shadow:0 2px 8px rgba(99,102,241,.3)}
+p,span,div{color:#94a3b8!important;line-height:1.8!important;font-size:1.05rem!important}
 
-/* ===== TABS WITH MODERN DESIGN ===== */
+/* ===== ULTRA-MODERN FLUID TABS ===== */
 .stTabs [data-baseweb="tab-list"]{
-    gap:20px;
-    background:rgba(15,23,42,.6);
+    gap:24px;
+    background:linear-gradient(135deg,rgba(21,10,46,.75),rgba(13,2,33,.75));
     border-bottom:none;
-    padding:12px 24px;
-    border-radius:20px 20px 0 0;
-    backdrop-filter:blur(20px);
-    box-shadow:0 -10px 30px rgba(0,0,0,.3);
+    padding:16px 28px;
+    border-radius:24px 24px 0 0;
+    backdrop-filter:blur(30px) saturate(180%);
+    box-shadow:0 -15px 50px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.05);
+    border:1px solid rgba(139,92,246,.15);
 }
 .stTabs [data-baseweb="tab"]{
-    height:56px;
-    padding:0 36px;
-    background:rgba(30,41,59,.5);
-    border:2px solid rgba(148,163,184,.1);
-    border-radius:14px;
-    color:#94a3b8;
-    font-weight:600;
-    font-size:15px;
-    letter-spacing:.3px;
-    transition:all .4s cubic-bezier(.4,0,.2,1);
-    backdrop-filter:blur(10px);
+    height:64px;
+    padding:0 42px;
+    background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(99,102,241,.08));
+    border:2px solid rgba(139,92,246,.2);
+    border-radius:18px;
+    color:#a78bfa;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:16px;
+    letter-spacing:.5px;
+    transition:all .5s cubic-bezier(.34,1.56,.64,1);
+    backdrop-filter:blur(15px);
     position:relative;
     overflow:hidden;
+    box-shadow:0 4px 15px rgba(139,92,246,.15);
 }
 .stTabs [data-baseweb="tab"]::before{
     content:'';
@@ -122,39 +131,61 @@ p,span,div{color:#94a3b8!important;line-height:1.7!important}
     left:-100%;
     width:100%;
     height:100%;
-    background:linear-gradient(90deg,transparent,rgba(102,126,234,.2),transparent);
-    transition:left .6s ease;
+    background:linear-gradient(90deg,transparent,rgba(139,92,246,.3),rgba(236,72,153,.3),transparent);
+    transition:left .8s cubic-bezier(.4,0,.2,1);
+}
+.stTabs [data-baseweb="tab"]::after{
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:18px;
+    padding:2px;
+    background:linear-gradient(135deg,rgba(139,92,246,.4),rgba(236,72,153,.4));
+    -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+    -webkit-mask-composite:exclude;
+    mask-composite:exclude;
+    opacity:0;
+    transition:opacity .5s ease;
 }
 .stTabs [data-baseweb="tab"]:hover::before{left:100%}
+.stTabs [data-baseweb="tab"]:hover::after{opacity:1}
 .stTabs [data-baseweb="tab"]:hover{
-    background:rgba(102,126,234,.12);
-    border-color:rgba(102,126,234,.4);
-    transform:translateY(-4px) scale(1.02);
-    box-shadow:0 10px 30px rgba(102,126,234,.2);
+    background:linear-gradient(135deg,rgba(139,92,246,.18),rgba(236,72,153,.15));
+    border-color:rgba(139,92,246,.5);
+    transform:translateY(-6px) scale(1.03);
+    box-shadow:0 15px 45px rgba(139,92,246,.35),0 0 50px rgba(236,72,153,.25);
+    color:#e9d5ff;
 }
 .stTabs [aria-selected="true"]{
-    background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)!important;
+    background:linear-gradient(135deg,#8b5cf6 0%,#ec4899 100%)!important;
     color:#fff!important;
-    border-color:rgba(102,126,234,.6)!important;
-    box-shadow:0 15px 50px rgba(102,126,234,.5),inset 0 1px 0 rgba(255,255,255,.2)!important;
-    transform:translateY(-2px);
+    border-color:rgba(139,92,246,.8)!important;
+    box-shadow:0 20px 60px rgba(139,92,246,.6),0 0 80px rgba(236,72,153,.5),inset 0 2px 0 rgba(255,255,255,.3),inset 0 -2px 0 rgba(0,0,0,.2)!important;
+    transform:translateY(-4px) scale(1.02);
 }
 
-/* ===== BUTTONS WITH GLOW EFFECT ===== */
+/* ===== MAGNETIC GLOWING BUTTONS ===== */
 .stButton>button{
-    background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+    background:linear-gradient(135deg,#8b5cf6 0%,#6366f1 50%,#ec4899 100%);
+    background-size:200% 200%;
     color:#fff;
     border:none;
-    border-radius:16px;
-    padding:18px 52px;
-    font-weight:700;
-    font-size:16px;
-    letter-spacing:1px;
+    border-radius:20px;
+    padding:22px 60px;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:800;
+    font-size:17px;
+    letter-spacing:1.5px;
     text-transform:uppercase;
-    transition:all .4s cubic-bezier(.4,0,.2,1);
-    box-shadow:0 12px 40px rgba(102,126,234,.4),inset 0 1px 0 rgba(255,255,255,.2);
+    transition:all .5s cubic-bezier(.34,1.56,.64,1);
+    box-shadow:0 15px 50px rgba(139,92,246,.5),0 0 60px rgba(236,72,153,.3),inset 0 2px 0 rgba(255,255,255,.3),inset 0 -2px 0 rgba(0,0,0,.2);
     position:relative;
     overflow:hidden;
+    animation:gradientSlide 4s ease infinite;
+}
+@keyframes gradientSlide{
+    0%,100%{background-position:0% 50%}
+    50%{background-position:100% 50%}
 }
 .stButton>button::before{
     content:'';
@@ -164,59 +195,95 @@ p,span,div{color:#94a3b8!important;line-height:1.7!important}
     width:0;
     height:0;
     border-radius:50%;
-    background:rgba(255,255,255,.3);
+    background:radial-gradient(circle,rgba(255,255,255,.4),transparent 70%);
     transform:translate(-50%,-50%);
-    transition:width .6s,height .6s;
+    transition:width .7s cubic-bezier(.4,0,.2,1),height .7s cubic-bezier(.4,0,.2,1);
 }
-.stButton>button:hover::before{width:300px;height:300px}
+.stButton>button::after{
+    content:'';
+    position:absolute;
+    inset:-2px;
+    border-radius:22px;
+    background:linear-gradient(45deg,#8b5cf6,#ec4899,#6366f1,#8b5cf6);
+    background-size:400% 400%;
+    opacity:0;
+    filter:blur(20px);
+    transition:opacity .5s ease;
+    animation:rotateGradient 6s linear infinite;
+    z-index:-1;
+}
+@keyframes rotateGradient{
+    0%{background-position:0% 50%}
+    50%{background-position:100% 50%}
+    100%{background-position:0% 50%}
+}
+.stButton>button:hover::before{width:400px;height:400px}
+.stButton>button:hover::after{opacity:.8}
 .stButton>button:hover{
-    transform:translateY(-4px) scale(1.02);
-    box-shadow:0 20px 60px rgba(102,126,234,.6),0 0 40px rgba(118,75,162,.4),inset 0 1px 0 rgba(255,255,255,.3);
+    transform:translateY(-6px) scale(1.05);
+    box-shadow:0 25px 80px rgba(139,92,246,.7),0 0 90px rgba(236,72,153,.6),0 0 120px rgba(99,102,241,.4),inset 0 2px 0 rgba(255,255,255,.4);
 }
-.stButton>button:active{transform:translateY(-2px) scale(.98)}
+.stButton>button:active{transform:translateY(-3px) scale(.98)}
 
-/* ===== FILE UPLOADER ===== */
+/* ===== IMMERSIVE FILE UPLOADER ===== */
 .stFileUploader{
-    background:rgba(30,41,59,.6);
-    border:3px dashed rgba(102,126,234,.4);
-    border-radius:20px;
-    padding:32px;
-    transition:all .4s cubic-bezier(.4,0,.2,1);
-    backdrop-filter:blur(15px);
+    background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(236,72,153,.08));
+    border:3px dashed rgba(139,92,246,.5);
+    border-radius:24px;
+    padding:40px;
+    transition:all .5s cubic-bezier(.34,1.56,.64,1);
+    backdrop-filter:blur(25px) saturate(180%);
+    position:relative;
+    overflow:hidden;
 }
+.stFileUploader::before{
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:24px;
+    background:linear-gradient(45deg,rgba(139,92,246,.15),rgba(236,72,153,.15));
+    opacity:0;
+    transition:opacity .5s ease;
+}
+.stFileUploader:hover::before{opacity:1}
 .stFileUploader:hover{
-    background:rgba(102,126,234,.08);
-    border-color:rgba(102,126,234,.7);
-    transform:scale(1.01);
-    box-shadow:0 15px 40px rgba(102,126,234,.15);
+    background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(236,72,153,.15));
+    border-color:rgba(139,92,246,.8);
+    border-style:solid;
+    transform:scale(1.02) translateY(-4px);
+    box-shadow:0 20px 60px rgba(139,92,246,.3),0 0 80px rgba(236,72,153,.2);
 }
 
-/* ===== TEXT AREA ===== */
+/* ===== GLOWING TEXT AREA ===== */
 .stTextArea textarea{
-    background:rgba(30,41,59,.8)!important;
-    border:2px solid rgba(148,163,184,.2)!important;
-    border-radius:16px!important;
-    color:#e2e8f0!important;
-    font-size:15px!important;
-    padding:20px!important;
-    transition:all .3s ease!important;
-    line-height:1.8!important;
+    background:linear-gradient(135deg,rgba(21,10,46,.9),rgba(13,2,33,.9))!important;
+    border:2px solid rgba(139,92,246,.3)!important;
+    border-radius:20px!important;
+    color:#f1f5f9!important;
+    font-family:'JetBrains Mono',monospace!important;
+    font-size:16px!important;
+    padding:24px!important;
+    transition:all .4s cubic-bezier(.4,0,.2,1)!important;
+    line-height:1.9!important;
+    backdrop-filter:blur(20px)!important;
+    box-shadow:inset 0 2px 8px rgba(0,0,0,.3)!important;
 }
 .stTextArea textarea:focus{
-    border-color:rgba(102,126,234,.8)!important;
-    box-shadow:0 0 0 4px rgba(102,126,234,.15),0 10px 30px rgba(102,126,234,.2)!important;
-    background:rgba(30,41,59,.95)!important;
+    border-color:rgba(139,92,246,.9)!important;
+    box-shadow:0 0 0 5px rgba(139,92,246,.2),0 15px 50px rgba(139,92,246,.3),0 0 70px rgba(236,72,153,.2),inset 0 2px 8px rgba(0,0,0,.3)!important;
+    background:linear-gradient(135deg,rgba(21,10,46,.98),rgba(13,2,33,.98))!important;
+    transform:scale(1.01)!important;
 }
 
-/* ===== METRIC CARDS WITH GLASSMORPHISM ===== */
+/* ===== PREMIUM METRIC CARDS WITH GLOW ===== */
 .metric-card{
-    background:linear-gradient(135deg,rgba(30,41,59,.85) 0%,rgba(15,23,42,.85) 100%);
-    border:1px solid rgba(148,163,184,.15);
-    border-radius:24px;
-    padding:28px;
-    transition:all .5s cubic-bezier(.4,0,.2,1);
-    backdrop-filter:blur(20px) saturate(180%);
-    box-shadow:0 8px 32px rgba(0,0,0,.3);
+    background:linear-gradient(135deg,rgba(21,10,46,.90),rgba(13,2,33,.88));
+    border:2px solid rgba(139,92,246,.25);
+    border-radius:28px;
+    padding:36px;
+    transition:all .6s cubic-bezier(.34,1.56,.64,1);
+    backdrop-filter:blur(30px) saturate(200%);
+    box-shadow:0 10px 40px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);
     position:relative;
     overflow:hidden;
 }
@@ -226,138 +293,239 @@ p,span,div{color:#94a3b8!important;line-height:1.7!important}
     top:0;
     left:0;
     right:0;
-    height:2px;
-    background:linear-gradient(90deg,transparent,rgba(102,126,234,.6),transparent);
+    height:4px;
+    background:linear-gradient(90deg,transparent,rgba(139,92,246,.8),rgba(236,72,153,.8),transparent);
+    opacity:0;
+    transition:opacity .6s ease;
+    box-shadow:0 0 20px rgba(139,92,246,.6);
+}
+.metric-card::after{
+    content:'';
+    position:absolute;
+    inset:-100%;
+    background:radial-gradient(circle,rgba(139,92,246,.15),transparent 70%);
+    opacity:0;
+    transition:opacity .6s ease,transform .6s ease;
+    pointer-events:none;
+}
+.metric-card:hover::before{opacity:1}
+.metric-card:hover::after{opacity:1;transform:scale(1.5)}
+.metric-card:hover{
+    border-color:rgba(139,92,246,.6);
+    transform:translateY(-10px) scale(1.02) rotate(0.5deg);
+    box-shadow:0 25px 70px rgba(139,92,246,.4),0 0 90px rgba(236,72,153,.3),inset 0 2px 0 rgba(255,255,255,.1);
+}
+
+/* ===== IMMERSIVE ANALYSIS CARDS ===== */
+.analysis-card{
+    background:linear-gradient(135deg,rgba(21,10,46,.92),rgba(13,2,33,.90));
+    border:2px solid rgba(139,92,246,.3);
+    border-radius:24px;
+    padding:34px;
+    transition:all .5s cubic-bezier(.34,1.56,.64,1);
+    backdrop-filter:blur(25px) saturate(180%);
+    box-shadow:0 12px 45px rgba(0,0,0,.4);
+    position:relative;
+    overflow:hidden;
+}
+.analysis-card::before{
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:24px;
+    background:linear-gradient(135deg,rgba(139,92,246,.1),rgba(236,72,153,.1));
     opacity:0;
     transition:opacity .5s ease;
 }
-.metric-card:hover::before{opacity:1}
-.metric-card:hover{
-    border-color:rgba(102,126,234,.5);
-    transform:translateY(-6px) scale(1.01);
-    box-shadow:0 20px 50px rgba(102,126,234,.25),inset 0 1px 0 rgba(255,255,255,.05);
-}
-
-/* ===== ANALYSIS CARDS ===== */
-.analysis-card{
-    background:linear-gradient(135deg,rgba(30,41,59,.9) 0%,rgba(15,23,42,.85) 100%);
-    border:1px solid rgba(148,163,184,.2);
-    border-radius:20px;
-    padding:28px;
-    transition:all .4s cubic-bezier(.4,0,.2,1);
-    backdrop-filter:blur(20px);
-    box-shadow:0 10px 40px rgba(0,0,0,.3);
-}
+.analysis-card:hover::before{opacity:1}
 .analysis-card:hover{
-    border-color:rgba(102,126,234,.5);
-    transform:translateY(-4px);
-    box-shadow:0 15px 50px rgba(102,126,234,.2);
+    border-color:rgba(139,92,246,.6);
+    transform:translateY(-8px) scale(1.01);
+    box-shadow:0 20px 65px rgba(139,92,246,.35),0 0 80px rgba(236,72,153,.25);
 }
 
-/* ===== SCORE BADGES WITH 3D EFFECT ===== */
+/* ===== ULTRA 3D GLOWING SCORE BADGES ===== */
 .score-badge{
     display:inline-block;
-    padding:20px 40px;
-    border-radius:28px;
-    font-family:'Poppins',sans-serif;
+    padding:28px 52px;
+    border-radius:32px;
+    font-family:'Space Grotesk',sans-serif;
     font-weight:900;
-    font-size:48px;
-    box-shadow:0 15px 40px rgba(0,0,0,.4),inset 0 2px 0 rgba(255,255,255,.3),inset 0 -2px 0 rgba(0,0,0,.3);
-    transition:all .4s cubic-bezier(.4,0,.2,1);
+    font-size:56px;
+    box-shadow:0 20px 60px rgba(0,0,0,.6),inset 0 3px 0 rgba(255,255,255,.4),inset 0 -3px 0 rgba(0,0,0,.4);
+    transition:all .5s cubic-bezier(.34,1.56,.64,1);
     position:relative;
+    letter-spacing:-.02em;
 }
-.score-badge:hover{transform:scale(1.08) rotate(-2deg);box-shadow:0 20px 60px rgba(0,0,0,.5),inset 0 2px 0 rgba(255,255,255,.4)}
-.score-excellent{background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#fff;box-shadow:0 15px 50px rgba(16,185,129,.6)}
-.score-good{background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);color:#fff;box-shadow:0 15px 50px rgba(59,130,246,.6)}
-.score-fair{background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);color:#fff;box-shadow:0 15px 50px rgba(245,158,11,.6)}
-.score-poor{background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%);color:#fff;box-shadow:0 15px 50px rgba(239,68,68,.6)}
+.score-badge::after{
+    content:'';
+    position:absolute;
+    inset:-4px;
+    border-radius:36px;
+    opacity:0;
+    filter:blur(25px);
+    transition:opacity .5s ease;
+    z-index:-1;
+}
+.score-badge:hover{transform:scale(1.12) rotate(-3deg) translateY(-8px);box-shadow:0 30px 90px rgba(0,0,0,.7),inset 0 3px 0 rgba(255,255,255,.5)}
+.score-badge:hover::after{opacity:.9}
+.score-excellent{background:linear-gradient(135deg,#10b981 0%,#059669 50%,#047857 100%);color:#fff;box-shadow:0 20px 70px rgba(16,185,129,.7),0 0 90px rgba(16,185,129,.5)}
+.score-excellent::after{background:linear-gradient(135deg,#10b981,#059669)}
+.score-good{background:linear-gradient(135deg,#6366f1 0%,#4f46e5 50%,#4338ca 100%);color:#fff;box-shadow:0 20px 70px rgba(99,102,241,.7),0 0 90px rgba(99,102,241,.5)}
+.score-good::after{background:linear-gradient(135deg,#6366f1,#4f46e5)}
+.score-fair{background:linear-gradient(135deg,#f59e0b 0%,#d97706 50%,#b45309 100%);color:#fff;box-shadow:0 20px 70px rgba(245,158,11,.7),0 0 90px rgba(245,158,11,.5)}
+.score-fair::after{background:linear-gradient(135deg,#f59e0b,#d97706)}
+.score-poor{background:linear-gradient(135deg,#ef4444 0%,#dc2626 50%,#b91c1c 100%);color:#fff;box-shadow:0 20px 70px rgba(239,68,68,.7),0 0 90px rgba(239,68,68,.5)}
+.score-poor::after{background:linear-gradient(135deg,#ef4444,#dc2626)}
 
-/* ===== CHIPS ===== */
+/* ===== ANIMATED GLOW CHIPS ===== */
 .chip{
     display:inline-block;
-    margin:4px 8px 4px 0;
-    padding:8px 16px;
-    border-radius:24px;
-    background:rgba(102,126,234,.18);
-    border:1px solid rgba(102,126,234,.4);
-    font-size:13px;
-    font-weight:600;
-    color:#cbd5e1;
-    transition:all .3s cubic-bezier(.4,0,.2,1);
-    box-shadow:0 2px 8px rgba(102,126,234,.15);
+    margin:6px 10px 6px 0;
+    padding:10px 20px;
+    border-radius:28px;
+    background:linear-gradient(135deg,rgba(139,92,246,.20),rgba(236,72,153,.18));
+    border:2px solid rgba(139,92,246,.5);
+    font-size:14px;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    color:#e9d5ff;
+    transition:all .4s cubic-bezier(.34,1.56,.64,1);
+    box-shadow:0 4px 12px rgba(139,92,246,.25),inset 0 1px 0 rgba(255,255,255,.1);
+    position:relative;
+    overflow:hidden;
 }
+.chip::before{
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:28px;
+    background:linear-gradient(135deg,rgba(139,92,246,.3),rgba(236,72,153,.3));
+    opacity:0;
+    transition:opacity .4s ease;
+}
+.chip:hover::before{opacity:1}
 .chip:hover{
-    background:rgba(102,126,234,.3);
-    border-color:rgba(102,126,234,.7);
-    transform:translateY(-2px);
-    box-shadow:0 6px 16px rgba(102,126,234,.3);
+    background:linear-gradient(135deg,rgba(139,92,246,.35),rgba(236,72,153,.33));
+    border-color:rgba(139,92,246,.8);
+    transform:translateY(-4px) scale(1.05);
+    box-shadow:0 10px 30px rgba(139,92,246,.45),0 0 40px rgba(236,72,153,.35),inset 0 1px 0 rgba(255,255,255,.2);
+    color:#fff;
 }
 
-/* ===== DIVIDERS ===== */
+/* ===== GLOWING DIVIDERS ===== */
 hr{
     border:none;
-    height:2px;
-    background:linear-gradient(90deg,transparent,rgba(148,163,184,.4),transparent);
-    margin:32px 0;
+    height:3px;
+    background:linear-gradient(90deg,transparent,rgba(139,92,246,.5),rgba(236,72,153,.5),transparent);
+    margin:40px 0;
     position:relative;
+    box-shadow:0 0 20px rgba(139,92,246,.3);
 }
 hr::before{
     content:'';
     position:absolute;
-    top:-1px;
+    top:-2px;
     left:50%;
     transform:translateX(-50%);
-    width:80px;
-    height:4px;
-    background:linear-gradient(90deg,#667eea,#764ba2);
-    border-radius:2px;
-    box-shadow:0 2px 10px rgba(102,126,234,.5);
+    width:120px;
+    height:6px;
+    background:linear-gradient(90deg,#8b5cf6,#ec4899,#6366f1);
+    border-radius:3px;
+    box-shadow:0 4px 20px rgba(139,92,246,.7),0 0 40px rgba(236,72,153,.5);
+    animation:glowPulseSmall 3s ease-in-out infinite;
+}
+@keyframes glowPulseSmall{
+    0%,100%{opacity:1;filter:brightness(1)}
+    50%{opacity:.8;filter:brightness(1.3)}
 }
 
-/* ===== EXPANDERS ===== */
+/* ===== FLUID EXPANDERS ===== */
 .stExpander{
-    background:rgba(30,41,59,.7)!important;
-    border:1px solid rgba(148,163,184,.2)!important;
-    border-radius:16px!important;
-    transition:all .3s ease!important;
-    backdrop-filter:blur(10px)!important;
+    background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85))!important;
+    border:2px solid rgba(139,92,246,.3)!important;
+    border-radius:20px!important;
+    transition:all .4s cubic-bezier(.4,0,.2,1)!important;
+    backdrop-filter:blur(20px) saturate(180%)!important;
 }
-.stExpander:hover{border-color:rgba(102,126,234,.5)!important;box-shadow:0 8px 24px rgba(102,126,234,.15)!important}
-.stExpander [data-testid="stExpanderToggleButton"]{color:#e2e8f0!important;font-weight:600!important}
-
-/* ===== PROGRESS BARS ===== */
-.stProgress>div>div{
-    background:linear-gradient(90deg,#667eea,#764ba2)!important;
-    border-radius:10px!important;
-    box-shadow:0 2px 10px rgba(102,126,234,.5)!important;
+.stExpander:hover{
+    border-color:rgba(139,92,246,.6)!important;
+    box-shadow:0 12px 40px rgba(139,92,246,.25),0 0 50px rgba(236,72,153,.15)!important;
+    transform:translateY(-2px)!important;
 }
-
-/* ===== SCROLLBAR ===== */
-::-webkit-scrollbar{width:10px;height:10px}
-::-webkit-scrollbar-track{background:rgba(15,23,42,.8);border-radius:10px}
-::-webkit-scrollbar-thumb{background:linear-gradient(135deg,#667eea,#764ba2);border-radius:10px;border:2px solid rgba(15,23,42,.8)}
-::-webkit-scrollbar-thumb:hover{background:linear-gradient(135deg,#764ba2,#667eea)}
-
-/* ===== SECTION HEADERS ===== */
-.section-header{
-    font-size:24px;
-    font-weight:800;
+.stExpander [data-testid="stExpanderToggleButton"]{
     color:#f1f5f9!important;
-    margin-bottom:20px;
-    text-transform:uppercase;
-    letter-spacing:1.2px;
-    text-shadow:0 2px 10px rgba(102,126,234,.6);
-    font-family:'Poppins',sans-serif!important;
+    font-family:'Space Grotesk',sans-serif!important;
+    font-weight:700!important;
+    font-size:15px!important;
 }
 
-/* ===== FADE IN ANIMATION ===== */
-@keyframes fadeInUp{
-    from{opacity:0;transform:translateY(30px)}
-    to{opacity:1;transform:translateY(0)}
+/* ===== ANIMATED GLOW PROGRESS BARS ===== */
+.stProgress>div>div{
+    background:linear-gradient(90deg,#8b5cf6,#ec4899,#6366f1)!important;
+    background-size:200% 200%!important;
+    border-radius:12px!important;
+    box-shadow:0 4px 20px rgba(139,92,246,.6),0 0 30px rgba(236,72,153,.4)!important;
+    animation:progressGlow 3s ease-in-out infinite!important;
 }
-.metric-card,.analysis-card{animation:fadeInUp .6s ease-out backwards}
-.metric-card:nth-child(2){animation-delay:.1s}
-.metric-card:nth-child(3){animation-delay:.2s}
+@keyframes progressGlow{
+    0%,100%{background-position:0% 50%;filter:brightness(1)}
+    50%{background-position:100% 50%;filter:brightness(1.3)}
+}
+
+/* ===== PREMIUM GLOWING SCROLLBAR ===== */
+::-webkit-scrollbar{width:12px;height:12px}
+::-webkit-scrollbar-track{background:rgba(13,2,33,.9);border-radius:12px;box-shadow:inset 0 0 10px rgba(0,0,0,.5)}
+::-webkit-scrollbar-thumb{
+    background:linear-gradient(135deg,#8b5cf6,#ec4899,#6366f1);
+    background-size:200% 200%;
+    border-radius:12px;
+    border:2px solid rgba(13,2,33,.9);
+    box-shadow:0 0 15px rgba(139,92,246,.6);
+    animation:scrollGlow 4s ease infinite;
+}
+@keyframes scrollGlow{
+    0%,100%{background-position:0% 50%}
+    50%{background-position:100% 50%}
+}
+::-webkit-scrollbar-thumb:hover{
+    background:linear-gradient(135deg,#ec4899,#8b5cf6,#6366f1);
+    box-shadow:0 0 25px rgba(236,72,153,.8);
+}
+
+/* ===== GLOWING SECTION HEADERS ===== */
+.section-header{
+    font-size:32px;
+    font-weight:900;
+    color:#f8fafc!important;
+    margin-bottom:28px;
+    text-transform:uppercase;
+    letter-spacing:2px;
+    text-shadow:0 4px 20px rgba(139,92,246,.8),0 0 50px rgba(236,72,153,.6),0 0 80px rgba(99,102,241,.4);
+    font-family:'Space Grotesk',sans-serif!important;
+    animation:headerGlow 3s ease-in-out infinite;
+}
+@keyframes headerGlow{
+    0%,100%{filter:brightness(1) drop-shadow(0 0 20px rgba(139,92,246,.6))}
+    50%{filter:brightness(1.2) drop-shadow(0 0 40px rgba(236,72,153,.8))}
+}
+
+/* ===== FLUID ENTRANCE ANIMATIONS ===== */
+@keyframes fadeInUp{
+    from{opacity:0;transform:translateY(40px) scale(.95)}
+    to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes fadeInRotate{
+    from{opacity:0;transform:translateY(40px) rotate(-5deg) scale(.9)}
+    to{opacity:1;transform:translateY(0) rotate(0deg) scale(1)}
+}
+.metric-card{animation:fadeInRotate .8s cubic-bezier(.34,1.56,.64,1) backwards}
+.analysis-card{animation:fadeInUp .7s ease-out backwards}
+.metric-card:nth-child(1){animation-delay:.05s}
+.metric-card:nth-child(2){animation-delay:.15s}
+.metric-card:nth-child(3){animation-delay:.25s}
+.analysis-card:nth-child(1){animation-delay:.1s}
+.analysis-card:nth-child(2){animation-delay:.2s}
 
 /* ===== HIDE STREAMLIT DEFAULT ELEMENTS ===== */
 #MainMenu{visibility:hidden}
@@ -366,9 +534,16 @@ header{visibility:hidden}
 .stDeployButton{display:none}
 [data-testid="stToolbar"]{display:none}
 
-/* ===== UTILITIES ===== */
-.small{font-size:12px;color:#9aa5b1;letter-spacing:.3px}
-.glow-text{text-shadow:0 0 20px rgba(102,126,234,.8),0 0 40px rgba(102,126,234,.6)}
+/* ===== UTILITIES WITH ENHANCED GLOWS ===== */
+.small{font-size:13px;color:#a78bfa;letter-spacing:.5px;font-weight:500}
+.glow-text{
+    text-shadow:0 0 30px rgba(139,92,246,.9),0 0 60px rgba(236,72,153,.7),0 0 90px rgba(99,102,241,.5);
+    animation:textGlow 3s ease-in-out infinite;
+}
+@keyframes textGlow{
+    0%,100%{filter:brightness(1)}
+    50%{filter:brightness(1.4)}
+}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -1614,11 +1789,14 @@ with tab1:
             else:
                 st.info("⭐ No nice-to-have requirements specified for this position.")
         
-        # ===== Beautiful Candidate Assessment =====
+        # ===== IMMERSIVE CANDIDATE ASSESSMENT =====
         st.markdown("""
-        <div style="text-align:center;margin:48px 0 32px 0;">
-            <h3 class="section-header" style="display:inline-block;padding:16px 40px;background:rgba(139,92,246,.15);
-                       border-radius:20px;border:3px solid rgba(139,92,246,.4);box-shadow:0 8px 24px rgba(139,92,246,.3);">
+        <div style="text-align:center;margin:56px 0 40px 0;position:relative;">
+            <h3 class="section-header" style="display:inline-block;padding:24px 56px;
+                       background:linear-gradient(135deg,rgba(139,92,246,.25),rgba(236,72,153,.22));
+                       border-radius:28px;border:3px solid rgba(139,92,246,.6);
+                       box-shadow:0 15px 60px rgba(139,92,246,.5),0 0 80px rgba(236,72,153,.4),inset 0 2px 0 rgba(255,255,255,.15);
+                       backdrop-filter:blur(20px);font-size:36px;letter-spacing:3px;animation:headerGlow 3s ease-in-out infinite;">
                 🎯 CANDIDATE ASSESSMENT
             </h3>
         </div>
@@ -1626,39 +1804,48 @@ with tab1:
         
         llm = analysis['llm_analysis']
         
-        # Top Strengths Section - Full Width, Prominent
+        # Top Strengths Section - Ultra Immersive
         strengths = llm.get('top_strengths', [])[:4]
         if strengths:
             st.markdown("""
-            <div class="metric-card" style="background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(5,150,105,.12));
-                        border:2px solid rgba(16,185,129,.4);border-radius:24px;padding:32px;
-                        box-shadow:0 12px 40px rgba(16,185,129,.25);margin-bottom:24px;">
-                <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
-                    <div style="width:56px;height:56px;background:linear-gradient(135deg,#10b981,#059669);
-                                border-radius:16px;display:flex;align-items:center;justify-content:center;
-                                font-size:28px;box-shadow:0 8px 20px rgba(16,185,129,.4);">
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(16,185,129,.22),rgba(5,150,105,.20));
+                        border:3px solid rgba(16,185,129,.6);border-radius:32px;padding:40px;
+                        box-shadow:0 20px 70px rgba(16,185,129,.45),0 0 100px rgba(16,185,129,.35),inset 0 2px 0 rgba(255,255,255,.1);
+                        margin-bottom:32px;position:relative;overflow:hidden;">
+                <div style="position:absolute;inset:0;background:radial-gradient(circle at top left,rgba(16,185,129,.15),transparent 60%);
+                            pointer-events:none;"></div>
+                <div style="display:flex;align-items:center;gap:20px;margin-bottom:28px;position:relative;z-index:1;">
+                    <div style="width:72px;height:72px;background:linear-gradient(135deg,#10b981,#059669,#047857);
+                                border-radius:20px;display:flex;align-items:center;justify-content:center;
+                                font-size:36px;box-shadow:0 12px 40px rgba(16,185,129,.6),0 0 60px rgba(16,185,129,.4);
+                                animation:glowPulseSmall 3s ease-in-out infinite;">
                         💪
                     </div>
-                    <h3 style="margin:0;color:#6ee7b7;font-size:24px;font-weight:800;font-family:'Poppins',sans-serif;
-                               text-transform:uppercase;letter-spacing:1px;">
+                    <h3 style="margin:0;color:#6ee7b7;font-size:30px;font-weight:900;font-family:'Space Grotesk',sans-serif;
+                               text-transform:uppercase;letter-spacing:2px;text-shadow:0 4px 20px rgba(16,185,129,.8);">
                         Top Strengths
                     </h3>
                 </div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:20px;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;margin-top:24px;position:relative;z-index:1;">
             """, unsafe_allow_html=True)
             
             for idx, s in enumerate(strengths, 1):
                 st.markdown(f"""
-                <div style="background:rgba(15,23,42,.7);padding:20px;border-radius:16px;
-                            border-left:4px solid #10b981;backdrop-filter:blur(10px);
-                            transition:all .3s ease;position:relative;">
-                    <div style="position:absolute;top:12px;right:12px;width:32px;height:32px;
-                                background:rgba(16,185,129,.2);border-radius:50%;display:flex;
-                                align-items:center;justify-content:center;font-size:14px;font-weight:700;
-                                color:#6ee7b7;border:2px solid rgba(16,185,129,.5);">
+                <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
+                            padding:26px;border-radius:20px;border-left:5px solid #10b981;
+                            backdrop-filter:blur(25px);transition:all .4s cubic-bezier(.34,1.56,.64,1);
+                            position:relative;overflow:hidden;border:2px solid rgba(16,185,129,.3);
+                            box-shadow:0 8px 25px rgba(16,185,129,.2);">
+                    <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(16,185,129,.08),transparent);
+                                opacity:0;transition:opacity .4s ease;"></div>
+                    <div style="position:absolute;top:14px;right:14px;width:40px;height:40px;
+                                background:linear-gradient(135deg,rgba(16,185,129,.35),rgba(16,185,129,.25));
+                                border-radius:50%;display:flex;align-items:center;justify-content:center;
+                                font-size:16px;font-weight:900;color:#6ee7b7;
+                                border:2px solid rgba(16,185,129,.6);box-shadow:0 4px 15px rgba(16,185,129,.4);">
                         {idx}
                     </div>
-                    <p style="margin:0;color:#e2e8f0;font-size:15px;line-height:1.7;padding-right:40px;">
+                    <p style="margin:0;color:#f1f5f9;font-size:16px;line-height:1.9;padding-right:50px;font-weight:600;">
                         ✓ {s}
                     </p>
                 </div>
@@ -1673,23 +1860,29 @@ with tab1:
         with col1:
             cultural_fit = str(llm.get('cultural_fit', 'N/A'))
             st.markdown(f"""
-            <div class="metric-card" style="background:linear-gradient(135deg,rgba(102,126,234,.12),rgba(88,80,236,.12));
-                        border:2px solid rgba(102,126,234,.4);border-radius:24px;padding:32px;
-                        box-shadow:0 12px 40px rgba(102,126,234,.25);height:100%;">
-                <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
-                    <div style="width:56px;height:56px;background:linear-gradient(135deg,#667eea,#764ba2);
-                                border-radius:16px;display:flex;align-items:center;justify-content:center;
-                                font-size:28px;box-shadow:0 8px 20px rgba(102,126,234,.4);">
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(99,102,241,.22),rgba(139,92,246,.20));
+                        border:3px solid rgba(99,102,241,.6);border-radius:28px;padding:38px;
+                        box-shadow:0 18px 65px rgba(99,102,241,.4),0 0 90px rgba(139,92,246,.3),inset 0 2px 0 rgba(255,255,255,.1);
+                        height:100%;position:relative;overflow:hidden;">
+                <div style="position:absolute;inset:0;background:radial-gradient(circle at bottom right,rgba(99,102,241,.15),transparent 60%);
+                            pointer-events:none;"></div>
+                <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px;position:relative;z-index:1;">
+                    <div style="width:72px;height:72px;background:linear-gradient(135deg,#6366f1,#8b5cf6,#4f46e5);
+                                border-radius:20px;display:flex;align-items:center;justify-content:center;
+                                font-size:36px;box-shadow:0 12px 40px rgba(99,102,241,.6),0 0 60px rgba(139,92,246,.4);
+                                animation:glowPulseSmall 3s ease-in-out infinite;">
                         🤝
                     </div>
-                    <h3 style="margin:0;color:#93bbfd;font-size:22px;font-weight:800;font-family:'Poppins',sans-serif;
-                               text-transform:uppercase;letter-spacing:1px;">
+                    <h3 style="margin:0;color:#c7d2fe;font-size:26px;font-weight:900;font-family:'Space Grotesk',sans-serif;
+                               text-transform:uppercase;letter-spacing:2px;text-shadow:0 4px 20px rgba(99,102,241,.8);">
                         Cultural Fit
                     </h3>
                 </div>
-                <div style="background:rgba(15,23,42,.6);padding:24px;border-radius:16px;
-                            border-left:4px solid #667eea;backdrop-filter:blur(10px);">
-                    <p style="margin:0;color:#cbd5e1;font-size:15px;line-height:1.8;">
+                <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
+                            padding:28px;border-radius:20px;border-left:5px solid #6366f1;
+                            backdrop-filter:blur(25px);border:2px solid rgba(99,102,241,.3);
+                            box-shadow:0 8px 25px rgba(99,102,241,.2);position:relative;z-index:1;">
+                    <p style="margin:0;color:#f1f5f9;font-size:16px;line-height:1.9;font-weight:500;">
                         {cultural_fit}
                     </p>
                 </div>
@@ -1699,62 +1892,79 @@ with tab1:
         with col2:
             technical_strength = str(llm.get('technical_strength', 'N/A'))
             st.markdown(f"""
-            <div class="metric-card" style="background:linear-gradient(135deg,rgba(139,92,246,.12),rgba(168,85,247,.12));
-                        border:2px solid rgba(139,92,246,.4);border-radius:24px;padding:32px;
-                        box-shadow:0 12px 40px rgba(139,92,246,.25);height:100%;">
-                <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
-                    <div style="width:56px;height:56px;background:linear-gradient(135deg,#a855f7,#9333ea);
-                                border-radius:16px;display:flex;align-items:center;justify-content:center;
-                                font-size:28px;box-shadow:0 8px 20px rgba(139,92,246,.4);">
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(236,72,153,.22),rgba(139,92,246,.20));
+                        border:3px solid rgba(236,72,153,.6);border-radius:28px;padding:38px;
+                        box-shadow:0 18px 65px rgba(236,72,153,.4),0 0 90px rgba(139,92,246,.3),inset 0 2px 0 rgba(255,255,255,.1);
+                        height:100%;position:relative;overflow:hidden;">
+                <div style="position:absolute;inset:0;background:radial-gradient(circle at bottom left,rgba(236,72,153,.15),transparent 60%);
+                            pointer-events:none;"></div>
+                <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px;position:relative;z-index:1;">
+                    <div style="width:72px;height:72px;background:linear-gradient(135deg,#ec4899,#8b5cf6,#d946ef);
+                                border-radius:20px;display:flex;align-items:center;justify-content:center;
+                                font-size:36px;box-shadow:0 12px 40px rgba(236,72,153,.6),0 0 60px rgba(139,92,246,.4);
+                                animation:glowPulseSmall 3s ease-in-out infinite;">
                         ⚙️
                     </div>
-                    <h3 style="margin:0;color:#d8b4fe;font-size:22px;font-weight:800;font-family:'Poppins',sans-serif;
-                               text-transform:uppercase;letter-spacing:1px;">
+                    <h3 style="margin:0;color:#fbcfe8;font-size:26px;font-weight:900;font-family:'Space Grotesk',sans-serif;
+                               text-transform:uppercase;letter-spacing:2px;text-shadow:0 4px 20px rgba(236,72,153,.8);">
                         Technical Fit
                     </h3>
                 </div>
-                <div style="background:rgba(15,23,42,.6);padding:24px;border-radius:16px;
-                            border-left:4px solid #a855f7;backdrop-filter:blur(10px);">
-                    <p style="margin:0;color:#cbd5e1;font-size:15px;line-height:1.8;">
+                <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
+                            padding:28px;border-radius:20px;border-left:5px solid #ec4899;
+                            backdrop-filter:blur(25px);border:2px solid rgba(236,72,153,.3);
+                            box-shadow:0 8px 25px rgba(236,72,153,.2);position:relative;z-index:1;">
+                    <p style="margin:0;color:#f1f5f9;font-size:16px;line-height:1.9;font-weight:500;">
                         {technical_strength}
                     </p>
                 </div>
             </div>
             """, unsafe_allow_html=True)
         
-        # Development Areas Section
-        st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
+        # Development Areas Section - Enhanced
+        st.markdown("<div style='height:32px;'></div>", unsafe_allow_html=True)
         dev_areas = llm.get('improvement_areas', [])[:3]
         if dev_areas:
             st.markdown("""
-            <div class="metric-card" style="background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(217,119,6,.12));
-                        border:2px solid rgba(245,158,11,.4);border-radius:24px;padding:32px;
-                        box-shadow:0 12px 40px rgba(245,158,11,.25);">
-                <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
-                    <div style="width:56px;height:56px;background:linear-gradient(135deg,#f59e0b,#d97706);
-                                border-radius:16px;display:flex;align-items:center;justify-content:center;
-                                font-size:28px;box-shadow:0 8px 20px rgba(245,158,11,.4);">
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(245,158,11,.22),rgba(217,119,6,.20));
+                        border:3px solid rgba(245,158,11,.6);border-radius:32px;padding:40px;
+                        box-shadow:0 20px 70px rgba(245,158,11,.45),0 0 100px rgba(245,158,11,.35),inset 0 2px 0 rgba(255,255,255,.1);
+                        position:relative;overflow:hidden;">
+                <div style="position:absolute;inset:0;background:radial-gradient(circle at top right,rgba(245,158,11,.15),transparent 60%);
+                            pointer-events:none;"></div>
+                <div style="display:flex;align-items:center;gap:20px;margin-bottom:28px;position:relative;z-index:1;">
+                    <div style="width:72px;height:72px;background:linear-gradient(135deg,#f59e0b,#d97706,#b45309);
+                                border-radius:20px;display:flex;align-items:center;justify-content:center;
+                                font-size:36px;box-shadow:0 12px 40px rgba(245,158,11,.6),0 0 60px rgba(245,158,11,.4);
+                                animation:glowPulseSmall 3s ease-in-out infinite;">
                         📈
                     </div>
-                    <h3 style="margin:0;color:#fcd34d;font-size:24px;font-weight:800;font-family:'Poppins',sans-serif;
-                               text-transform:uppercase;letter-spacing:1px;">
+                    <h3 style="margin:0;color:#fcd34d;font-size:30px;font-weight:900;font-family:'Space Grotesk',sans-serif;
+                               text-transform:uppercase;letter-spacing:2px;text-shadow:0 4px 20px rgba(245,158,11,.8);">
                         Development Areas
                     </h3>
                 </div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:20px;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-top:24px;position:relative;z-index:1;">
             """, unsafe_allow_html=True)
             
             for idx, area in enumerate(dev_areas, 1):
                 st.markdown(f"""
-                <div style="background:rgba(15,23,42,.7);padding:20px;border-radius:16px;
-                            border-left:4px solid #f59e0b;backdrop-filter:blur(10px);
-                            display:flex;align-items:start;gap:12px;">
-                    <span style="flex-shrink:0;width:28px;height:28px;background:rgba(245,158,11,.2);
+                <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
+                            padding:26px;border-radius:20px;border-left:5px solid #f59e0b;
+                            backdrop-filter:blur(25px);display:flex;align-items:start;gap:16px;
+                            transition:all .4s cubic-bezier(.34,1.56,.64,1);border:2px solid rgba(245,158,11,.3);
+                            box-shadow:0 8px 25px rgba(245,158,11,.2);position:relative;overflow:hidden;">
+                    <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(245,158,11,.08),transparent);
+                                opacity:0;transition:opacity .4s ease;"></div>
+                    <span style="flex-shrink:0;width:42px;height:42px;
+                                background:linear-gradient(135deg,rgba(245,158,11,.35),rgba(245,158,11,.25));
                                 border-radius:50%;display:flex;align-items:center;justify-content:center;
-                                font-size:14px;font-weight:700;color:#fcd34d;border:2px solid rgba(245,158,11,.5);">
+                                font-size:18px;font-weight:900;color:#fcd34d;
+                                border:2px solid rgba(245,158,11,.6);box-shadow:0 4px 15px rgba(245,158,11,.4);
+                                position:relative;z-index:1;">
                         {idx}
                     </span>
-                    <p style="margin:0;color:#e2e8f0;font-size:15px;line-height:1.7;">
+                    <p style="margin:0;color:#f1f5f9;font-size:16px;line-height:1.9;font-weight:600;position:relative;z-index:1;">
                         {area}
                     </p>
                 </div>
@@ -1762,11 +1972,21 @@ with tab1:
             
             st.markdown("</div></div>", unsafe_allow_html=True)
         
-        # ===== Final Recommendation =====
+        # ===== Final Recommendation - Immersive =====
         st.markdown("""
-        <div class="metric-card" style="margin-top:20px;background:linear-gradient(135deg,rgba(102,126,234,.15),rgba(118,75,162,.15));border:2px solid rgba(102,126,234,.3);border-radius:12px;">
-            <h3 style="margin:0;color:#667eea;font-size:18px;text-transform:uppercase;">📋 Final Recommendation</h3>
-            <p style="margin:14px 0 0 0;font-size:14px;line-height:1.8;color:#cbd5e1;">
+        <div class="metric-card" style="margin-top:32px;background:linear-gradient(135deg,rgba(99,102,241,.22),rgba(236,72,153,.20));
+                    border:3px solid rgba(99,102,241,.6);border-radius:28px;padding:36px;
+                    box-shadow:0 18px 65px rgba(99,102,241,.4),0 0 90px rgba(236,72,153,.3),inset 0 2px 0 rgba(255,255,255,.1);
+                    position:relative;overflow:hidden;">
+            <div style="position:absolute;inset:0;background:radial-gradient(circle at center,rgba(99,102,241,.12),transparent 70%);
+                        pointer-events:none;"></div>
+            <div style="display:flex;align-items:center;gap:18px;margin-bottom:20px;position:relative;z-index:1;">
+                <div style="font-size:34px;">📋</div>
+                <h3 style="margin:0;color:#c7d2fe;font-size:26px;font-weight:900;text-transform:uppercase;
+                           font-family:'Space Grotesk',sans-serif;letter-spacing:2px;
+                           text-shadow:0 4px 20px rgba(99,102,241,.8);">Final Recommendation</h3>
+            </div>
+            <p style="margin:0;font-size:16px;line-height:1.9;color:#f1f5f9;font-weight:500;position:relative;z-index:1;">
         """ + str(llm.get('overall_comment', 'Pending analysis'))[:500] + """
             </p>
         </div>
