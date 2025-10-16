@@ -435,18 +435,14 @@ def load_models():
             continue
     if not model: return None, None, None, False
 
-    # spaCy - try to load full model, fallback to blank if needed
-    try:
-        nlp = spacy.load("en_core_web_sm")
-        # Verify parser is available
-        if "parser" not in nlp.pipe_names:
-            # Parser missing, use blank model
-            raise ValueError("Parser not available")
-    except Exception:
-        # Fallback to blank model with sentencizer
-        nlp = spacy.blank("en")
-        if "sentencizer" not in nlp.pipe_names:
-            nlp.add_pipe("sentencizer")
+    # spaCy - load full model with parser (required)
+    nlp = spacy.load("en_core_web_sm")
+    
+    # Verify all required components are available
+    if "parser" not in nlp.pipe_names:
+        raise RuntimeError("spaCy parser component not available. Please ensure en_core_web_sm is properly installed.")
+    if "tagger" not in nlp.pipe_names:
+        raise RuntimeError("spaCy tagger component not available. Please ensure en_core_web_sm is properly installed.")
 
     # Stronger default embedder
     s_name = os.getenv("SENTENCE_MODEL_NAME", "all-mpnet-base-v2")
@@ -628,15 +624,10 @@ def extract_atoms_from_text(text, nlp, max_atoms=60):
     doc = nlp(text)
     cands = []
     
-    # Extract noun chunks if parser is available
-    try:
-        if nlp and hasattr(doc, "noun_chunks"):
-            for nc in doc.noun_chunks:
-                s = normalize_text(nc.text)
-                if 2 <= len(s) <= 50: cands.append(s)
-    except (ValueError, AttributeError):
-        # Parser not available, skip noun chunks
-        pass
+    # Extract noun chunks (parser is required and verified at startup)
+    for nc in doc.noun_chunks:
+        s = normalize_text(nc.text)
+        if 2 <= len(s) <= 50: cands.append(s)
 
     for seg in re.split(r'[\n]', text):
         parts = re.split(r'[|/•;,:()]', seg)
