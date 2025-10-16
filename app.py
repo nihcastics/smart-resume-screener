@@ -611,17 +611,35 @@ def load_models():
     if not model: return None, None, None, False
 
     # spaCy - load full model with parser (required)
-    nlp = spacy.load("en_core_web_sm")
+    try:
+        nlp = spacy.load("en_core_web_sm")
+    except OSError:
+        print("❌ spaCy model 'en_core_web_sm' not found. Attempting to download...")
+        try:
+            import subprocess
+            subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"], check=True)
+            nlp = spacy.load("en_core_web_sm")
+            print("✅ spaCy model downloaded successfully!")
+        except Exception as e:
+            print(f"❌ Failed to download spaCy model: {e}")
+            return None, None, None, False
     
     # Verify all required components are available
     if "parser" not in nlp.pipe_names:
-        raise RuntimeError("spaCy parser component not available. Please ensure en_core_web_sm is properly installed.")
+        print("❌ spaCy parser component not available")
+        return None, None, None, False
     if "tagger" not in nlp.pipe_names:
-        raise RuntimeError("spaCy tagger component not available. Please ensure en_core_web_sm is properly installed.")
+        print("❌ spaCy tagger component not available")
+        return None, None, None, False
 
     # Stronger default embedder
-    s_name = os.getenv("SENTENCE_MODEL_NAME", "all-mpnet-base-v2")
-    embedder = SentenceTransformer(s_name, device='cpu')
+    try:
+        s_name = os.getenv("SENTENCE_MODEL_NAME", "all-mpnet-base-v2")
+        embedder = SentenceTransformer(s_name, device='cpu')
+        print(f"✅ Sentence transformer loaded: {s_name}")
+    except Exception as e:
+        print(f"❌ Failed to load sentence transformer: {e}")
+        return None, None, None, False
 
     return model, nlp, embedder, True
 
@@ -1151,13 +1169,25 @@ with st.sidebar:
     dbg = st.toggle("Show debug details", value=False)
     st.caption("Tip: Turn on for atoms/coverage internals.")
 
-with st.spinner('Initializing models...'):
+with st.spinner('🔄 Initializing AI models and database...'):
     model, nlp, embedder, models_ok = load_models()
     resumes_collection, analyses_collection, mongo_ok = init_mongodb()
 
 if not models_ok:
-    st.error("Gemini model unavailable. Set GEMINI_API_KEY and a valid GEMINI_MODEL_NAME.")
+    st.error("❌ **AI Model Initialization Failed**")
+    st.markdown("""
+    **Possible issues:**
+    1. Missing or invalid `GEMINI_API_KEY` in `.env` file
+    2. spaCy model not installed - Run: `python -m spacy download en_core_web_sm`
+    3. Internet connection required for first-time model downloads
+    
+    **Quick fix:**
+    - Ensure `.env` file contains: `GEMINI_API_KEY=your_key_here`
+    - Restart the application after adding the key
+    """)
     st.stop()
+else:
+    st.success("✅ AI models loaded successfully!")
 
 # ===== HERO HEADER =====
 st.markdown("""
@@ -1191,13 +1221,42 @@ with tab1:
     c1,c2 = st.columns([1,1], gap="large")
     with c1:
         section("Upload Resume (PDF)", "📤")
-        up = st.file_uploader("pdf", type=['pdf'], label_visibility="collapsed")
+        up = st.file_uploader(
+            "Upload Resume PDF", 
+            type=['pdf'], 
+            label_visibility="collapsed",
+            accept_multiple_files=False,
+            key="resume_uploader",
+            help="Click or drag and drop a PDF file here"
+        )
+        if up:
+            st.success(f"✓ Loaded: {up.name} ({len(up.getvalue())//1024} KB)")
     with c2:
         section("Job Description", "📝")
-        jd = st.text_area("jd", height=220, label_visibility="collapsed", placeholder="Paste a detailed job description...")
+        jd = st.text_area(
+            "Job Description", 
+            height=220, 
+            label_visibility="collapsed", 
+            placeholder="Paste a detailed job description here...\n\nInclude:\n• Required skills and experience\n• Technologies and tools\n• Education requirements\n• Responsibilities",
+            key="job_description"
+        )
 
     st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
-    go_analyze = st.button("🚀 Analyze Resume", use_container_width=True)
+    
+    # Show button status
+    can_analyze = up is not None and jd and len(jd) >= 50
+    if not can_analyze:
+        if not up:
+            st.info("👆 Upload a resume PDF to begin")
+        elif not jd or len(jd) < 50:
+            st.info("👆 Add a detailed job description (minimum 50 characters)")
+    
+    go_analyze = st.button(
+        "🚀 Analyze Resume", 
+        use_container_width=True,
+        type="primary",
+        disabled=not can_analyze
+    )
 
     if go_analyze:
         if not up:
