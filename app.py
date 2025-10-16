@@ -3333,7 +3333,7 @@ with tab1:
                     fit_score = round(10 * (0.35*global_sem01 + 0.65*cov_final), 1)
                 fit_score = float(np.clip(fit_score, 0, 10))
 
-                # ---------- Balanced Final Scoring with Smart Penalties ----------
+                # ---------- STRICTER Balanced Scoring with Realistic Penalties ----------
                 weights = plan.get("scoring_weights", DEFAULT_WEIGHTS)
                 sem10, cov10 = round(10*global_sem01,1), round(10*cov_final,1)
                 w_sem, w_cov, w_llm = float(weights["semantic"]), float(weights["coverage"]), float(weights["llm_fit"])
@@ -3343,27 +3343,40 @@ with tab1:
                     W = w_sem + w_cov + w_llm
                 w_sem, w_cov, w_llm = w_sem/W, w_cov/W, w_llm/W
                 
-                # Base score calculation
+                # Base score calculation with stricter calibration
                 raw_score = float(np.clip(w_sem*sem10 + w_cov*cov10 + w_llm*fit_score, 0, 10))
                 
-                # Smart penalty system - only penalize truly poor matches, be gentle on good candidates
+                # Apply realistic calibration: scale down inflated scores
+                # Most candidates shouldn't score above 8 unless truly exceptional
+                if raw_score >= 8.5:
+                    raw_score = 8.0 + (raw_score - 8.5) * 0.4  # Compress 8.5-10 → 8.0-8.6
+                elif raw_score >= 7.5:
+                    raw_score = 7.0 + (raw_score - 7.5) * 0.8  # Compress 7.5-8.5 → 7.0-8.0
+                
+                # Stricter penalty system for realistic assessment
                 penalty = 0.0
                 penalty_reason = []
                 
                 if must_atoms and len(must_atoms) > 0:
-                    # Only apply penalties for significantly low coverage
-                    if must_cov < 0.25:  # Less than 25% is critical failure (was 0.30)
-                        # Max penalty: bring down from raw_score, but cap at -1.5 (was max(raw_score - 4.0))
-                        penalty_amount = min(raw_score * 0.25, 1.5)  # Max -1.5 instead of brutal drop
+                    # Stricter thresholds and penalties
+                    if must_cov < 0.30:  # Less than 30% is critical failure
+                        penalty_amount = min(raw_score * 0.40, 2.5)  # Up to -2.5 points
                         penalty = max(penalty, penalty_amount)
-                        penalty_reason.append(f"Critical gaps (<25% must-haves)")
-                    elif must_cov < 0.40:  # Less than 40% is major concern (was 0.45, range narrowed)
-                        penalty_amount = min(raw_score * 0.10, 0.8)  # Max -0.8 (was up to 1.5)
+                        penalty_reason.append(f"Critical skill gaps (<30% must-haves)")
+                    elif must_cov < 0.50:  # Less than 50% is major concern
+                        penalty_amount = min(raw_score * 0.25, 1.8)  # Up to -1.8 points
                         penalty = max(penalty, penalty_amount)
-                        penalty_reason.append(f"Major gaps (<40% must-haves)")
+                        penalty_reason.append(f"Major skill gaps (<50% must-haves)")
+                    elif must_cov < 0.65:  # Less than 65% is moderate concern
+                        penalty_amount = min(raw_score * 0.15, 1.2)  # Up to -1.2 points
+                        penalty = max(penalty, penalty_amount)
+                        penalty_reason.append(f"Moderate gaps (<65% must-haves)")
                     
-                    # NO combo penalty: removed harsh "semantic + coverage both weak" rule
-                    # Good candidates should not be over-penalized
+                    # Additional penalty for weak semantic + coverage combo
+                    if must_cov < 0.55 and global_sem01 < 0.55:
+                        combo_penalty = 0.8
+                        penalty += combo_penalty
+                        penalty_reason.append("Weak alignment + gaps")
                 
                 # Apply penalty
                 final_score = float(np.clip(raw_score - penalty, 0, 10))
@@ -3801,6 +3814,27 @@ with tab1:
                 safe = safe[:max_length].rstrip() + "..."
             return f"<span style=\"font-size:12px;line-height:1.6;\">{safe}</span>"
 
+        def _clean_rationale(text):
+            """Clean up LLM-generated rationales to remove gibberish/noise"""
+            if not text:
+                return ""
+            text = text.strip()
+            # Remove common noise patterns
+            text = re.sub(r'\[.*?\]', '', text)  # Remove [bracketed] content
+            text = re.sub(r'\(.*?\)', '', text)  # Remove (parenthetical) content
+            text = re.sub(r'\{.*?\}', '', text)  # Remove {braced} content
+            text = re.sub(r'<.*?>', '', text)    # Remove <tags>
+            text = re.sub(r'\s+', ' ', text)     # Normalize whitespace
+            text = text.replace('...', ' ')
+            text = text.replace('..', ' ')
+            # Remove fragments shorter than 10 chars (likely noise)
+            if len(text) < 10:
+                return ""
+            # Limit to 150 chars for cleaner display
+            if len(text) > 150:
+                text = text[:147].rstrip() + "..."
+            return text.strip()
+        
         def _resume_snippet(info):
             """Get first resume context snippet"""
             contexts = info.get("resume_contexts") or []
@@ -3945,7 +3979,8 @@ with tab1:
                         signals = f"✓ {conf_pct}% · Sim {sim_val:.2f}" if info.get("llm_present") else f"Sim {sim_val:.2f}"
                         
                         resume_html = _resume_snippet(info)
-                        rationale = (info.get("llm_rationale") or "").strip()
+                        raw_rationale = (info.get("llm_rationale") or "").strip()
+                        rationale = _clean_rationale(raw_rationale)
                         
                         st.markdown(f"""
                         <div style="background:rgba(21,10,46,.75);border:1px solid rgba(16,185,129,.3);border-left:4px solid #10b981;
@@ -3953,7 +3988,7 @@ with tab1:
                             <div style="display:flex;align-items:center;gap:12px;">
                                 <span style="color:#10b981;font-size:18px;">✓</span>
                                 <div style="flex:1;">
-                                    <div style="color:#f1f5f9;font-size:14px;font-weight:600;margin-bottom:4px;">{req}</div>
+                                    <div style="color:#f1f5f9;font-size:14px;font-weight:600;margin-bottom:4px;">{html.escape(req)}</div>
                                     <div style="color:#94a3b8;font-size:11px;">{signals}</div>
                                     {f'<div style="color:#6ee7b7;font-size:11px;margin-top:4px;font-style:italic;">{html.escape(rationale)}</div>' if rationale else ''}
                                     <div style="color:#cbd5e1;font-size:11px;margin-top:6px;">📄 {resume_html}</div>
@@ -3990,7 +4025,8 @@ with tab1:
                         signals = f"~{conf_pct}% · Sim {sim_val:.2f}" if conf_pct > 0 else f"Sim {sim_val:.2f}"
                         
                         resume_html = _resume_snippet(info)
-                        rationale = (info.get("llm_rationale") or "").strip()
+                        raw_rationale = (info.get("llm_rationale") or "").strip()
+                        rationale = _clean_rationale(raw_rationale)
                         
                         st.markdown(f"""
                         <div style="background:rgba(21,10,46,.75);border:1px solid rgba(251,191,36,.3);border-left:4px solid #fbbf24;
@@ -3998,7 +4034,7 @@ with tab1:
                             <div style="display:flex;align-items:center;gap:12px;">
                                 <span style="color:#fbbf24;font-size:18px;">△</span>
                                 <div style="flex:1;">
-                                    <div style="color:#f1f5f9;font-size:14px;font-weight:600;margin-bottom:4px;">{req}</div>
+                                    <div style="color:#f1f5f9;font-size:14px;font-weight:600;margin-bottom:4px;">{html.escape(req)}</div>
                                     <div style="color:#94a3b8;font-size:11px;">{signals}</div>
                                     {f'<div style="color:#fde68a;font-size:11px;margin-top:4px;font-style:italic;">{html.escape(rationale)}</div>' if rationale else ''}
                                     <div style="color:#cbd5e1;font-size:11px;margin-top:6px;">📄 {resume_html}</div>
@@ -4034,7 +4070,8 @@ with tab1:
                         conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
                         signals = f"✗ {conf_pct}% · Sim {sim_val:.2f}" if conf_pct > 0 else f"Sim {sim_val:.2f}"
                         
-                        rationale = (info.get("llm_rationale") or "No evidence found").strip()
+                        raw_rationale = (info.get("llm_rationale") or "No evidence found").strip()
+                        rationale = _clean_rationale(raw_rationale) or "No evidence found"
                         
                         st.markdown(f"""
                         <div style="background:rgba(21,10,46,.75);border:1px solid rgba(239,68,68,.3);border-left:4px solid #ef4444;
@@ -4042,7 +4079,7 @@ with tab1:
                             <div style="display:flex;align-items:center;gap:12px;">
                                 <span style="color:#ef4444;font-size:18px;">✗</span>
                                 <div style="flex:1;">
-                                    <div style="color:#f1f5f9;font-size:14px;font-weight:600;margin-bottom:4px;">{req}</div>
+                                    <div style="color:#f1f5f9;font-size:14px;font-weight:600;margin-bottom:4px;">{html.escape(req)}</div>
                                     <div style="color:#fca5a5;font-size:11px;">{signals}</div>
                                     <div style="color:#fca5a5;font-size:11px;margin-top:4px;font-style:italic;">{html.escape(rationale)}</div>
                                 </div>
@@ -4082,7 +4119,8 @@ with tab1:
                         signals = f"⭐ {conf_pct}% · Sim {sim_val:.2f}" if info.get("llm_present") else f"Sim {sim_val:.2f}"
                         
                         resume_html = _resume_snippet(info)
-                        rationale = (info.get("llm_rationale") or "").strip()
+                        raw_rationale = (info.get("llm_rationale") or "").strip()
+                        rationale = _clean_rationale(raw_rationale)
                         
                         st.markdown(f"""
                         <div style="background:rgba(21,10,46,.75);border:1px solid rgba(139,92,246,.3);border-left:4px solid #8b5cf6;
@@ -4090,7 +4128,7 @@ with tab1:
                             <div style="display:flex;align-items:center;gap:12px;">
                                 <span style="color:#8b5cf6;font-size:18px;">⭐</span>
                                 <div style="flex:1;">
-                                    <div style="color:#f1f5f9;font-size:14px;font-weight:600;margin-bottom:4px;">{req}</div>
+                                    <div style="color:#f1f5f9;font-size:14px;font-weight:600;margin-bottom:4px;">{html.escape(req)}</div>
                                     <div style="color:#94a3b8;font-size:11px;">{signals}</div>
                                     {f'<div style="color:#c7d2fe;font-size:11px;margin-top:4px;font-style:italic;">{html.escape(rationale)}</div>' if rationale else ''}
                                     <div style="color:#cbd5e1;font-size:11px;margin-top:6px;">📄 {resume_html}</div>
@@ -4127,7 +4165,8 @@ with tab1:
                         signals = f"~{conf_pct}% · Sim {sim_val:.2f}" if conf_pct > 0 else f"Sim {sim_val:.2f}"
                         
                         resume_html = _resume_snippet(info)
-                        rationale = (info.get("llm_rationale") or "").strip()
+                        raw_rationale = (info.get("llm_rationale") or "").strip()
+                        rationale = _clean_rationale(raw_rationale)
                         
                         st.markdown(f"""
                         <div style="background:rgba(21,10,46,.75);border:1px solid rgba(59,130,246,.3);border-left:4px solid #3b82f6;
@@ -4135,7 +4174,7 @@ with tab1:
                             <div style="display:flex;align-items:center;gap:12px;">
                                 <span style="color:#3b82f6;font-size:18px;">△</span>
                                 <div style="flex:1;">
-                                    <div style="color:#f1f5f9;font-size:14px;font-weight:600;margin-bottom:4px;">{req}</div>
+                                    <div style="color:#f1f5f9;font-size:14px;font-weight:600;margin-bottom:4px;">{html.escape(req)}</div>
                                     <div style="color:#94a3b8;font-size:11px;">{signals}</div>
                                     {f'<div style="color:#dbeafe;font-size:11px;margin-top:4px;font-style:italic;">{html.escape(rationale)}</div>' if rationale else ''}
                                     <div style="color:#cbd5e1;font-size:11px;margin-top:6px;">📄 {resume_html}</div>
@@ -4171,7 +4210,8 @@ with tab1:
                         conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
                         signals = f"○ {conf_pct}% · Sim {sim_val:.2f}" if conf_pct > 0 else f"Sim {sim_val:.2f}"
                         
-                        rationale = (info.get("llm_rationale") or "Optional - not found").strip()
+                        raw_rationale = (info.get("llm_rationale") or "Optional - not found").strip()
+                        rationale = _clean_rationale(raw_rationale) or "Optional - not found"
                         
                         st.markdown(f"""
                         <div style="background:rgba(21,10,46,.75);border:1px solid rgba(99,102,241,.3);border-left:4px solid #6366f1;
@@ -4179,7 +4219,7 @@ with tab1:
                             <div style="display:flex;align-items:center;gap:12px;">
                                 <span style="color:#6366f1;font-size:18px;">○</span>
                                 <div style="flex:1;">
-                                    <div style="color:#cbd5e1;font-size:14px;font-weight:600;margin-bottom:4px;">{req}</div>
+                                    <div style="color:#cbd5e1;font-size:14px;font-weight:600;margin-bottom:4px;">{html.escape(req)}</div>
                                     <div style="color:#a5b4fc;font-size:11px;">{signals}</div>
                                     <div style="color:#93c5fd;font-size:11px;margin-top:4px;font-style:italic;">{html.escape(rationale)}</div>
                                 </div>
