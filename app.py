@@ -1297,41 +1297,192 @@ tab1, tab2 = st.tabs(["📄 Analyze", "🕒 Recent"])
 
 # --- Analyze tab ---
 with tab1:
-    st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
+    
+    # Initialize variables first to check state
+    up = st.session_state.get('uploaded_file', None)
+    jd = st.session_state.get('job_description', '')
+    
+    # Beautiful step indicator that fades out after showing
+    step_placeholder = st.empty()
+    if not models_ok:
+        step_placeholder.warning("⚠️ **AI models not loaded** - Please check setup instructions above")
+    elif not up:
+        step_placeholder.markdown("""
+        <div class="step-indicator" style="
+            background:linear-gradient(135deg,rgba(99,102,241,.18),rgba(139,92,246,.15));
+            border:2px solid rgba(99,102,241,.4);
+            border-radius:20px;
+            padding:20px 32px;
+            text-align:center;
+            box-shadow:0 8px 32px rgba(99,102,241,.25),0 0 60px rgba(139,92,246,.15);
+            backdrop-filter:blur(20px);
+            animation:fadeInOut 5s ease-in-out forwards;
+            margin-bottom:24px;
+        ">
+            <div style="display:flex;align-items:center;justify-content:center;gap:14px;">
+                <span style="font-size:32px;animation:bounce 1.5s ease-in-out infinite;">👆</span>
+                <span style="
+                    font-size:17px;
+                    font-weight:700;
+                    color:#c7d2fe;
+                    font-family:'Space Grotesk',sans-serif;
+                    letter-spacing:0.5px;
+                ">Step 1: Upload a resume PDF file using the button below</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    elif not jd or len(jd) < 50:
+        step_placeholder.markdown("""
+        <div class="step-indicator" style="
+            background:linear-gradient(135deg,rgba(236,72,153,.18),rgba(139,92,246,.15));
+            border:2px solid rgba(236,72,153,.4);
+            border-radius:20px;
+            padding:20px 32px;
+            text-align:center;
+            box-shadow:0 8px 32px rgba(236,72,153,.25),0 0 60px rgba(139,92,246,.15);
+            backdrop-filter:blur(20px);
+            animation:fadeInOut 5s ease-in-out forwards;
+            margin-bottom:24px;
+        ">
+            <div style="display:flex;align-items:center;justify-content:center;gap:14px;">
+                <span style="font-size:32px;animation:bounce 1.5s ease-in-out infinite;">👉</span>
+                <span style="
+                    font-size:17px;
+                    font-weight:700;
+                    color:#fbbf24;
+                    font-family:'Space Grotesk',sans-serif;
+                    letter-spacing:0.5px;
+                ">Step 2: Add a detailed job description (minimum 50 characters)</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        step_placeholder.markdown("""
+        <div class="step-indicator" style="
+            background:linear-gradient(135deg,rgba(16,185,129,.18),rgba(5,150,105,.15));
+            border:2px solid rgba(16,185,129,.5);
+            border-radius:20px;
+            padding:20px 32px;
+            text-align:center;
+            box-shadow:0 8px 32px rgba(16,185,129,.3),0 0 60px rgba(5,150,105,.2);
+            backdrop-filter:blur(20px);
+            animation:fadeInOut 5s ease-in-out forwards;
+            margin-bottom:24px;
+        ">
+            <div style="display:flex;align-items:center;justify-content:center;gap:14px;">
+                <span style="font-size:32px;animation:bounce 1.5s ease-in-out infinite;">✅</span>
+                <span style="
+                    font-size:17px;
+                    font-weight:700;
+                    color:#6ee7b7;
+                    font-family:'Space Grotesk',sans-serif;
+                    letter-spacing:0.5px;
+                ">Ready! Click the button below to start analysis</span>
+                <span style="font-size:32px;animation:bounce 1.5s ease-in-out infinite;animation-delay:0.3s;">🚀</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
     c1,c2 = st.columns([1,1], gap="large")
+    
     with c1:
-        section("Upload Resume (PDF)", "📤")
-        
-        # Clear instruction
+        # Enhanced section with icon
         st.markdown("""
-        <div style="margin-bottom:16px;padding:14px 22px;background:rgba(139,92,246,.12);
-                    border-radius:16px;border-left:4px solid #8b5cf6;">
-            <p style="margin:0;color:#c7d2fe;font-size:15px;font-weight:600;">
-                📁 Click "Browse files" button below or drag & drop your PDF
-            </p>
+        <div style="margin-bottom:24px;">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+                <div style="
+                    width:52px;
+                    height:52px;
+                    background:linear-gradient(135deg,rgba(139,92,246,.25),rgba(99,102,241,.20));
+                    border-radius:16px;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:26px;
+                    box-shadow:0 6px 20px rgba(139,92,246,.3),0 0 40px rgba(99,102,241,.2);
+                    animation:glowPulseSmall 3s ease-in-out infinite;
+                ">📤</div>
+                <h3 style="
+                    margin:0;
+                    font-size:1.75rem;
+                    font-weight:800;
+                    color:#e2e8f0;
+                    font-family:'Space Grotesk',sans-serif;
+                    text-shadow:0 2px 12px rgba(139,92,246,.5);
+                ">Upload Resume (PDF)</h3>
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # File uploader with NO restrictions
-        up = st.file_uploader(
+        # File uploader - update session state
+        uploaded = st.file_uploader(
             "Upload Resume PDF", 
             type=['pdf'], 
             label_visibility="collapsed",
             accept_multiple_files=False
         )
+        if uploaded:
+            st.session_state['uploaded_file'] = uploaded
+            up = uploaded
         
+        # Success message when file is uploaded
         if up:
             st.markdown(f"""
-            <div style="margin-top:16px;padding:14px 22px;background:rgba(16,185,129,.12);
-                        border-radius:16px;border-left:4px solid #10b981;">
-                <p style="margin:0;color:#6ee7b7;font-size:15px;font-weight:700;">
-                    ✓ Loaded: {up.name} ({len(up.getvalue())//1024} KB)
-                </p>
+            <div style="
+                margin-top:20px;
+                padding:18px 26px;
+                background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(5,150,105,.12));
+                border:2px solid rgba(16,185,129,.5);
+                border-radius:18px;
+                box-shadow:0 6px 24px rgba(16,185,129,.25),0 0 45px rgba(5,150,105,.15);
+                backdrop-filter:blur(20px);
+                animation:fadeInRotate 0.6s ease-out;
+            ">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <span style="font-size:28px;">✓</span>
+                    <div style="flex:1;">
+                        <p style="margin:0;color:#6ee7b7;font-size:16px;font-weight:700;font-family:'Space Grotesk',sans-serif;">
+                            File Loaded Successfully
+                        </p>
+                        <p style="margin:4px 0 0 0;color:#a7f3d0;font-size:14px;font-weight:500;">
+                            {up.name} • {len(up.getvalue())//1024} KB
+                        </p>
+                    </div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
     
     with c2:
-        section("Job Description", "📝")
+        # Enhanced section with icon
+        st.markdown("""
+        <div style="margin-bottom:24px;">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+                <div style="
+                    width:52px;
+                    height:52px;
+                    background:linear-gradient(135deg,rgba(236,72,153,.25),rgba(219,39,119,.20));
+                    border-radius:16px;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:26px;
+                    box-shadow:0 6px 20px rgba(236,72,153,.3),0 0 40px rgba(219,39,119,.2);
+                    animation:glowPulseSmall 3s ease-in-out infinite;
+                    animation-delay:0.5s;
+                ">📝</div>
+                <h3 style="
+                    margin:0;
+                    font-size:1.75rem;
+                    font-weight:800;
+                    color:#e2e8f0;
+                    font-family:'Space Grotesk',sans-serif;
+                    text-shadow:0 2px 12px rgba(236,72,153,.5);
+                ">Job Description</h3>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
         jd = st.text_area(
             "Job Description", 
             height=220, 
@@ -1340,19 +1491,10 @@ with tab1:
             key="job_description"
         )
 
-    st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:28px;'></div>", unsafe_allow_html=True)
     
     # Show button status with clear messages
     can_analyze = models_ok and up is not None and jd and len(jd) >= 50
-    
-    if not models_ok:
-        st.warning("⚠️ **AI models not loaded** - Please check setup instructions above")
-    elif not up:
-        st.info("👆 **Step 1:** Upload a resume PDF file using the button above")
-    elif not jd or len(jd) < 50:
-        st.info("👆 **Step 2:** Add a detailed job description (minimum 50 characters)")
-    else:
-        st.success("✅ **Ready!** Click the button below to start analysis.")
     
     # Button without disabled attribute (let user click anytime)
     go_analyze = st.button(
