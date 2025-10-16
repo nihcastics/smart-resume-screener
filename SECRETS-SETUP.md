@@ -14,15 +14,27 @@
 
 ---
 
-## 📋 Copy This (Replace with Your Values If Different):
+## 📋 Copy This into Streamlit Cloud Secrets:
+
+**IMPORTANT**: Get your actual values from your local `.env` file!
 
 ```toml
 # Google Gemini API Key
-GEMINI_API_KEY = "AIzaSyCm22mt3bsmj4jVyUaJxMA1dTvdSTq4U_Y"
+GEMINI_API_KEY = "paste_your_gemini_key_from_env_file"
 
 # MongoDB Connection URI
-MONGO_URI = "mongodb+srv://sachinshiva1612_db_user:IFNVixjfLJQbXqt@cluster0.irfzzbt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+MONGO_URI = "paste_your_mongodb_uri_from_env_file"
+
+# Hugging Face Token (for model downloads)
+HF_TOKEN = "paste_your_huggingface_token_from_env_file"
 ```
+
+### 📝 Your Actual Values (from .env file):
+- GEMINI_API_KEY: Starts with `AIzaSy...`
+- MONGO_URI: Starts with `mongodb+srv://...`
+- HF_TOKEN: Starts with `hf_...`
+
+Copy these from your `.env` file and paste them in Streamlit Cloud secrets!
 
 ---
 
