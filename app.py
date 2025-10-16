@@ -937,11 +937,41 @@ def extract_atoms_from_text(text, nlp, max_atoms=60):
         if 2 <= len(s) <= 50:
             cands.append(s)
 
-    generic = set(["experience","skills","tools","technologies","knowledge","projects","project",
-                   "responsibilities","requirements","good to have","must have","engineer","engineering",
-                   "developer","analyst","internship","intern","fresher"])
-    cands = [c for c in cands if c not in generic and not c.isdigit()]
-    freq = Counter(cands)
+    # STRICT filtering: Remove all useless/generic words and phrases
+    generic = set([
+        "experience","skills","tools","technologies","knowledge","projects","project",
+        "responsibilities","requirements","good to have","must have","engineer","engineering",
+        "developer","analyst","internship","intern","fresher","strong","good","excellent",
+        "ability","familiar","able","work","team","communication","problem solving","teamwork",
+        "leadership","management","collaborate","develop","design","build","create","implement",
+        "manage","handle","provide","ensure","maintain","support","help","assist","drive",
+        "lead","track","monitor","report","analyze","evaluate","assess","review","test",
+        "nice","have","nice to have","nice to have requirements","nice to have skills",
+        "foundations","foundation"
+    ])
+    
+    # Filter out items containing stopwords
+    filtered = []
+    for c in cands:
+        # Skip if entire phrase is in stopwords
+        if c in generic:
+            continue
+        # Skip if it contains too many generic words
+        words = c.split()
+        generic_count = sum(1 for w in words if w in generic)
+        if generic_count >= len(words) - 1:  # Too many stopwords
+            continue
+        # Skip adjectives at the beginning that are modifiers
+        if len(words) > 1:
+            first_word = words[0]
+            if first_word in {"strong", "good", "excellent", "basic", "advanced", "intermediate"}:
+                continue
+        filtered.append(c)
+    
+    # Remove "have" and other single-word residuals
+    filtered = [c for c in filtered if c not in {"have", "able", "strong", "good", "nice"}]
+    
+    freq = Counter(filtered)
     scored = []
     for k,v in freq.items():
         tokens = k.split()
@@ -2597,6 +2627,71 @@ with tab1:
                 Download comprehensive JSON with all metrics, scoring details & insights
             </p>
         </div>
+        """, unsafe_allow_html=True)
+        
+        # Enhanced download button styling
+        st.markdown("""
+        <style>
+        /* Premium Download Button Styling */
+        .stDownloadButton > button {
+            background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #ec4899 100%) !important;
+            background-size: 200% 200% !important;
+            color: #ffffff !important;
+            border: 2px solid rgba(139, 92, 246, 0.6) !important;
+            border-radius: 22px !important;
+            padding: 18px 48px !important;
+            font-family: 'Space Grotesk', sans-serif !important;
+            font-weight: 800 !important;
+            font-size: 15px !important;
+            letter-spacing: 1.2px !important;
+            text-transform: uppercase !important;
+            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+            box-shadow: 0 15px 50px rgba(139, 92, 246, 0.5), 0 0 60px rgba(236, 72, 153, 0.3), inset 0 2px 0 rgba(255, 255, 255, 0.3), inset 0 -2px 0 rgba(0, 0, 0, 0.2) !important;
+            position: relative !important;
+            overflow: hidden !important;
+            animation: gradientSlide 4s ease infinite !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: 56px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        
+        .stDownloadButton > button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.4), transparent 70%);
+            transform: translate(-50%, -50%);
+            transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1), height 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+        }
+        
+        .stDownloadButton > button:hover {
+            transform: translateY(-6px) scale(1.05) !important;
+            box-shadow: 0 25px 80px rgba(139, 92, 246, 0.7), 0 0 90px rgba(236, 72, 153, 0.6), 0 0 120px rgba(99, 102, 241, 0.4), inset 0 2px 0 rgba(255, 255, 255, 0.4) !important;
+            border-color: rgba(139, 92, 246, 0.9) !important;
+        }
+        
+        .stDownloadButton > button:hover::before {
+            width: 400px;
+            height: 400px;
+        }
+        
+        .stDownloadButton > button:active {
+            transform: translateY(-3px) scale(0.98) !important;
+        }
+        
+        @keyframes gradientSlide {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        </style>
         """, unsafe_allow_html=True)
         
         st.download_button(
