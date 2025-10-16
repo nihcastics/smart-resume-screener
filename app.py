@@ -292,108 +292,56 @@ p,span,div{color:#94a3b8!important;line-height:1.8!important;font-size:1.05rem!i
     transform:scale(1.01)!important;
 }
 
-/* ===== PREMIUM METRIC CARDS WITH GLOW ===== */
+/* ===== Minimal metric cards ===== */
 .metric-card{
-    background:linear-gradient(135deg,rgba(21,10,46,.90),rgba(13,2,33,.88));
-    border:2px solid rgba(139,92,246,.25);
-    border-radius:28px;
-    padding:36px;
-    transition:all .6s cubic-bezier(.34,1.56,.64,1);
-    backdrop-filter:blur(30px) saturate(200%);
-    box-shadow:0 10px 40px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);
-    position:relative;
-    overflow:hidden;
+    background:rgba(15,23,42,0.55);
+    border:1px solid rgba(148,163,184,0.28);
+    border-radius:18px;
+    padding:22px;
+    transition:all .3s ease;
 }
-.metric-card::before{
-    content:'';
-    position:absolute;
-    top:0;
-    left:0;
-    right:0;
-    height:4px;
-    background:linear-gradient(90deg,transparent,rgba(139,92,246,.8),rgba(236,72,153,.8),transparent);
-    opacity:0;
-    transition:opacity .6s ease;
-    box-shadow:0 0 20px rgba(139,92,246,.6);
-}
-.metric-card::after{
-    content:'';
-    position:absolute;
-    inset:-100%;
-    background:radial-gradient(circle,rgba(139,92,246,.15),transparent 70%);
-    opacity:0;
-    transition:opacity .6s ease,transform .6s ease;
-    pointer-events:none;
-}
-.metric-card:hover::before{opacity:1}
-.metric-card:hover::after{opacity:1;transform:scale(1.5)}
 .metric-card:hover{
-    border-color:rgba(139,92,246,.6);
-    transform:translateY(-10px) scale(1.02) rotate(0.5deg);
-    box-shadow:0 25px 70px rgba(139,92,246,.4),0 0 90px rgba(236,72,153,.3),inset 0 2px 0 rgba(255,255,255,.1);
+    border-color:rgba(148,163,184,0.5);
+    transform:translateY(-4px);
+    box-shadow:0 12px 28px rgba(15,23,42,0.28);
 }
 
-/* ===== IMMERSIVE ANALYSIS CARDS ===== */
+/* ===== Minimal analysis cards ===== */
 .analysis-card{
-    background:linear-gradient(135deg,rgba(21,10,46,.92),rgba(13,2,33,.90));
-    border:2px solid rgba(139,92,246,.3);
-    border-radius:24px;
-    padding:34px;
-    transition:all .5s cubic-bezier(.34,1.56,.64,1);
-    backdrop-filter:blur(25px) saturate(180%);
-    box-shadow:0 12px 45px rgba(0,0,0,.4);
-    position:relative;
-    overflow:hidden;
+    background:rgba(15,23,42,0.6);
+    border:1px solid rgba(148,163,184,0.3);
+    border-radius:18px;
+    padding:26px;
+    transition:all .3s ease;
 }
-.analysis-card::before{
-    content:'';
-    position:absolute;
-    inset:0;
-    border-radius:24px;
-    background:linear-gradient(135deg,rgba(139,92,246,.1),rgba(236,72,153,.1));
-    opacity:0;
-    transition:opacity .5s ease;
-}
-.analysis-card:hover::before{opacity:1}
 .analysis-card:hover{
-    border-color:rgba(139,92,246,.6);
-    transform:translateY(-8px) scale(1.01);
-    box-shadow:0 20px 65px rgba(139,92,246,.35),0 0 80px rgba(236,72,153,.25);
+    border-color:rgba(148,163,184,0.5);
+    transform:translateY(-4px);
+    box-shadow:0 14px 28px rgba(15,23,42,0.3);
 }
 
-/* ===== ULTRA 3D GLOWING SCORE BADGES ===== */
+/* ===== Score badge ===== */
 .score-badge{
     display:inline-block;
-    padding:28px 52px;
-    border-radius:32px;
+    padding:18px 36px;
+    border-radius:16px;
     font-family:'Space Grotesk',sans-serif;
-    font-weight:900;
-    font-size:56px;
-    box-shadow:0 20px 60px rgba(0,0,0,.6),inset 0 3px 0 rgba(255,255,255,.4),inset 0 -3px 0 rgba(0,0,0,.4);
-    transition:all .5s cubic-bezier(.34,1.56,.64,1);
-    position:relative;
-    letter-spacing:-.02em;
+    font-weight:700;
+    font-size:42px;
+    background:rgba(15,23,42,0.7);
+    border:1px solid rgba(148,163,184,0.35);
+    color:#e2e8f0;
+    transition:all .3s ease;
 }
-.score-badge::after{
-    content:'';
-    position:absolute;
-    inset:-4px;
-    border-radius:36px;
-    opacity:0;
-    filter:blur(25px);
-    transition:opacity .5s ease;
-    z-index:-1;
+.score-badge:hover{
+    border-color:rgba(148,163,184,0.6);
+    transform:translateY(-4px);
+    box-shadow:0 12px 24px rgba(15,23,42,0.25);
 }
-.score-badge:hover{transform:scale(1.12) rotate(-3deg) translateY(-8px);box-shadow:0 30px 90px rgba(0,0,0,.7),inset 0 3px 0 rgba(255,255,255,.5)}
-.score-badge:hover::after{opacity:.9}
-.score-excellent{background:linear-gradient(135deg,#10b981 0%,#059669 50%,#047857 100%);color:#fff;box-shadow:0 20px 70px rgba(16,185,129,.7),0 0 90px rgba(16,185,129,.5)}
-.score-excellent::after{background:linear-gradient(135deg,#10b981,#059669)}
-.score-good{background:linear-gradient(135deg,#6366f1 0%,#4f46e5 50%,#4338ca 100%);color:#fff;box-shadow:0 20px 70px rgba(99,102,241,.7),0 0 90px rgba(99,102,241,.5)}
-.score-good::after{background:linear-gradient(135deg,#6366f1,#4f46e5)}
-.score-fair{background:linear-gradient(135deg,#f59e0b 0%,#d97706 50%,#b45309 100%);color:#fff;box-shadow:0 20px 70px rgba(245,158,11,.7),0 0 90px rgba(245,158,11,.5)}
-.score-fair::after{background:linear-gradient(135deg,#f59e0b,#d97706)}
-.score-poor{background:linear-gradient(135deg,#ef4444 0%,#dc2626 50%,#b91c1c 100%);color:#fff;box-shadow:0 20px 70px rgba(239,68,68,.7),0 0 90px rgba(239,68,68,.5)}
-.score-poor::after{background:linear-gradient(135deg,#ef4444,#dc2626)}
+.score-excellent{background:rgba(16,185,129,0.18);color:#34d399;border-color:rgba(16,185,129,0.5)}
+.score-good{background:rgba(96,165,250,0.18);color:#60a5fa;border-color:rgba(59,130,246,0.4)}
+.score-fair{background:rgba(251,191,36,0.18);color:#facc15;border-color:rgba(251,191,36,0.45)}
+.score-poor{background:rgba(248,113,113,0.18);color:#f87171;border-color:rgba(248,113,113,0.45)}
 
 /* ===== ANIMATED GLOW CHIPS ===== */
 .chip{
@@ -1311,13 +1259,7 @@ def refine_atom_list(atoms, nlp=None, reserved_canonicals=None, limit=40):
 def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_chunks, embedder, model=None,
                                    faiss_index=None, strict_threshold=0.60, partial_threshold=0.48,
                                    nlp=None, jd_text=""):
-    """
-    Requirement coverage that relies on RAG evidence + LLM confirmation instead of lexicon heuristics.
-    - Retrieves the most relevant resume snippets for every requirement
-    - Aligns each requirement with its originating JD context
-    - Uses the LLM to render a present/missing verdict with confidence
-    - Applies competency awareness as a gentle post-adjustment
-    """
+    """Full requirement coverage evaluation mixing lexical checks, semantic RAG and LLM verification."""
 
     chunk_embs = None
     if resume_chunks and embedder:
@@ -1328,16 +1270,17 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
         except Exception:
             chunk_embs = None
 
-    # Pre-compute JD sentence contexts for requirement alignment
+    resume_tokens = token_set(resume_text) if resume_text else set()
+
     normalized_jd = jd_text.lower() if jd_text else ""
     jd_sentences = []
     if jd_text:
         raw_sentences = re.split(r'(?<=[.!?])\s+', jd_text)
         for sent in raw_sentences:
-            s = sent.strip()
-            if 8 <= len(s) <= 240:
-                jd_sentences.append(s)
-        if not jd_sentences:
+            cleaned = sent.strip()
+            if 8 <= len(cleaned) <= 240:
+                jd_sentences.append(cleaned)
+        if not jd_sentences and jd_text.strip():
             jd_sentences = [jd_text.strip()]
 
     jd_embs = None
@@ -1349,7 +1292,6 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
         except Exception:
             jd_embs = None
 
-    # Pre-compute competency signals for semantic context awareness (if nlp available)
     if nlp is not None:
         try:
             comp_scores, comp_evd = compute_competency_scores(
@@ -1365,7 +1307,6 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
     atom_to_comp_nice, atom_kind_nice = map_atoms_to_competencies(nice_atoms, catalog)
 
     def comp_adjustment(atom, base_score, req_type):
-        """Apply gentle competency-aware adjustments to prevent over-penalisation."""
         a_norm = normalize_text(atom)
         if req_type == "must-have":
             comp_id = atom_to_comp_must.get(a_norm)
@@ -1378,21 +1319,21 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
 
         cscore = float(comp_scores.get(comp_id, 0.0))
         if (kind or "framework") == "core":
-            if base_score >= 1.0 and cscore < 0.50:
+            if base_score >= 0.95 and cscore < 0.50:
                 return 0.75
-            if base_score >= 0.85 and cscore < 0.40:
+            if base_score >= 0.80 and cscore < 0.40:
                 return 0.60
         else:
-            if base_score >= 1.0 and cscore < 0.25:
-                return 0.90
+            if base_score >= 0.95 and cscore < 0.25:
+                return 0.85
         return base_score
 
-    def summarize_snippet(text, limit=240):
-        text = (text or "").strip()
-        text = re.sub(r'\s+', ' ', text)
-        if len(text) > limit:
-            text = text[:limit-3].rstrip() + "..."
-        return text
+    def summarize_snippet(text, limit=220):
+        snippet = (text or "").strip()
+        snippet = re.sub(r'\s+', ' ', snippet)
+        if len(snippet) > limit:
+            snippet = snippet[:limit-3].rstrip() + "..."
+        return snippet
 
     def gather_resume_contexts(atom, top_k=3):
         contexts, sims = [], []
@@ -1467,25 +1408,25 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
         for atom in atoms:
             resume_ctx, top_similarity = gather_resume_contexts(atom)
             jd_ctx = gather_jd_context(atom)
+            lexical_hit = bool(resume_tokens and contains_atom(atom, resume_tokens, resume_text))
 
-            if top_similarity >= strict_threshold:
-                base_score = 0.80
-            elif top_similarity >= partial_threshold:
-                base_score = 0.55
-            else:
-                base_score = 0.0
+            semantic_strength = max(0.0, float(top_similarity))
+            lexical_strength = 1.0 if lexical_hit else 0.0
+            pre_score = float(np.clip(0.55 * lexical_strength + 0.45 * semantic_strength, 0.0, 1.0))
 
             detail = {
                 "req_type": req_type,
-                "similarity": float(top_similarity),
-                "max_similarity": float(top_similarity),
+                "similarity": semantic_strength,
+                "max_similarity": semantic_strength,
                 "resume_contexts": resume_ctx,
                 "jd_context": jd_ctx,
-                "pre_llm_score": float(base_score),
-                "score": float(base_score),
+                "lexical_hit": lexical_hit,
+                "pre_llm_score": pre_score,
+                "score": pre_score,
                 "llm_present": False,
                 "llm_confidence": 0.0,
-                "llm_rationale": ""
+                "llm_rationale": "",
+                "status": "pending"
             }
             details[atom] = detail
 
@@ -1495,7 +1436,7 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
                     "req_type": req_type,
                     "resume_contexts": resume_ctx,
                     "jd_context": jd_ctx,
-                    "max_similarity": float(top_similarity)
+                    "max_similarity": semantic_strength
                 })
 
         return details, queue
@@ -1520,7 +1461,7 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
                 confidence = 0.0
             confidence = max(0.0, min(1.0, confidence))
 
-            rationale = str(verdict.get("rationale", "") or "").strip()
+            rationale = str(verdict.get("rationale", verdict.get("reason", "")) or "").strip()
             evidence = str(verdict.get("evidence", "") or "").strip()
 
             detail["llm_present"] = present
@@ -1531,27 +1472,45 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
             if evidence:
                 detail["llm_evidence"] = evidence
 
-            if present:
-                boosted = 0.90 + 0.10 * confidence
-                detail["score"] = float(np.clip(boosted, 0.0, 1.0))
+    status_counts = {"must": Counter(), "nice": Counter()}
+
+    def finalize_scores(detail_map):
+        for atom, detail in detail_map.items():
+            pre_score = detail.get("pre_llm_score", 0.0)
+            confidence = detail.get("llm_confidence", 0.0)
+            if detail.get("llm_present"):
+                llm_floor = 0.75 + 0.25 * confidence
+                score = max(pre_score, llm_floor)
             else:
-                dampened = detail["pre_llm_score"] * (0.35 if confidence >= 0.6 else 0.5)
-                detail["score"] = float(np.clip(dampened, 0.0, 1.0))
+                score = pre_score * 0.85
+                if confidence >= 0.6:
+                    score *= 0.5
+            score = float(np.clip(score, 0.0, 1.0))
+            detail["score"] = score
+
+            status = "met" if score >= 0.78 else ("partial" if score >= 0.45 else "missing")
+            detail["status"] = status
+
+    finalize_scores(must_details)
+    finalize_scores(nice_details)
 
     for atom, detail in must_details.items():
         adjusted = comp_adjustment(atom, detail["score"], detail["req_type"])
         detail["score"] = float(np.clip(adjusted, 0.0, 1.0))
+        detail["status"] = "met" if detail["score"] >= 0.78 else ("partial" if detail["score"] >= 0.45 else "missing")
+        status_counts["must"][detail["status"]] += 1
 
     for atom, detail in nice_details.items():
         adjusted = comp_adjustment(atom, detail["score"], detail["req_type"])
         detail["score"] = float(np.clip(adjusted, 0.0, 1.0))
+        detail["status"] = "met" if detail["score"] >= 0.78 else ("partial" if detail["score"] >= 0.45 else "missing")
+        status_counts["nice"][detail["status"]] += 1
 
     must_scores = [d["score"] for d in must_details.values()]
     nice_scores = [d["score"] for d in nice_details.values()]
 
     must_cov = float(np.mean(must_scores)) if must_scores else 0.0
     nice_cov = float(np.mean(nice_scores)) if nice_scores else 1.0
-
     overall = 0.70 * must_cov + 0.30 * nice_cov if must_scores else nice_cov
 
     return {
@@ -1559,6 +1518,7 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
         "must": must_cov,
         "nice": nice_cov,
         "details": {"must": must_details, "nice": nice_details},
+        "status_counts": status_counts,
         "competencies": {"scores": comp_scores, "evidence": comp_evd}
     }
 
@@ -3102,17 +3062,31 @@ with tab1:
                     "overall": round(cov_final, 3),
                     "must_atoms_count": len(must_atoms),
                     "nice_atoms_count": len(nice_atoms),
-                    "cue_average_similarity": round(cue_alignment.get("average_similarity", 0.0), 3)
+                    "cue_average_similarity": round(cue_alignment.get("average_similarity", 0.0), 3),
+                    "status_counts": coverage_summary.get("status_counts", {})
                 }
                 llm_out = llm_json(
                     model,
                     analysis_prompt(jd, plan, profile, coverage_summary, cue_alignment, global_sem01, cov_final)
                 )
                 fit_score = llm_out.get("fit_score")
+                if isinstance(fit_score, str):
+                    try:
+                        fit_score = float(fit_score.strip())
+                    except Exception:
+                        fit_score = None
+                if isinstance(fit_score, bool):
+                    fit_score = float(fit_score)
                 if not isinstance(fit_score, (int, float)):
-                    # Enhanced fallback: better balance between semantic and coverage
-                    # Favor coverage more as it's more concrete
-                    fit_score = round(10 * (0.35*global_sem01 + 0.65*cov_final), 1)
+                    cue_avg = float(cue_alignment.get("average_similarity", 0.0) or 0.0)
+                    blended = (
+                        0.45 * cov_final +
+                        0.25 * must_cov +
+                        0.10 * nice_cov +
+                        0.10 * global_sem01 +
+                        0.10 * cue_avg
+                    )
+                    fit_score = round(10 * float(np.clip(blended, 0.0, 1.0)), 1)
                 fit_score = float(np.clip(fit_score, 0, 10))
 
                 # ---------- Balanced Final Scoring with Smart Penalties ----------
@@ -3537,551 +3511,133 @@ with tab1:
             st.plotly_chart(fig_radar, use_container_width=True, config={'displayModeBar': False, 'staticPlot': False})
         
         # ===== Requirement Coverage =====
-        st.markdown("""
-        <div style="text-align:center;margin:40px 0 24px 0;">
-            <h3 class="section-header" style="display:inline-block;padding:14px 36px;
-                       background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(5,150,105,.08));
-                       border-radius:16px;border:2px solid rgba(16,185,129,.35);
-                       box-shadow:0 4px 16px rgba(16,185,129,.2);">
-                ✅ Requirement Coverage Analysis
-            </h3>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Get requirement details
+        st.markdown("### Requirement Coverage")
+
+        coverage_summary = analysis.get("coverage_summary", {})
         matches = analysis.get("atom_matches", {})
-        must_atoms = analysis["atoms"]["must"]
-        nice_atoms = analysis["atoms"]["nice"]
+        must_atoms = analysis["atoms"].get("must", [])
+        nice_atoms = analysis["atoms"].get("nice", [])
 
         def build_detail_map(atoms, source):
             detail_map = {}
             for atom in atoms:
                 info = dict(source.get(atom, {}))
                 info.setdefault("score", 0.0)
-                info.setdefault("similarity", 0.0)
-                info.setdefault("max_similarity", info.get("similarity", 0.0))
+                info.setdefault("max_similarity", float(info.get("max_similarity", info.get("similarity", 0.0))))
                 info.setdefault("resume_contexts", [])
                 info.setdefault("jd_context", {"text": "", "similarity": 0.0})
                 info.setdefault("pre_llm_score", 0.0)
                 info.setdefault("llm_present", False)
                 info.setdefault("llm_confidence", 0.0)
                 info.setdefault("llm_rationale", "")
-                info.setdefault("req_type", "")
+                info.setdefault("lexical_hit", False)
+                info.setdefault("status", "missing")
                 detail_map[atom] = info
             return detail_map
 
         must_detail_map = build_detail_map(must_atoms, matches.get("must", {}))
         nice_detail_map = build_detail_map(nice_atoms, matches.get("nice", {}))
 
-        def _snippet_html(text, empty_label="No direct evidence"):
-            if not text:
-                return f"<span style=\"color:#64748b;font-style:italic;\">{empty_label}</span>"
-            safe = html.escape(text)
-            return safe.replace("\n", "<br>")
+        overall_pct = int(round(float(coverage_summary.get("overall", 0.0)) * 100))
+        must_pct = int(round(float(coverage_summary.get("must", 0.0)) * 100)) if must_atoms else 0
+        nice_pct = int(round(float(coverage_summary.get("nice", 1.0)) * 100)) if nice_atoms else 0
 
-        def _resume_snippet(info):
-            contexts = info.get("resume_contexts") or []
-            if contexts:
-                return _snippet_html(contexts[0].get("text", ""), "No resume snippet")
-            return _snippet_html("", "No resume snippet")
+        status_counts = coverage_summary.get("status_counts", {})
+
+        def _status_summary(counter):
+            if not isinstance(counter, dict):
+                return ""
+            met = counter.get("met", 0)
+            partial = counter.get("partial", 0)
+            missing = counter.get("missing", 0)
+            return f"Met {met} · Partial {partial} · Missing {missing}"
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Overall", f"{overall_pct}%")
+            st.caption(_status_summary(status_counts.get("must", {})) if must_atoms else "")
+        with col2:
+            st.metric("Must-have", f"{must_pct}%")
+            st.caption(_status_summary(status_counts.get("must", {})))
+        with col3:
+            st.metric("Nice-to-have", f"{nice_pct}%")
+            if nice_atoms:
+                st.caption(_status_summary(status_counts.get("nice", {})))
+            else:
+                st.caption("No nice-to-have requirements")
+
+        def _first_snippet(contexts):
+            if not contexts:
+                return ""
+            snippet = contexts[0].get("text", "") or ""
+            return html.escape(snippet)
 
         def _jd_snippet(info):
             jd_ctx = info.get("jd_context") or {}
-            return _snippet_html(jd_ctx.get("text", ""), "No JD snippet")
+            snippet = jd_ctx.get("text", "") or ""
+            return html.escape(snippet)
 
-        def split_status(detail_map):
-            full, partial, missing = [], [], []
-            for atom, info in detail_map.items():
-                score = float(info.get("score", 0.0))
-                if score >= 0.85:  # Full or LLM-verified
-                    full.append((atom, info))
-                elif score >= 0.5:  # Partial match
-                    partial.append((atom, info))
-                else:
-                    missing.append((atom, info))
-            return full, partial, missing
+        def render_requirement_group(title, detail_map):
+            st.markdown(f"#### {title}")
+            if not detail_map:
+                st.caption("No requirements surfaced for this category.")
+                return
 
-        must_full, must_partial, must_missing = split_status(must_detail_map)
-        nice_full, nice_partial, nice_missing = split_status(nice_detail_map)
-
-        must_score_total = sum(float(info.get("score", 0.0)) for info in must_detail_map.values())
-        nice_score_total = sum(float(info.get("score", 0.0)) for info in nice_detail_map.values())
-
-        total_atoms = len(must_atoms) + len(nice_atoms)
-        total_score = must_score_total + nice_score_total
-        coverage_pct = int(round((total_score / total_atoms) * 100)) if total_atoms else 0
-        must_coverage_pct = int(round((must_score_total / len(must_atoms)) * 100)) if must_atoms else 0
-        nice_pct = int(round((nice_score_total / len(nice_atoms)) * 100)) if nice_atoms else 0
-
-        full_total = len(must_full) + len(nice_full)
-        partial_total = len(must_partial) + len(nice_partial)
-        
-        # Coverage Overview Cards
-        col1, col2, col3 = st.columns([1,1,1])
-        
-        with col1:
-            st.markdown(f"""
-            <div class="metric-card" style="background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(5,150,105,.1));
-                        border:2px solid rgba(16,185,129,.4);border-radius:16px;padding:24px;text-align:center;">
-                <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px;">
-                    <div style="width:48px;height:48px;background:#10b981;border-radius:12px;
-                                display:flex;align-items:center;justify-content:center;font-size:24px;">✓</div>
-                    <div style="text-align:left;">
-                        <p style="margin:0;font-size:11px;color:#6ee7b7;text-transform:uppercase;font-weight:700;">Coverage</p>
-                        <h3 style="margin:4px 0 0 0;font-size:32px;color:#10b981;font-weight:900;">{coverage_pct}%</h3>
-                    </div>
-                </div>
-                <div style="height:6px;background:rgba(16,185,129,.2);border-radius:10px;overflow:hidden;">
-                    <div style="width:{coverage_pct}%;height:100%;background:#10b981;border-radius:10px;
-                                transition:width 1s ease;box-shadow:0 0 10px #10b98180;"></div>
-                </div>
-                <p style="margin:12px 0 0 0;font-size:13px;color:#94a3b8;">
-                    <strong style="color:#10b981;">{full_total}</strong> full • <strong style="color:#fbbf24;">{partial_total}</strong> partial · <strong>{total_atoms}</strong> total
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown(f"""
-            <div class="metric-card" style="background:linear-gradient(135deg,rgba(239,68,68,.15),rgba(220,38,38,.1));
-                        border:2px solid rgba(239,68,68,.4);border-radius:16px;padding:24px;text-align:center;">
-                <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px;">
-                    <div style="width:48px;height:48px;background:#ef4444;border-radius:12px;
-                                display:flex;align-items:center;justify-content:center;font-size:24px;">🔴</div>
-                    <div style="text-align:left;">
-                        <p style="margin:0;font-size:11px;color:#fca5a5;text-transform:uppercase;font-weight:700;">Must-Have</p>
-                        <h3 style="margin:4px 0 0 0;font-size:32px;color:#ef4444;font-weight:900;">{must_coverage_pct}%</h3>
-                    </div>
-                </div>
-                <div style="height:6px;background:rgba(239,68,68,.2);border-radius:10px;overflow:hidden;">
-                    <div style="width:{must_coverage_pct}%;height:100%;background:#ef4444;border-radius:10px;
-                                transition:width 1s ease;box-shadow:0 0 10px #ef444480;"></div>
-                </div>
-                <p style="margin:12px 0 0 0;font-size:13px;color:#94a3b8;">
-                    <strong style="color:#10b981;">{len(must_full)}</strong> full · <strong style="color:#fbbf24;">{len(must_partial)}</strong> partial · <strong style="color:#ef4444;">{len(must_missing)}</strong> missing
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown(f"""
-            <div class="metric-card" style="background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(37,99,235,.1));
-                        border:2px solid rgba(59,130,246,.4);border-radius:16px;padding:24px;text-align:center;">
-                <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px;">
-                    <div style="width:48px;height:48px;background:#3b82f6;border-radius:12px;
-                                display:flex;align-items:center;justify-content:center;font-size:24px;">⭐</div>
-                    <div style="text-align:left;">
-                        <p style="margin:0;font-size:11px;color:#93c5fd;text-transform:uppercase;font-weight:700;">Nice-to-Have</p>
-                        <h3 style="margin:4px 0 0 0;font-size:32px;color:#3b82f6;font-weight:900;">{nice_pct}%</h3>
-                    </div>
-                </div>
-                <div style="height:6px;background:rgba(59,130,246,.2);border-radius:10px;overflow:hidden;">
-                    <div style="width:{nice_pct}%;height:100%;background:#3b82f6;border-radius:10px;
-                                transition:width 1s ease;box-shadow:0 0 10px #3b82f680;"></div>
-                </div>
-                <p style="margin:12px 0 0 0;font-size:13px;color:#94a3b8;">
-                    {f'<strong style="color:#10b981;">{len(nice_full)}</strong> full · <strong style="color:#fbbf24;">{len(nice_partial)}</strong> partial · <strong style="color:#3b82f6;">{len(nice_missing)}</strong> missing' if len(nice_atoms) > 0 else '<span style="font-style:italic;">No nice-to-have specified</span>'}
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # IMMERSIVE Requirements Breakdown
-        st.markdown("""
-        <div style="margin-top:48px;"></div>
-        """, unsafe_allow_html=True)
-        
-        # Premium Tabbed view for requirements
-        req_tab1, req_tab2 = st.tabs(["🔴 Must-Have Requirements", "⭐ Nice-to-Have"])
-        
-        with req_tab1:
-            if len(must_atoms) > 0:
-                if must_full:
-                    st.markdown(f"""
-                    <div class="metric-card" style="margin-bottom:28px;background:linear-gradient(135deg,rgba(16,185,129,.20),rgba(5,150,105,.18));
-                                border:3px solid rgba(16,185,129,.6);border-radius:24px;padding:28px;
-                                box-shadow:0 12px 45px rgba(16,185,129,.35),0 0 70px rgba(16,185,129,.25),inset 0 2px 0 rgba(255,255,255,.1);">
-                        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
-                            <div style="width:52px;height:52px;background:linear-gradient(135deg,#10b981,#059669);
-                                        border-radius:16px;display:flex;align-items:center;justify-content:center;
-                                        font-size:28px;box-shadow:0 8px 25px rgba(16,185,129,.5);animation:glowPulseSmall 3s ease-in-out infinite;">
-                                ✓
+            order = ["met", "partial", "missing"]
+            labels = {"met": "Met", "partial": "Partial", "missing": "Missing"}
+            cards_html = []
+            for status in order:
+                subset = [(atom, info) for atom, info in detail_map.items() if info.get("status", "missing") == status]
+                if not subset:
+                    continue
+                cards_html.append(f"<div class='requirement-group-header'>{labels[status]} ({len(subset)})</div>")
+                for atom, info in sorted(subset, key=lambda item: (-float(item[1].get("score", 0.0)), item[0].lower())):
+                    score_pct = int(round(float(info.get("score", 0.0)) * 100))
+                    similarity = float(info.get("max_similarity", 0.0))
+                    confidence = float(info.get("llm_confidence", 0.0))
+                    if info.get("llm_present"):
+                        llm_note = f"LLM ✓ {int(round(confidence*100))}%"
+                    elif confidence > 0:
+                        llm_note = f"LLM • {int(round(confidence*100))}%"
+                    else:
+                        llm_note = "LLM n/a"
+                    lexical_hint = "Keyword match" if info.get("lexical_hit") else "Semantic match"
+                    resume_snippet = _first_snippet(info.get("resume_contexts") or [])
+                    jd_snippet = _jd_snippet(info)
+                    rationale = (info.get("llm_rationale") or "").strip()
+                    rationale_html = f"<div class='requirement-card__note'>{html.escape(rationale)}</div>" if rationale else ""
+                    resume_html = resume_snippet or "<span class='muted'>No resume evidence</span>"
+                    jd_html = jd_snippet or "<span class='muted'>No JD snippet</span>"
+                    cards_html.append(
+                        f"""
+                        <div class='requirement-card'>
+                            <div class='requirement-card__header'>
+                                <span class='requirement-card__name'>{html.escape(atom)}</span>
+                                <span class='status-badge status-{status}'>{labels[status]}</span>
                             </div>
-                            <h4 style="margin:0;color:#6ee7b7;font-size:24px;font-weight:900;
-                                       font-family:'Space Grotesk',sans-serif;text-transform:uppercase;
-                        letter-spacing:1.5px;text-shadow:0 3px 15px rgba(16,185,129,.7);">
-                    FOUND ({len(must_full)})
-                            </h4>
-                        </div>
-                        <div style="display:grid;gap:14px;">
-                    """, unsafe_allow_html=True)
-                    
-                    for idx, (req, info) in enumerate(must_full, 1):
-                        signals = []
-                        if info.get("llm_present"):
-                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
-                            signals.append(f"LLM ✓ ({conf_pct}% conf)")
-                        elif info.get("llm_confidence", 0.0) > 0:
-                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
-                            signals.append(f"LLM review ({conf_pct}% conf)")
-                        if info.get("similarity", 0.0) > 0:
-                            signals.append(f"Sim {info['similarity']:.2f}")
-                        signal_html = " • ".join(signals) if signals else "Verified via RAG + LLM"
-                        resume_html = _resume_snippet(info)
-                        jd_html = _jd_snippet(info)
-                        rationale = (info.get("llm_rationale") or "").strip()
-                        rationale_html = f"<div style=\"margin-top:8px;color:#e2e8f0;font-size:12px;font-style:italic;\">{html.escape(rationale)}</div>" if rationale else ""
-                        st.markdown(f"""
-                        <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
-                                    border:2px solid rgba(16,185,129,.4);border-left:5px solid #10b981;
-                                    border-radius:16px;padding:20px 24px;display:flex;align-items:center;gap:16px;
-                                    backdrop-filter:blur(20px);transition:all .4s cubic-bezier(.34,1.56,.64,1);
-                                    box-shadow:0 6px 20px rgba(16,185,129,.2);position:relative;overflow:hidden;">
-                            <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(16,185,129,.08),transparent);
-                                        opacity:0;transition:opacity .4s ease;"></div>
-                            <span style="flex-shrink:0;min-width:40px;height:40px;
-                                         background:linear-gradient(135deg,rgba(16,185,129,.35),rgba(16,185,129,.25));
-                                         color:#6ee7b7;border-radius:50%;display:flex;align-items:center;justify-content:center;
-                                         font-size:20px;font-weight:900;border:2px solid rgba(16,185,129,.6);
-                                         box-shadow:0 4px 15px rgba(16,185,129,.4);position:relative;z-index:1;">✓</span>
-                            <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
-                                <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
-                                <span style="color:#94a3b8;font-size:12px;font-weight:500;">{signal_html}</span>
-                                <div style="margin-top:10px;font-size:12px;color:#e2e8f0;line-height:1.6;">
-                                    <div><span style="color:#38bdf8;">JD:</span> {jd_html}</div>
-                                    <div style="margin-top:6px;"><span style="color:#22d3ee;">Resume:</span> {resume_html}</div>
-                                    {rationale_html}
-                                </div>
+                            <div class='requirement-card__meta'>
+                                <span>{score_pct}% score</span>
+                                <span>{similarity:.2f} sim</span>
+                                <span>{llm_note}</span>
+                                <span>{lexical_hint}</span>
+                            </div>
+                            <div class='requirement-card__body'>
+                                <div><strong>Resume</strong> {resume_html}</div>
+                                <div><strong>JD</strong> {jd_html}</div>
+                                {rationale_html}
                             </div>
                         </div>
-                        """, unsafe_allow_html=True)
-                    
-                    st.markdown("</div></div>", unsafe_allow_html=True)
+                        """
+                    )
+            st.markdown("\n".join(cards_html), unsafe_allow_html=True)
 
-                if must_partial:
-                    st.markdown(f"""
-                    <div class="metric-card" style="margin-top:20px;margin-bottom:28px;background:linear-gradient(135deg,rgba(250,204,21,.22),rgba(251,191,36,.18));
-                                border:3px solid rgba(251,191,36,.6);border-radius:24px;padding:28px;
-                                box-shadow:0 12px 45px rgba(251,191,36,.35),0 0 70px rgba(251,191,36,.25),inset 0 2px 0 rgba(255,255,255,.1);">
-                        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
-                            <div style="width:52px;height:52px;background:linear-gradient(135deg,#facc15,#fbbf24);
-                                        border-radius:16px;display:flex;align-items:center;justify-content:center;
-                                        font-size:28px;box-shadow:0 8px 25px rgba(251,191,36,.5);animation:glowPulseSmall 3s ease-in-out infinite;">
-                                △
-                            </div>
-                            <h4 style="margin:0;color:#fde68a;font-size:24px;font-weight:900;
-                                       font-family:'Space Grotesk',sans-serif;text-transform:uppercase;
-                                       letter-spacing:1.5px;text-shadow:0 3px 15px rgba(251,191,36,.7);">
-                                PARTIAL SIGNALS ({len(must_partial)})
-                            </h4>
-                        </div>
-                        <div style="display:grid;gap:14px;">
-                    """, unsafe_allow_html=True)
+        tab_must, tab_nice = st.tabs(["Must-have", "Nice-to-have"])
+        with tab_must:
+            render_requirement_group("Must-have requirements", must_detail_map)
+        with tab_nice:
+            render_requirement_group("Nice-to-have requirements", nice_detail_map)
 
-                    for idx, (req, info) in enumerate(must_partial, 1):
-                        signals = []
-                        if info.get("llm_present"):
-                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
-                            signals.append(f"LLM ✓ ({conf_pct}% conf)")
-                        else:
-                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
-                            if conf_pct > 0:
-                                signals.append(f"LLM unsure ({conf_pct}% conf)")
-                        if info.get("similarity", 0.0) > 0:
-                            signals.append(f"Sim {info['similarity']:.2f}")
-                        elif info.get("pre_llm_score", 0.0) > 0:
-                            signals.append("Partial semantic")
-                        signal_html = " • ".join(signals) if signals else "Needs stronger evidence"
-                        resume_html = _resume_snippet(info)
-                        jd_html = _jd_snippet(info)
-                        rationale = (info.get("llm_rationale") or "").strip()
-                        rationale_html = f"<div style=\"margin-top:8px;color:#fde68a;font-size:12px;font-style:italic;\">{html.escape(rationale)}</div>" if rationale else ""
-                        st.markdown(f"""
-                        <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
-                                    border:2px solid rgba(251,191,36,.4);border-left:5px solid #fbbf24;
-                                    border-radius:16px;padding:20px 24px;display:flex;align-items:center;gap:16px;
-                                    backdrop-filter:blur(20px);transition:all .4s cubic-bezier(.34,1.56,.64,1);
-                                    box-shadow:0 6px 20px rgba(251,191,36,.2);position:relative;overflow:hidden;">
-                            <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(251,191,36,.08),transparent);
-                                        opacity:0;transition:opacity .4s ease;"></div>
-                            <span style="flex-shrink:0;min-width:40px;height:40px;
-                                         background:linear-gradient(135deg,rgba(251,191,36,.35),rgba(251,191,36,.25));
-                                         color:#fde68a;border-radius:50%;display:flex;align-items:center;justify-content:center;
-                                         font-size:20px;font-weight:900;border:2px solid rgba(251,191,36,.6);
-                                         box-shadow:0 4px 15px rgba(251,191,36,.4);position:relative;z-index:1;">△</span>
-                            <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
-                                <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
-                                <span style="color:#94a3b8;font-size:12px;font-weight:500;">{signal_html}</span>
-                                <div style="margin-top:10px;font-size:12px;color:#f8fafc;line-height:1.6;">
-                                    <div><span style="color:#fde68a;">JD:</span> {jd_html}</div>
-                                    <div style="margin-top:6px;"><span style="color:#facc15;">Resume:</span> {resume_html}</div>
-                                    {rationale_html}
-                                </div>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                    st.markdown("</div></div>", unsafe_allow_html=True)
-
-                if must_missing:
-                    st.markdown(f"""
-                    <div class="metric-card" style="margin-top:28px;background:linear-gradient(135deg,rgba(239,68,68,.20),rgba(220,38,38,.18));
-                                border:3px solid rgba(239,68,68,.6);border-radius:24px;padding:28px;
-                                box-shadow:0 12px 45px rgba(239,68,68,.35),0 0 70px rgba(239,68,68,.25),inset 0 2px 0 rgba(255,255,255,.1);">
-                        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
-                            <div style="width:52px;height:52px;background:linear-gradient(135deg,#ef4444,#dc2626);
-                                        border-radius:16px;display:flex;align-items:center;justify-content:center;
-                                        font-size:28px;box-shadow:0 8px 25px rgba(239,68,68,.5);animation:glowPulseSmall 3s ease-in-out infinite;">
-                                ✗
-                            </div>
-                            <h4 style="margin:0;color:#fca5a5;font-size:24px;font-weight:900;
-                                       font-family:'Space Grotesk',sans-serif;text-transform:uppercase;
-                        letter-spacing:1.5px;text-shadow:0 3px 15px rgba(239,68,68,.7);">
-                    MISSING ({len(must_missing)})
-                            </h4>
-                        </div>
-                        <div style="display:grid;gap:14px;">
-                    """, unsafe_allow_html=True)
-                    
-                    for idx, (req, info) in enumerate(must_missing, 1):
-                        signals = []
-                        similarity_note = info.get("similarity", 0.0)
-                        if info.get("llm_present"):
-                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
-                            signals.append(f"LLM flagged ({conf_pct}% conf)")
-                        else:
-                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
-                            if conf_pct > 0:
-                                signals.append(f"LLM missing ({conf_pct}% conf)")
-                        if similarity_note > 0.05:
-                            signals.append(f"Best sim {similarity_note:.2f}")
-                        signal_html = " • ".join(signals) if signals else "No supporting evidence"
-                        resume_html = _resume_snippet(info)
-                        jd_html = _jd_snippet(info)
-                        rationale = (info.get("llm_rationale") or "").strip()
-                        rationale_html = f"<div style=\"margin-top:8px;color:#fca5a5;font-size:12px;font-style:italic;\">{html.escape(rationale)}</div>" if rationale else ""
-                        st.markdown(f"""
-                        <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
-                                    border:2px solid rgba(239,68,68,.4);border-left:5px solid #ef4444;
-                                    border-radius:16px;padding:20px 24px;display:flex;align-items:center;gap:16px;
-                                    backdrop-filter:blur(20px);transition:all .4s cubic-bezier(.34,1.56,.64,1);
-                                    box-shadow:0 6px 20px rgba(239,68,68,.2);position:relative;overflow:hidden;">
-                            <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(239,68,68,.08),transparent);
-                                        opacity:0;transition:opacity .4s ease;"></div>
-                            <span style="flex-shrink:0;min-width:40px;height:40px;
-                                         background:linear-gradient(135deg,rgba(239,68,68,.35),rgba(239,68,68,.25));
-                                         color:#fca5a5;border-radius:50%;display:flex;align-items:center;justify-content:center;
-                                         font-size:20px;font-weight:900;border:2px solid rgba(239,68,68,.6);
-                                         box-shadow:0 4px 15px rgba(239,68,68,.4);position:relative;z-index:1;">✗</span>
-                            <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
-                                <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
-                                <span style="color:#fca5a5;font-size:12px;font-weight:600;">{signal_html}</span>
-                                <div style="margin-top:10px;font-size:12px;color:#fca5a5;line-height:1.6;">
-                                    <div><span style="color:#f87171;">JD:</span> {jd_html}</div>
-                                    <div style="margin-top:6px;"><span style="color:#f87171;">Resume:</span> {resume_html}</div>
-                                    {rationale_html}
-                                </div>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    st.markdown("</div></div>", unsafe_allow_html=True)
-            else:
-                st.info("No must-have requirements identified from job description.")
-        
-        with req_tab2:
-            if len(nice_atoms) > 0:
-                if nice_full:
-                    st.markdown(f"""
-                    <div class="metric-card" style="margin-bottom:28px;background:linear-gradient(135deg,rgba(139,92,246,.20),rgba(99,102,241,.18));
-                                border:3px solid rgba(139,92,246,.6);border-radius:24px;padding:28px;
-                                box-shadow:0 12px 45px rgba(139,92,246,.35),0 0 70px rgba(139,92,246,.25),inset 0 2px 0 rgba(255,255,255,.1);">
-                        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
-                            <div style="width:52px;height:52px;background:linear-gradient(135deg,#8b5cf6,#6366f1);
-                                        border-radius:16px;display:flex;align-items:center;justify-content:center;
-                                        font-size:28px;box-shadow:0 8px 25px rgba(139,92,246,.5);animation:glowPulseSmall 3s ease-in-out infinite;">
-                                ⭐
-                            </div>
-                            <h4 style="margin:0;color:#c7d2fe;font-size:24px;font-weight:900;
-                                       font-family:'Space Grotesk',sans-serif;text-transform:uppercase;
-                        letter-spacing:1.5px;text-shadow:0 3px 15px rgba(139,92,246,.7);">
-                    FOUND ({len(nice_full)})
-                            </h4>
-                        </div>
-                        <div style="display:grid;gap:14px;">
-                    """, unsafe_allow_html=True)
-                    
-                    for idx, (req, info) in enumerate(nice_full, 1):
-                        signals = []
-                        if info.get("llm_present"):
-                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
-                            signals.append(f"LLM ✓ ({conf_pct}% conf)")
-                        elif info.get("llm_confidence", 0.0) > 0:
-                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
-                            signals.append(f"LLM review ({conf_pct}% conf)")
-                        if info.get("similarity", 0.0) > 0:
-                            signals.append(f"Sim {info['similarity']:.2f}")
-                        signal_html = " • ".join(signals) if signals else "Verified via RAG + LLM"
-                        resume_html = _resume_snippet(info)
-                        jd_html = _jd_snippet(info)
-                        rationale = (info.get("llm_rationale") or "").strip()
-                        rationale_html = f"<div style=\"margin-top:8px;color:#c7d2fe;font-size:12px;font-style:italic;\">{html.escape(rationale)}</div>" if rationale else ""
-                        st.markdown(f"""
-                        <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
-                                    border:2px solid rgba(139,92,246,.4);border-left:5px solid #8b5cf6;
-                                    border-radius:16px;padding:20px 24px;display:flex;align-items:center;gap:16px;
-                                    backdrop-filter:blur(20px);transition:all .4s cubic-bezier(.34,1.56,.64,1);
-                                    box-shadow:0 6px 20px rgba(139,92,246,.2);position:relative;overflow:hidden;">
-                            <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(139,92,246,.08),transparent);
-                                        opacity:0;transition:opacity .4s ease;"></div>
-                            <span style="flex-shrink:0;min-width:40px;height:40px;
-                                         background:linear-gradient(135deg,rgba(139,92,246,.35),rgba(139,92,246,.25));
-                                         color:#c7d2fe;border-radius:50%;display:flex;align-items:center;justify-content:center;
-                                         font-size:20px;font-weight:900;border:2px solid rgba(139,92,246,.6);
-                                         box-shadow:0 4px 15px rgba(139,92,246,.4);position:relative;z-index:1;">⭐</span>
-                            <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
-                                <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
-                                <span style="color:#c7d2fe;font-size:12px;font-weight:500;">{signal_html}</span>
-                                <div style="margin-top:10px;font-size:12px;color:#e0e7ff;line-height:1.6;">
-                                    <div><span style="color:#a5b4fc;">JD:</span> {jd_html}</div>
-                                    <div style="margin-top:6px;"><span style="color:#a78bfa;">Resume:</span> {resume_html}</div>
-                                    {rationale_html}
-                                </div>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    st.markdown("</div></div>", unsafe_allow_html=True)
-
-                if nice_partial:
-                    st.markdown(f"""
-                    <div class="metric-card" style="margin-top:20px;margin-bottom:28px;background:linear-gradient(135deg,rgba(96,165,250,.22),rgba(59,130,246,.18));
-                                border:3px solid rgba(59,130,246,.6);border-radius:24px;padding:28px;
-                                box-shadow:0 12px 45px rgba(59,130,246,.35),0 0 70px rgba(59,130,246,.25),inset 0 2px 0 rgba(255,255,255,.1);">
-                        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
-                            <div style="width:52px;height:52px;background:linear-gradient(135deg,#3b82f6,#60a5fa);
-                                        border-radius:16px;display:flex;align-items:center;justify-content:center;
-                                        font-size:28px;box-shadow:0 8px 25px rgba(59,130,246,.5);animation:glowPulseSmall 3s ease-in-out infinite;">
-                                △
-                            </div>
-                            <h4 style="margin:0;color:#dbeafe;font-size:24px;font-weight:900;
-                                       font-family:'Space Grotesk',sans-serif;text-transform:uppercase;
-                                       letter-spacing:1.5px;text-shadow:0 3px 15px rgba(59,130,246,.7);">
-                                PARTIAL SIGNALS ({len(nice_partial)})
-                            </h4>
-                        </div>
-                        <div style="display:grid;gap:14px;">
-                    """, unsafe_allow_html=True)
-
-                    for idx, (req, info) in enumerate(nice_partial, 1):
-                        signals = []
-                        if info.get("llm_present"):
-                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
-                            signals.append(f"LLM ✓ ({conf_pct}% conf)")
-                        else:
-                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
-                            if conf_pct > 0:
-                                signals.append(f"LLM unsure ({conf_pct}% conf)")
-                        if info.get("similarity", 0.0) > 0:
-                            signals.append(f"Sim {info['similarity']:.2f}")
-                        elif info.get("pre_llm_score", 0.0) > 0:
-                            signals.append("Partial semantic")
-                        signal_html = " • ".join(signals) if signals else "Needs more resume detail"
-                        resume_html = _resume_snippet(info)
-                        jd_html = _jd_snippet(info)
-                        rationale = (info.get("llm_rationale") or "").strip()
-                        rationale_html = f"<div style=\"margin-top:8px;color:#dbeafe;font-size:12px;font-style:italic;\">{html.escape(rationale)}</div>" if rationale else ""
-                        st.markdown(f"""
-                        <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
-                                    border:2px solid rgba(96,165,250,.4);border-left:5px solid #60a5fa;
-                                    border-radius:16px;padding:20px 24px;display:flex;align-items:center;gap:16px;
-                                    backdrop-filter:blur(20px);transition:all .4s cubic-bezier(.34,1.56,.64,1);
-                                    box-shadow:0 6px 20px rgba(96,165,250,.2);position:relative;overflow:hidden;">
-                            <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(96,165,250,.08),transparent);
-                                        opacity:0;transition:opacity .4s ease;"></div>
-                            <span style="flex-shrink:0;min-width:40px;height:40px;
-                                         background:linear-gradient(135deg,rgba(96,165,250,.35),rgba(96,165,250,.25));
-                                         color:#dbeafe;border-radius:50%;display:flex;align-items:center;justify-content:center;
-                                         font-size:20px;font-weight:900;border:2px solid rgba(96,165,250,.6);
-                                         box-shadow:0 4px 15px rgba(96,165,250,.4);position:relative;z-index:1;">△</span>
-                            <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
-                                <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
-                                <span style="color:#dbeafe;font-size:12px;font-weight:500;">{signal_html}</span>
-                                <div style="margin-top:10px;font-size:12px;color:#dbeafe;line-height:1.6;">
-                                    <div><span style="color:#bfdbfe;">JD:</span> {jd_html}</div>
-                                    <div style="margin-top:6px;"><span style="color:#93c5fd;">Resume:</span> {resume_html}</div>
-                                    {rationale_html}
-                                </div>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                    st.markdown("</div></div>", unsafe_allow_html=True)
-
-                if nice_missing:
-                    st.markdown(f"""
-                    <div class="metric-card" style="margin-top:28px;background:linear-gradient(135deg,rgba(99,102,241,.18),rgba(79,70,229,.16));
-                                border:3px solid rgba(99,102,241,.5);border-radius:24px;padding:28px;
-                                box-shadow:0 12px 45px rgba(99,102,241,.3),0 0 70px rgba(99,102,241,.2),inset 0 2px 0 rgba(255,255,255,.1);">
-                        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
-                            <div style="width:52px;height:52px;background:linear-gradient(135deg,#6366f1,#4f46e5);
-                                        border-radius:16px;display:flex;align-items:center;justify-content:center;
-                                        font-size:28px;box-shadow:0 8px 25px rgba(99,102,241,.5);animation:glowPulseSmall 3s ease-in-out infinite;">
-                                ○
-                            </div>
-                            <h4 style="margin:0;color:#93c5fd;font-size:24px;font-weight:900;
-                                       font-family:'Space Grotesk',sans-serif;text-transform:uppercase;
-                        letter-spacing:1.5px;text-shadow:0 3px 15px rgba(99,102,241,.7);">
-                    NOT FOUND ({len(nice_missing)})
-                            </h4>
-                        </div>
-                        <div style="display:grid;gap:14px;">
-                    """, unsafe_allow_html=True)
-                    
-                    for idx, (req, info) in enumerate(nice_missing, 1):
-                        signals = []
-                        similarity_note = info.get("similarity", 0.0)
-                        if info.get("llm_present"):
-                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
-                            signals.append(f"LLM flagged ({conf_pct}% conf)")
-                        else:
-                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
-                            if conf_pct > 0:
-                                signals.append(f"LLM missing ({conf_pct}% conf)")
-                        if similarity_note > 0.05:
-                            signals.append(f"Best sim {similarity_note:.2f}")
-                        signal_html = " • ".join(signals) if signals else "No supporting evidence"
-                        resume_html = _resume_snippet(info)
-                        jd_html = _jd_snippet(info)
-                        rationale = (info.get("llm_rationale") or "").strip()
-                        rationale_html = f"<div style=\"margin-top:8px;color:#93c5fd;font-size:12px;font-style:italic;\">{html.escape(rationale)}</div>" if rationale else ""
-                        st.markdown(f"""
-                        <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
-                                    border:2px solid rgba(99,102,241,.4);border-left:5px solid #6366f1;
-                                    border-radius:16px;padding:20px 24px;display:flex;align-items:center;gap:16px;
-                                    backdrop-filter:blur(20px);transition:all .4s cubic-bezier(.34,1.56,.64,1);
-                                    box-shadow:0 6px 20px rgba(99,102,241,.2);position:relative;overflow:hidden;">
-                            <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(99,102,241,.08),transparent);
-                                        opacity:0;transition:opacity .4s ease;"></div>
-                            <span style="flex-shrink:0;min-width:40px;height:40px;
-                                         background:linear-gradient(135deg,rgba(99,102,241,.35),rgba(99,102,241,.25));
-                                         color:#93c5fd;border-radius:50%;display:flex;align-items:center;justify-content:center;
-                                         font-size:20px;font-weight:900;border:2px solid rgba(99,102,241,.6);
-                                         box-shadow:0 4px 15px rgba(99,102,241,.4);position:relative;z-index:1;">○</span>
-                            <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
-                                <span style="color:#cbd5e1;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
-                                <span style="color:#a5b4fc;font-size:12px;font-weight:500;">{signal_html}</span>
-                                <div style="margin-top:10px;font-size:12px;color:#c7d2fe;line-height:1.6;">
-                                    <div><span style="color:#a5b4fc;">JD:</span> {jd_html}</div>
-                                    <div style="margin-top:6px;"><span style="color:#818cf8;">Resume:</span> {resume_html}</div>
-                                    {rationale_html}
-                                </div>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    st.markdown("</div></div>", unsafe_allow_html=True)
-            else:
-                st.info("⭐ No nice-to-have requirements specified for this position.")
+        st.markdown("<hr />", unsafe_allow_html=True)
         
         # ===== IMMERSIVE CANDIDATE ASSESSMENT =====
         st.markdown("""
