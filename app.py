@@ -244,6 +244,8 @@ p,span,div{color:#94a3b8!important;line-height:1.8!important;font-size:1.05rem!i
     background:linear-gradient(45deg,rgba(139,92,246,.15),rgba(236,72,153,.15));
     opacity:0;
     transition:opacity .5s ease;
+    pointer-events:none!important;
+    z-index:-1;
 }
 .stFileUploader:hover::before{opacity:1}
 .stFileUploader:hover{
@@ -263,6 +265,9 @@ p,span,div{color:#94a3b8!important;line-height:1.8!important;font-size:1.05rem!i
     pointer-events:auto!important;
 }
 .stFileUploader label{
+    pointer-events:auto!important;
+}
+.stFileUploader div[data-testid="stFileUploaderDropzone"]{
     pointer-events:auto!important;
 }
 
