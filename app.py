@@ -876,13 +876,13 @@ def coverage_from_atoms_semantic(must_atoms, nice_atoms, resume_chunks, embedder
             sims = np.dot(chunk_embs, atom_emb)
             max_sim = float(np.max(sims)) if sims.size > 0 else 0.0
             
-            # Fuzzy scoring: give partial credit for near-matches
+            # Stricter fuzzy scoring: less generous partial credit
             if max_sim >= threshold:
                 score = 1.0  # Full match
-            elif max_sim >= (threshold - 0.10):
-                score = 0.6  # Partial match (60% credit)
-            elif max_sim >= (threshold - 0.15):
-                score = 0.3  # Weak match (30% credit)
+            elif max_sim >= (threshold - 0.08):
+                score = 0.5  # Partial match (50% credit, down from 60%)
+            elif max_sim >= (threshold - 0.12):
+                score = 0.2  # Weak match (20% credit, down from 30%)
             else:
                 score = 0.0  # No match
             must_hits.append(score)
@@ -898,13 +898,13 @@ def coverage_from_atoms_semantic(must_atoms, nice_atoms, resume_chunks, embedder
             sims = np.dot(chunk_embs, atom_emb)
             max_sim = float(np.max(sims)) if sims.size > 0 else 0.0
             
-            # Same fuzzy scoring
+            # Same stricter fuzzy scoring
             if max_sim >= threshold:
                 score = 1.0
-            elif max_sim >= (threshold - 0.10):
-                score = 0.6
-            elif max_sim >= (threshold - 0.15):
-                score = 0.3
+            elif max_sim >= (threshold - 0.08):
+                score = 0.5
+            elif max_sim >= (threshold - 0.12):
+                score = 0.2
             else:
                 score = 0.0
             nice_hits.append(score)
@@ -1068,20 +1068,43 @@ RESUME_TEXT:
 
 def atomicize_requirements_prompt(jd, resume_preview):
     return f"""
+You are extracting CORE TECHNICAL SKILLS and CONCRETE REQUIREMENTS from a job description.
+
 Return ONLY JSON with:
-- must_atoms: 10-30 short atomic requirements strictly derived from the JOB DESCRIPTION (<=4 words each).
-- nice_atoms: 5-20 atomic nice-to-haves strictly from the JOB DESCRIPTION.
-Avoid vague items like "cloud engineering", "good communication". Use concise, concrete tokens (e.g., "python", "linux admin", "vpc", "api design").
+- must_atoms: Array of 15-30 CORE technical skills/requirements (2-4 words each)
+- nice_atoms: Array of 8-20 OPTIONAL/BONUS technical skills (2-4 words each)
+
+CRITICAL RULES:
+1. Extract ONLY core technical skills, tools, frameworks, languages, platforms, and measurable requirements
+2. IGNORE helper words like: "strong", "good", "excellent", "ability to", "experience with", "knowledge of"
+3. Focus on NOUNS and CONCRETE ITEMS: "Python", "AWS", "Docker", "React", "SQL", "5+ years"
+4. DO NOT extract soft skills: communication, teamwork, leadership, problem-solving
+5. DO NOT extract job responsibilities - only extract required SKILLS/TECH
+6. Keep items SHORT (2-4 words max): "Python 3.x" not "Experience with Python programming"
+7. Extract version numbers when specified: "Java 11", "React 18"
+8. Extract certifications as-is: "AWS Solutions Architect", "PMP"
+
+EXAMPLES OF GOOD ATOMS:
+✅ "Python", "AWS Lambda", "PostgreSQL", "CI/CD", "Kubernetes", "REST APIs", "Git", "5+ years experience"
+
+EXAMPLES OF BAD ATOMS (AVOID THESE):
+❌ "strong communication", "team player", "problem solving", "able to work independently"
+❌ "design and develop solutions", "collaborate with stakeholders"
+❌ "good understanding of cloud", "familiar with agile"
 
 JOB DESCRIPTION:
 {jd}
 
 RESUME PREVIEW (for context only; do NOT add atoms not present in JD):
 {resume_preview}
+
+Return ONLY valid JSON. No explanations.
 """
 
 def analysis_prompt(jd, plan, profile, global_sem, cov_final, cov_parts):
     return f"""
+You are a STRICT technical recruiter evaluating candidate fit. Be critical and demanding.
+
 Return ONLY JSON with:
 cultural_fit, technical_strength, experience_relevance (<=60 words each),
 top_strengths (string[]),
@@ -1091,14 +1114,28 @@ risk_flags (string[]),
 followup_questions (string[]),
 fit_score (0..10 number; reflect semantic + coverage + LLM judgment; do not output strings).
 
-SCORING GUIDANCE (IMPORTANT - Use holistic assessment):
-- If semantic >= 0.70 (high semantic match), start with fit_score 7-8 baseline
-- If semantic >= 0.60 and coverage_final >= 0.40, fit_score should be 6-7
-- If semantic >= 0.50 and coverage_final >= 0.30, fit_score should be 5-6
-- Coverage includes partial matches (0.6 weight for near-matches); don't penalize too harshly for slightly lower coverage
-- Prioritize semantic match over exact keyword coverage - semantic shows actual relevance
-- Low coverage (<0.30) AND low semantic (<0.40) → fit_score 3-4
-- Focus on overall competency alignment, not just keyword matching
+STRICT SCORING GUIDANCE (Be Conservative):
+- fit_score 9-10: EXCEPTIONAL match - rare; candidate exceeds ALL requirements significantly
+- fit_score 7-8: STRONG match - meets 80%+ of must-haves + good nice-to-haves + strong semantic alignment
+- fit_score 5-6: MODERATE match - meets 60-70% of must-haves + reasonable experience
+- fit_score 3-4: WEAK match - meets <50% of must-haves or lacks core technical skills
+- fit_score 0-2: POOR match - fundamental skill gaps
+
+SCORING THRESHOLDS (STRICTER):
+- semantic >= 0.75 AND coverage_final >= 0.70 → fit_score 8-9 (excellent)
+- semantic >= 0.65 AND coverage_final >= 0.60 → fit_score 6-7 (good)
+- semantic >= 0.55 AND coverage_final >= 0.50 → fit_score 5-6 (moderate)
+- semantic >= 0.45 AND coverage_final >= 0.40 → fit_score 4-5 (below average)
+- semantic < 0.45 OR coverage_final < 0.40 → fit_score 2-4 (weak)
+
+CRITICAL EVALUATION FACTORS:
+1. Must-have requirements coverage: {cov_parts.get('must_coverage', 0):.2f} - HEAVILY WEIGHTED
+2. Technical depth: Does candidate show DEEP expertise or just surface knowledge?
+3. Years of experience: Does it match the seniority level required?
+4. Semantic alignment: {global_sem:.4f} - Shows conceptual fit beyond keywords
+5. Red flags: Career gaps, job hopping, mismatched domains
+
+Be HONEST and CRITICAL. Do NOT inflate scores. Companies want accurate filtering.
 
 CONTEXT:
 - JOB_DESCRIPTION: {jd}
@@ -1107,6 +1144,8 @@ CONTEXT:
 - GLOBAL_SEMANTIC (0..1): {global_sem:.4f}
 - COVERAGE_FINAL (0..1): {cov_final:.4f}
 - COVERAGE_PARTS: {json.dumps(cov_parts, ensure_ascii=False)}
+
+Return ONLY valid JSON. No explanations.
 """
 
 # ---- File parsing ----
@@ -1168,25 +1207,28 @@ def save_to_db(resume_doc, jd, analysis, resumes_collection, analyses_collection
             rid = str(r.inserted_id)
             print(f"✅ Resume saved to DB with ID: {rid}")
         
-        # Save analysis document
+        # Save analysis document with correct field mapping
         if analyses_collection:
             adoc = {
                 "resume_id": rid,
                 "candidate": resume_doc.get("name", "Unknown"),
                 "email": resume_doc.get("email", "N/A"),
                 "file_name": resume_doc.get("file_name", "unknown"),
-                "job_desc": jd[:500] if len(jd) > 500 else jd,  # Store first 500 chars of JD
-                "job_desc_full": jd,  # Store full JD
+                "job_desc": jd[:500] if len(jd) > 500 else jd,
+                "job_desc_full": jd,
                 "analysis": _sanitize_for_mongo(analysis),
                 "timestamp": time.time(),
-                "overall_score": analysis.get("overall_score", 0),
-                "coverage_pct": analysis.get("coverage", {}).get("percentage", 0)
+                # Fix: Use correct field names from analysis dict
+                "overall_score": analysis.get("score", 0),
+                "coverage_pct": analysis.get("coverage_score", 0)
             }
             result = analyses_collection.insert_one(adoc)
             print(f"✅ Analysis saved to DB with ID: {result.inserted_id}")
             st.success(f"💾 Analysis saved to database successfully!")
     except Exception as exc:
         print(f"❌ MongoDB save error: {exc}")
+        import traceback
+        traceback.print_exc()
         st.warning(f"⚠️ Could not save to database: {str(exc)[:100]}")
 
 def get_recent(analyses_collection, mongo_ok, limit=20):
@@ -1626,8 +1668,9 @@ with tab1:
 
                 # ---------- Coverage (semantic similarity over chunks) ----------
                 show_status(0.58, "📊", "Scoring requirement coverage...", "rgba(16,185,129,.15)", "rgba(5,150,105,.12)")
+                # Stricter threshold: 0.35 (up from 0.28) for better precision
                 cov_final, must_cov, nice_cov, must_hits, nice_hits = coverage_from_atoms_semantic(
-                    must_atoms, nice_atoms, parsed.get("chunks", []), embedder, threshold=0.28
+                    must_atoms, nice_atoms, parsed.get("chunks", []), embedder, threshold=0.35
                 )
 
                 # ---------- Global semantic ----------
@@ -2513,14 +2556,43 @@ with tab1:
         """, unsafe_allow_html=True)
 
         # ===== Download Results =====
-        st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:32px;'></div>", unsafe_allow_html=True)
         payload = json.dumps(analysis, ensure_ascii=False, indent=2)
+        
+        # Beautiful download button
+        st.markdown("""
+        <div style="
+            background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(139,92,246,.12));
+            border:2px solid rgba(99,102,241,.4);
+            border-radius:20px;
+            padding:24px;
+            text-align:center;
+            box-shadow:0 8px 32px rgba(99,102,241,.25),0 0 60px rgba(139,92,246,.15);
+            backdrop-filter:blur(20px);
+            margin-bottom:20px;
+        ">
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px;">
+                <span style="font-size:32px;animation:glowPulseSmall 2s ease-in-out infinite;">📥</span>
+                <span style="
+                    font-size:18px;
+                    font-weight:800;
+                    color:#c7d2fe;
+                    font-family:'Space Grotesk',sans-serif;
+                    letter-spacing:0.5px;
+                ">Export Complete Analysis</span>
+            </div>
+            <p style="margin:0;color:#94a3b8;font-size:14px;font-weight:500;">
+                Download detailed JSON report with all metrics, scores, and insights
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
         st.download_button(
             "📥 Download Full Analysis (JSON)",
             data=payload.encode('utf-8'),
             file_name=f"analysis_{resume['name'].replace(' ','_')}_{int(time.time())}.json",
             use_container_width=True,
-            help="Download the complete analysis with all metrics and details"
+            type="primary"
         )
 
 # --- Recent tab ---
@@ -2580,3 +2652,43 @@ with tab2:
                     <p class="small">{t}</p>
                 </div>
                 """, unsafe_allow_html=True)
+
+# ===== FOOTER =====
+st.markdown("<div style='height:60px;'></div>", unsafe_allow_html=True)
+st.markdown("""
+<div style="
+    background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(99,102,241,.08));
+    border-top:2px solid rgba(139,92,246,.25);
+    border-radius:20px 20px 0 0;
+    padding:32px 24px;
+    text-align:center;
+    margin-top:60px;
+    backdrop-filter:blur(20px);
+">
+    <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px;">
+        <span style="font-size:24px;">🚀</span>
+        <span style="
+            font-size:16px;
+            font-weight:700;
+            color:#c7d2fe;
+            font-family:'Space Grotesk',sans-serif;
+            letter-spacing:0.5px;
+        ">Smart Resume Screener</span>
+    </div>
+    <p style="
+        margin:0;
+        color:#94a3b8;
+        font-size:15px;
+        font-weight:600;
+        font-family:'Inter',sans-serif;
+    ">
+        Created by <span style="color:#8b5cf6;font-weight:800;">Sachin S</span> from 
+        <span style="color:#ec4899;font-weight:800;">VIT Chennai</span>
+    </p>
+    <div style="margin-top:12px;">
+        <span style="color:#64748b;font-size:13px;font-weight:500;">
+            AI-Powered Resume Analysis • Semantic Matching • Intelligent Insights
+        </span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
