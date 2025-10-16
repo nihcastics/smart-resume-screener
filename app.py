@@ -3985,34 +3985,46 @@ with tab1:
                         st.markdown(f"""
                         <div style="background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(5,150,105,.05));
                                     border:2px solid rgba(16,185,129,.35);border-left:5px solid #10b981;
-                                    border-radius:16px;padding:20px 24px;margin-bottom:14px;
-                                    box-shadow:0 4px 16px rgba(16,185,129,.15);
-                                    transition:all 0.3s ease;position:relative;overflow:hidden;">
-                            <div style="position:absolute;top:0;right:0;width:120px;height:120px;
-                                        background:radial-gradient(circle,rgba(16,185,129,.15),transparent 70%);
+                                    border-radius:16px;padding:24px 28px;margin-bottom:16px;
+                                    box-shadow:0 4px 20px rgba(16,185,129,.18),0 8px 32px rgba(16,185,129,.12);
+                                    transition:all 0.4s cubic-bezier(0.4,0,0.2,1);
+                                    position:relative;overflow:hidden;cursor:pointer;">
+                            <div style="position:absolute;top:0;right:0;width:140px;height:140px;
+                                        background:radial-gradient(circle,rgba(16,185,129,.18),transparent 70%);
                                         pointer-events:none;"></div>
-                            <div style="display:flex;align-items:flex-start;gap:16px;position:relative;">
-                                <div style="width:42px;height:42px;min-width:42px;
+                            <div style="display:flex;align-items:flex-start;gap:18px;position:relative;">
+                                <div style="width:48px;height:48px;min-width:48px;
                                             background:linear-gradient(135deg,#10b981,#059669);
-                                            border-radius:12px;display:flex;align-items:center;justify-content:center;
-                                            font-size:22px;box-shadow:0 4px 12px rgba(16,185,129,.4);">
+                                            border-radius:14px;display:flex;align-items:center;justify-content:center;
+                                            font-size:24px;box-shadow:0 4px 16px rgba(16,185,129,.45),0 0 24px rgba(16,185,129,.25);">
                                     ✓
                                 </div>
                                 <div style="flex:1;">
-                                    <div style="color:#f1f5f9;font-size:16px;font-weight:700;margin-bottom:8px;
-                                               line-height:1.5;">{html.escape(req)}</div>
-                                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
-                                        <span style="background:rgba(16,185,129,.2);color:#6ee7b7;
-                                                     padding:4px 12px;border-radius:8px;font-size:12px;font-weight:600;">
+                                    <div style="color:#f8fafc;font-size:17px;font-weight:700;margin-bottom:10px;
+                                               line-height:1.5;font-family:'Inter',sans-serif;letter-spacing:-0.01em;">
+                                        {html.escape(req)}
+                                    </div>
+                                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+                                        <span style="background:linear-gradient(135deg,rgba(16,185,129,.25),rgba(16,185,129,.15));
+                                                     color:#6ee7b7;padding:5px 14px;border-radius:10px;
+                                                     font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;
+                                                     border:1px solid rgba(16,185,129,.3);
+                                                     box-shadow:0 2px 8px rgba(16,185,129,.2);">
                                             {signals}
                                         </span>
                                     </div>
-                                    {f'<div style="color:#a7f3d0;font-size:13px;margin-bottom:10px;line-height:1.6;font-style:italic;padding-left:8px;border-left:2px solid rgba(16,185,129,.3);">{html.escape(rationale)}</div>' if rationale else ''}
-                                    <div style="background:rgba(15,23,42,.6);border-radius:10px;padding:12px 16px;
-                                               border:1px solid rgba(16,185,129,.2);">
-                                        <div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:4px;
-                                                   text-transform:uppercase;letter-spacing:0.5px;">Evidence from Resume</div>
-                                        <div style="color:#cbd5e1;font-size:12px;line-height:1.6;">{resume_html}</div>
+                                    {f'<div style="color:#a7f3d0;font-size:14px;margin-bottom:12px;line-height:1.7;font-style:italic;padding-left:12px;border-left:3px solid rgba(16,185,129,.4);font-family:\'Inter\',sans-serif;">{html.escape(rationale)}</div>' if rationale else ''}
+                                    <div style="background:linear-gradient(135deg,rgba(15,23,42,.8),rgba(15,23,42,.6));
+                                               border-radius:12px;padding:14px 18px;
+                                               border:1px solid rgba(16,185,129,.25);
+                                               box-shadow:inset 0 2px 8px rgba(0,0,0,.3);">
+                                        <div style="color:#94a3b8;font-size:10px;font-weight:700;margin-bottom:6px;
+                                                   text-transform:uppercase;letter-spacing:1px;font-family:'Inter',sans-serif;">
+                                            📄 Evidence from Resume
+                                        </div>
+                                        <div style="color:#e2e8f0;font-size:13px;line-height:1.7;font-family:'Inter',sans-serif;">
+                                            {resume_html}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -4053,34 +4065,46 @@ with tab1:
                         st.markdown(f"""
                         <div style="background:linear-gradient(135deg,rgba(251,191,36,.08),rgba(250,204,21,.05));
                                     border:2px solid rgba(251,191,36,.35);border-left:5px solid #fbbf24;
-                                    border-radius:16px;padding:20px 24px;margin-bottom:14px;
-                                    box-shadow:0 4px 16px rgba(251,191,36,.15);
-                                    transition:all 0.3s ease;position:relative;overflow:hidden;">
-                            <div style="position:absolute;top:0;right:0;width:120px;height:120px;
-                                        background:radial-gradient(circle,rgba(251,191,36,.15),transparent 70%);
+                                    border-radius:16px;padding:24px 28px;margin-bottom:16px;
+                                    box-shadow:0 4px 20px rgba(251,191,36,.18),0 8px 32px rgba(251,191,36,.12);
+                                    transition:all 0.4s cubic-bezier(0.4,0,0.2,1);
+                                    position:relative;overflow:hidden;cursor:pointer;">
+                            <div style="position:absolute;top:0;right:0;width:140px;height:140px;
+                                        background:radial-gradient(circle,rgba(251,191,36,.18),transparent 70%);
                                         pointer-events:none;"></div>
-                            <div style="display:flex;align-items:flex-start;gap:16px;position:relative;">
-                                <div style="width:42px;height:42px;min-width:42px;
+                            <div style="display:flex;align-items:flex-start;gap:18px;position:relative;">
+                                <div style="width:48px;height:48px;min-width:48px;
                                             background:linear-gradient(135deg,#fbbf24,#facc15);
-                                            border-radius:12px;display:flex;align-items:center;justify-content:center;
-                                            font-size:22px;box-shadow:0 4px 12px rgba(251,191,36,.4);">
+                                            border-radius:14px;display:flex;align-items:center;justify-content:center;
+                                            font-size:24px;box-shadow:0 4px 16px rgba(251,191,36,.45),0 0 24px rgba(251,191,36,.25);">
                                     △
                                 </div>
                                 <div style="flex:1;">
-                                    <div style="color:#f1f5f9;font-size:16px;font-weight:700;margin-bottom:8px;
-                                               line-height:1.5;">{html.escape(req)}</div>
-                                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
-                                        <span style="background:rgba(251,191,36,.2);color:#fde68a;
-                                                     padding:4px 12px;border-radius:8px;font-size:12px;font-weight:600;">
+                                    <div style="color:#f8fafc;font-size:17px;font-weight:700;margin-bottom:10px;
+                                               line-height:1.5;font-family:'Inter',sans-serif;letter-spacing:-0.01em;">
+                                        {html.escape(req)}
+                                    </div>
+                                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+                                        <span style="background:linear-gradient(135deg,rgba(251,191,36,.25),rgba(251,191,36,.15));
+                                                     color:#fde68a;padding:5px 14px;border-radius:10px;
+                                                     font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;
+                                                     border:1px solid rgba(251,191,36,.3);
+                                                     box-shadow:0 2px 8px rgba(251,191,36,.2);">
                                             {signals}
                                         </span>
                                     </div>
-                                    {f'<div style="color:#fef3c7;font-size:13px;margin-bottom:10px;line-height:1.6;font-style:italic;padding-left:8px;border-left:2px solid rgba(251,191,36,.3);">{html.escape(rationale)}</div>' if rationale else ''}
-                                    <div style="background:rgba(15,23,42,.6);border-radius:10px;padding:12px 16px;
-                                               border:1px solid rgba(251,191,36,.2);">
-                                        <div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:4px;
-                                                   text-transform:uppercase;letter-spacing:0.5px;">Evidence from Resume</div>
-                                        <div style="color:#cbd5e1;font-size:12px;line-height:1.6;">{resume_html}</div>
+                                    {f'<div style="color:#fef3c7;font-size:14px;margin-bottom:12px;line-height:1.7;font-style:italic;padding-left:12px;border-left:3px solid rgba(251,191,36,.4);font-family:\'Inter\',sans-serif;">{html.escape(rationale)}</div>' if rationale else ''}
+                                    <div style="background:linear-gradient(135deg,rgba(15,23,42,.8),rgba(15,23,42,.6));
+                                               border-radius:12px;padding:14px 18px;
+                                               border:1px solid rgba(251,191,36,.25);
+                                               box-shadow:inset 0 2px 8px rgba(0,0,0,.3);">
+                                        <div style="color:#94a3b8;font-size:10px;font-weight:700;margin-bottom:6px;
+                                                   text-transform:uppercase;letter-spacing:1px;font-family:'Inter',sans-serif;">
+                                            📄 Evidence from Resume
+                                        </div>
+                                        <div style="color:#e2e8f0;font-size:13px;line-height:1.7;font-family:'Inter',sans-serif;">
+                                            {resume_html}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -4120,32 +4144,40 @@ with tab1:
                         st.markdown(f"""
                         <div style="background:linear-gradient(135deg,rgba(239,68,68,.08),rgba(220,38,38,.05));
                                     border:2px solid rgba(239,68,68,.35);border-left:5px solid #ef4444;
-                                    border-radius:16px;padding:20px 24px;margin-bottom:14px;
-                                    box-shadow:0 4px 16px rgba(239,68,68,.15);
-                                    transition:all 0.3s ease;position:relative;overflow:hidden;">
-                            <div style="position:absolute;top:0;right:0;width:120px;height:120px;
-                                        background:radial-gradient(circle,rgba(239,68,68,.15),transparent 70%);
+                                    border-radius:16px;padding:24px 28px;margin-bottom:16px;
+                                    box-shadow:0 4px 20px rgba(239,68,68,.18),0 8px 32px rgba(239,68,68,.12);
+                                    transition:all 0.4s cubic-bezier(0.4,0,0.2,1);
+                                    position:relative;overflow:hidden;cursor:pointer;">
+                            <div style="position:absolute;top:0;right:0;width:140px;height:140px;
+                                        background:radial-gradient(circle,rgba(239,68,68,.18),transparent 70%);
                                         pointer-events:none;"></div>
-                            <div style="display:flex;align-items:flex-start;gap:16px;position:relative;">
-                                <div style="width:42px;height:42px;min-width:42px;
+                            <div style="display:flex;align-items:flex-start;gap:18px;position:relative;">
+                                <div style="width:48px;height:48px;min-width:48px;
                                             background:linear-gradient(135deg,#ef4444,#dc2626);
-                                            border-radius:12px;display:flex;align-items:center;justify-content:center;
-                                            font-size:22px;box-shadow:0 4px 12px rgba(239,68,68,.4);">
+                                            border-radius:14px;display:flex;align-items:center;justify-content:center;
+                                            font-size:24px;box-shadow:0 4px 16px rgba(239,68,68,.45),0 0 24px rgba(239,68,68,.25);">
                                     ✗
                                 </div>
                                 <div style="flex:1;">
-                                    <div style="color:#f1f5f9;font-size:16px;font-weight:700;margin-bottom:8px;
-                                               line-height:1.5;">{html.escape(req)}</div>
-                                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
-                                        <span style="background:rgba(239,68,68,.2);color:#fca5a5;
-                                                     padding:4px 12px;border-radius:8px;font-size:12px;font-weight:600;">
+                                    <div style="color:#f8fafc;font-size:17px;font-weight:700;margin-bottom:10px;
+                                               line-height:1.5;font-family:'Inter',sans-serif;letter-spacing:-0.01em;">
+                                        {html.escape(req)}
+                                    </div>
+                                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+                                        <span style="background:linear-gradient(135deg,rgba(239,68,68,.25),rgba(239,68,68,.15));
+                                                     color:#fca5a5;padding:5px 14px;border-radius:10px;
+                                                     font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;
+                                                     border:1px solid rgba(239,68,68,.3);
+                                                     box-shadow:0 2px 8px rgba(239,68,68,.2);">
                                             {signals}
                                         </span>
                                     </div>
-                                    <div style="color:#fecaca;font-size:13px;line-height:1.6;font-style:italic;
-                                               padding:12px 16px;background:rgba(239,68,68,.1);border-radius:10px;
-                                               border-left:2px solid rgba(239,68,68,.4);">
-                                        {html.escape(rationale)}
+                                    <div style="color:#fecaca;font-size:14px;line-height:1.7;font-style:italic;
+                                               padding:14px 18px;background:linear-gradient(135deg,rgba(239,68,68,.12),rgba(239,68,68,.08));
+                                               border-radius:12px;border-left:3px solid rgba(239,68,68,.5);
+                                               font-family:'Inter',sans-serif;
+                                               box-shadow:inset 0 2px 8px rgba(0,0,0,.2);">
+                                        ⚠️ {html.escape(rationale)}
                                     </div>
                                 </div>
                             </div>
@@ -4190,34 +4222,46 @@ with tab1:
                         st.markdown(f"""
                         <div style="background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(99,102,241,.05));
                                     border:2px solid rgba(139,92,246,.35);border-left:5px solid #8b5cf6;
-                                    border-radius:16px;padding:20px 24px;margin-bottom:14px;
-                                    box-shadow:0 4px 16px rgba(139,92,246,.15);
-                                    transition:all 0.3s ease;position:relative;overflow:hidden;">
-                            <div style="position:absolute;top:0;right:0;width:120px;height:120px;
-                                        background:radial-gradient(circle,rgba(139,92,246,.15),transparent 70%);
+                                    border-radius:16px;padding:24px 28px;margin-bottom:16px;
+                                    box-shadow:0 4px 20px rgba(139,92,246,.18),0 8px 32px rgba(139,92,246,.12);
+                                    transition:all 0.4s cubic-bezier(0.4,0,0.2,1);
+                                    position:relative;overflow:hidden;cursor:pointer;">
+                            <div style="position:absolute;top:0;right:0;width:140px;height:140px;
+                                        background:radial-gradient(circle,rgba(139,92,246,.18),transparent 70%);
                                         pointer-events:none;"></div>
-                            <div style="display:flex;align-items:flex-start;gap:16px;position:relative;">
-                                <div style="width:42px;height:42px;min-width:42px;
+                            <div style="display:flex;align-items:flex-start;gap:18px;position:relative;">
+                                <div style="width:48px;height:48px;min-width:48px;
                                             background:linear-gradient(135deg,#8b5cf6,#6366f1);
-                                            border-radius:12px;display:flex;align-items:center;justify-content:center;
-                                            font-size:22px;box-shadow:0 4px 12px rgba(139,92,246,.4);">
+                                            border-radius:14px;display:flex;align-items:center;justify-content:center;
+                                            font-size:24px;box-shadow:0 4px 16px rgba(139,92,246,.45),0 0 24px rgba(139,92,246,.25);">
                                     ⭐
                                 </div>
                                 <div style="flex:1;">
-                                    <div style="color:#f1f5f9;font-size:16px;font-weight:700;margin-bottom:8px;
-                                               line-height:1.5;">{html.escape(req)}</div>
-                                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
-                                        <span style="background:rgba(139,92,246,.2);color:#c7d2fe;
-                                                     padding:4px 12px;border-radius:8px;font-size:12px;font-weight:600;">
+                                    <div style="color:#f8fafc;font-size:17px;font-weight:700;margin-bottom:10px;
+                                               line-height:1.5;font-family:'Inter',sans-serif;letter-spacing:-0.01em;">
+                                        {html.escape(req)}
+                                    </div>
+                                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+                                        <span style="background:linear-gradient(135deg,rgba(139,92,246,.25),rgba(139,92,246,.15));
+                                                     color:#c7d2fe;padding:5px 14px;border-radius:10px;
+                                                     font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;
+                                                     border:1px solid rgba(139,92,246,.3);
+                                                     box-shadow:0 2px 8px rgba(139,92,246,.2);">
                                             {signals}
                                         </span>
                                     </div>
-                                    {f'<div style="color:#ddd6fe;font-size:13px;margin-bottom:10px;line-height:1.6;font-style:italic;padding-left:8px;border-left:2px solid rgba(139,92,246,.3);">{html.escape(rationale)}</div>' if rationale else ''}
-                                    <div style="background:rgba(15,23,42,.6);border-radius:10px;padding:12px 16px;
-                                               border:1px solid rgba(139,92,246,.2);">
-                                        <div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:4px;
-                                                   text-transform:uppercase;letter-spacing:0.5px;">Evidence from Resume</div>
-                                        <div style="color:#cbd5e1;font-size:12px;line-height:1.6;">{resume_html}</div>
+                                    {f'<div style="color:#ddd6fe;font-size:14px;margin-bottom:12px;line-height:1.7;font-style:italic;padding-left:12px;border-left:3px solid rgba(139,92,246,.4);font-family:\'Inter\',sans-serif;">{html.escape(rationale)}</div>' if rationale else ''}
+                                    <div style="background:linear-gradient(135deg,rgba(15,23,42,.8),rgba(15,23,42,.6));
+                                               border-radius:12px;padding:14px 18px;
+                                               border:1px solid rgba(139,92,246,.25);
+                                               box-shadow:inset 0 2px 8px rgba(0,0,0,.3);">
+                                        <div style="color:#94a3b8;font-size:10px;font-weight:700;margin-bottom:6px;
+                                                   text-transform:uppercase;letter-spacing:1px;font-family:'Inter',sans-serif;">
+                                            📄 Evidence from Resume
+                                        </div>
+                                        <div style="color:#e2e8f0;font-size:13px;line-height:1.7;font-family:'Inter',sans-serif;">
+                                            {resume_html}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -4258,34 +4302,46 @@ with tab1:
                         st.markdown(f"""
                         <div style="background:linear-gradient(135deg,rgba(59,130,246,.08),rgba(96,165,250,.05));
                                     border:2px solid rgba(59,130,246,.35);border-left:5px solid #3b82f6;
-                                    border-radius:16px;padding:20px 24px;margin-bottom:14px;
-                                    box-shadow:0 4px 16px rgba(59,130,246,.15);
-                                    transition:all 0.3s ease;position:relative;overflow:hidden;">
-                            <div style="position:absolute;top:0;right:0;width:120px;height:120px;
-                                        background:radial-gradient(circle,rgba(59,130,246,.15),transparent 70%);
+                                    border-radius:16px;padding:24px 28px;margin-bottom:16px;
+                                    box-shadow:0 4px 20px rgba(59,130,246,.18),0 8px 32px rgba(59,130,246,.12);
+                                    transition:all 0.4s cubic-bezier(0.4,0,0.2,1);
+                                    position:relative;overflow:hidden;cursor:pointer;">
+                            <div style="position:absolute;top:0;right:0;width:140px;height:140px;
+                                        background:radial-gradient(circle,rgba(59,130,246,.18),transparent 70%);
                                         pointer-events:none;"></div>
-                            <div style="display:flex;align-items:flex-start;gap:16px;position:relative;">
-                                <div style="width:42px;height:42px;min-width:42px;
+                            <div style="display:flex;align-items:flex-start;gap:18px;position:relative;">
+                                <div style="width:48px;height:48px;min-width:48px;
                                             background:linear-gradient(135deg,#3b82f6,#60a5fa);
-                                            border-radius:12px;display:flex;align-items:center;justify-content:center;
-                                            font-size:22px;box-shadow:0 4px 12px rgba(59,130,246,.4);">
+                                            border-radius:14px;display:flex;align-items:center;justify-content:center;
+                                            font-size:24px;box-shadow:0 4px 16px rgba(59,130,246,.45),0 0 24px rgba(59,130,246,.25);">
                                     △
                                 </div>
                                 <div style="flex:1;">
-                                    <div style="color:#f1f5f9;font-size:16px;font-weight:700;margin-bottom:8px;
-                                               line-height:1.5;">{html.escape(req)}</div>
-                                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
-                                        <span style="background:rgba(59,130,246,.2);color:#dbeafe;
-                                                     padding:4px 12px;border-radius:8px;font-size:12px;font-weight:600;">
+                                    <div style="color:#f8fafc;font-size:17px;font-weight:700;margin-bottom:10px;
+                                               line-height:1.5;font-family:'Inter',sans-serif;letter-spacing:-0.01em;">
+                                        {html.escape(req)}
+                                    </div>
+                                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+                                        <span style="background:linear-gradient(135deg,rgba(59,130,246,.25),rgba(59,130,246,.15));
+                                                     color:#dbeafe;padding:5px 14px;border-radius:10px;
+                                                     font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;
+                                                     border:1px solid rgba(59,130,246,.3);
+                                                     box-shadow:0 2px 8px rgba(59,130,246,.2);">
                                             {signals}
                                         </span>
                                     </div>
-                                    {f'<div style="color:#bfdbfe;font-size:13px;margin-bottom:10px;line-height:1.6;font-style:italic;padding-left:8px;border-left:2px solid rgba(59,130,246,.3);">{html.escape(rationale)}</div>' if rationale else ''}
-                                    <div style="background:rgba(15,23,42,.6);border-radius:10px;padding:12px 16px;
-                                               border:1px solid rgba(59,130,246,.2);">
-                                        <div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:4px;
-                                                   text-transform:uppercase;letter-spacing:0.5px;">Evidence from Resume</div>
-                                        <div style="color:#cbd5e1;font-size:12px;line-height:1.6;">{resume_html}</div>
+                                    {f'<div style="color:#bfdbfe;font-size:14px;margin-bottom:12px;line-height:1.7;font-style:italic;padding-left:12px;border-left:3px solid rgba(59,130,246,.4);font-family:\'Inter\',sans-serif;">{html.escape(rationale)}</div>' if rationale else ''}
+                                    <div style="background:linear-gradient(135deg,rgba(15,23,42,.8),rgba(15,23,42,.6));
+                                               border-radius:12px;padding:14px 18px;
+                                               border:1px solid rgba(59,130,246,.25);
+                                               box-shadow:inset 0 2px 8px rgba(0,0,0,.3);">
+                                        <div style="color:#94a3b8;font-size:10px;font-weight:700;margin-bottom:6px;
+                                                   text-transform:uppercase;letter-spacing:1px;font-family:'Inter',sans-serif;">
+                                            📄 Evidence from Resume
+                                        </div>
+                                        <div style="color:#e2e8f0;font-size:13px;line-height:1.7;font-family:'Inter',sans-serif;">
+                                            {resume_html}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -4324,33 +4380,41 @@ with tab1:
                         
                         st.markdown(f"""
                         <div style="background:linear-gradient(135deg,rgba(99,102,241,.06),rgba(79,70,229,.04));
-                                    border:2px solid rgba(99,102,241,.25);border-left:5px solid #6366f1;
-                                    border-radius:16px;padding:20px 24px;margin-bottom:14px;
-                                    box-shadow:0 4px 16px rgba(99,102,241,.1);
-                                    transition:all 0.3s ease;position:relative;overflow:hidden;opacity:0.85;">
-                            <div style="position:absolute;top:0;right:0;width:120px;height:120px;
-                                        background:radial-gradient(circle,rgba(99,102,241,.12),transparent 70%);
+                                    border:2px solid rgba(99,102,241,.28);border-left:5px solid #6366f1;
+                                    border-radius:16px;padding:24px 28px;margin-bottom:16px;
+                                    box-shadow:0 4px 20px rgba(99,102,241,.12),0 8px 32px rgba(99,102,241,.08);
+                                    transition:all 0.4s cubic-bezier(0.4,0,0.2,1);
+                                    position:relative;overflow:hidden;cursor:pointer;opacity:0.88;">
+                            <div style="position:absolute;top:0;right:0;width:140px;height:140px;
+                                        background:radial-gradient(circle,rgba(99,102,241,.14),transparent 70%);
                                         pointer-events:none;"></div>
-                            <div style="display:flex;align-items:flex-start;gap:16px;position:relative;">
-                                <div style="width:42px;height:42px;min-width:42px;
+                            <div style="display:flex;align-items:flex-start;gap:18px;position:relative;">
+                                <div style="width:48px;height:48px;min-width:48px;
                                             background:linear-gradient(135deg,#6366f1,#4f46e5);
-                                            border-radius:12px;display:flex;align-items:center;justify-content:center;
-                                            font-size:22px;box-shadow:0 4px 12px rgba(99,102,241,.3);">
+                                            border-radius:14px;display:flex;align-items:center;justify-content:center;
+                                            font-size:24px;box-shadow:0 4px 16px rgba(99,102,241,.35),0 0 24px rgba(99,102,241,.2);">
                                     ○
                                 </div>
                                 <div style="flex:1;">
-                                    <div style="color:#cbd5e1;font-size:16px;font-weight:700;margin-bottom:8px;
-                                               line-height:1.5;">{html.escape(req)}</div>
-                                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
-                                        <span style="background:rgba(99,102,241,.15);color:#a5b4fc;
-                                                     padding:4px 12px;border-radius:8px;font-size:12px;font-weight:600;">
+                                    <div style="color:#cbd5e1;font-size:17px;font-weight:700;margin-bottom:10px;
+                                               line-height:1.5;font-family:'Inter',sans-serif;letter-spacing:-0.01em;">
+                                        {html.escape(req)}
+                                    </div>
+                                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+                                        <span style="background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(99,102,241,.12));
+                                                     color:#a5b4fc;padding:5px 14px;border-radius:10px;
+                                                     font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;
+                                                     border:1px solid rgba(99,102,241,.25);
+                                                     box-shadow:0 2px 8px rgba(99,102,241,.15);">
                                             {signals}
                                         </span>
                                     </div>
-                                    <div style="color:#a5b4fc;font-size:13px;line-height:1.6;font-style:italic;
-                                               padding:12px 16px;background:rgba(99,102,241,.08);border-radius:10px;
-                                               border-left:2px solid rgba(99,102,241,.25);">
-                                        {html.escape(rationale)}
+                                    <div style="color:#a5b4fc;font-size:14px;line-height:1.7;font-style:italic;
+                                               padding:14px 18px;background:linear-gradient(135deg,rgba(99,102,241,.1),rgba(99,102,241,.06));
+                                               border-radius:12px;border-left:3px solid rgba(99,102,241,.3);
+                                               font-family:'Inter',sans-serif;
+                                               box-shadow:inset 0 2px 8px rgba(0,0,0,.2);">
+                                        ℹ️ {html.escape(rationale)}
                                     </div>
                                 </div>
                             </div>
