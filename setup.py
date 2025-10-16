@@ -120,6 +120,7 @@ def main():
         ("sentence_transformers", "Sentence Transformers"),
         ("google.generativeai", "Google Generative AI"),
         ("pymongo", "PyMongo"),
+        ("pyflakes", "Pyflakes"),
     ]
     
     all_imports_ok = True

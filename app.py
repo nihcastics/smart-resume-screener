@@ -29,7 +29,7 @@ import faiss
 import numpy as np
 import google.generativeai as genai
 from dotenv import load_dotenv
-import json, time, re, tempfile
+import json, time, re, tempfile, html
 from datetime import datetime
 from collections import Counter
 from pymongo import MongoClient
@@ -1309,14 +1309,16 @@ def refine_atom_list(atoms, nlp=None, reserved_canonicals=None, limit=40):
     return refined, reserved
 
 def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_chunks, embedder, model=None,
-                                   faiss_index=None, strict_threshold=0.60, partial_threshold=0.48, nlp=None):
+                                   faiss_index=None, strict_threshold=0.60, partial_threshold=0.48,
+                                   nlp=None, jd_text=""):
     """
-    IMPROVED requirement coverage with fairer scoring for perfect resumes.
-    - Higher thresholds (0.60/0.48) reduce false negatives on strong matches
-    - Competency-aware scoring prevents under-scoring ecosystem evidence
-    - LLM reserved only for true borderline cases
+    Requirement coverage that relies on RAG evidence + LLM confirmation instead of lexicon heuristics.
+    - Retrieves the most relevant resume snippets for every requirement
+    - Aligns each requirement with its originating JD context
+    - Uses the LLM to render a present/missing verdict with confidence
+    - Applies competency awareness as a gentle post-adjustment
     """
-    tokens = token_set(resume_text)
+
     chunk_embs = None
     if resume_chunks and embedder:
         try:
@@ -1325,6 +1327,27 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
                 chunk_embs = chunk_embs.reshape(1, -1)
         except Exception:
             chunk_embs = None
+
+    # Pre-compute JD sentence contexts for requirement alignment
+    normalized_jd = jd_text.lower() if jd_text else ""
+    jd_sentences = []
+    if jd_text:
+        raw_sentences = re.split(r'(?<=[.!?])\s+', jd_text)
+        for sent in raw_sentences:
+            s = sent.strip()
+            if 8 <= len(s) <= 240:
+                jd_sentences.append(s)
+        if not jd_sentences:
+            jd_sentences = [jd_text.strip()]
+
+    jd_embs = None
+    if embedder and jd_sentences:
+        try:
+            jd_embs = embedder.encode(jd_sentences, convert_to_numpy=True, normalize_embeddings=True)
+            if jd_embs.ndim == 1:
+                jd_embs = jd_embs.reshape(1, -1)
+        except Exception:
+            jd_embs = None
 
     # Pre-compute competency signals for semantic context awareness (if nlp available)
     if nlp is not None:
@@ -1342,8 +1365,7 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
     atom_to_comp_nice, atom_kind_nice = map_atoms_to_competencies(nice_atoms, catalog)
 
     def comp_adjustment(atom, base_score, req_type):
-        # IMPROVED: Adjust atom score based on competency strength
-        # But be GENEROUS to good candidates
+        """Apply gentle competency-aware adjustments to prevent over-penalisation."""
         a_norm = normalize_text(atom)
         if req_type == "must-have":
             comp_id = atom_to_comp_must.get(a_norm)
@@ -1353,92 +1375,183 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
             kind = atom_kind_nice.get(a_norm)
         if not comp_id:
             return base_score
+
         cscore = float(comp_scores.get(comp_id, 0.0))
         if (kind or "framework") == "core":
-            # For core items (e.g., "java"), require moderate ecosystem
-            # IMPROVED: threshold raised to 0.50 (from 0.65) to reward good candidates
             if base_score >= 1.0 and cscore < 0.50:
-                return 0.75  # partial credit if ecosystem weak but exists
+                return 0.75
             if base_score >= 0.85 and cscore < 0.40:
                 return 0.60
         else:
-            # Framework/tool atoms: only downgrade if VERY weak
             if base_score >= 1.0 and cscore < 0.25:
                 return 0.90
         return base_score
 
+    def summarize_snippet(text, limit=240):
+        text = (text or "").strip()
+        text = re.sub(r'\s+', ' ', text)
+        if len(text) > limit:
+            text = text[:limit-3].rstrip() + "..."
+        return text
+
+    def gather_resume_contexts(atom, top_k=3):
+        contexts, sims = [], []
+        if not atom:
+            return contexts, 0.0
+
+        if faiss_index is not None and resume_chunks and embedder:
+            fetched = retrieve_relevant_context(atom, faiss_index, resume_chunks, embedder, top_k=top_k)
+            for snippet, sim in fetched:
+                clip_sim = float(np.clip(sim, -1.0, 1.0))
+                contexts.append({
+                    "text": summarize_snippet(snippet),
+                    "similarity": clip_sim
+                })
+                sims.append(max(0.0, clip_sim))
+        elif chunk_embs is not None and embedder and resume_chunks:
+            try:
+                atom_emb = embedder.encode(atom, convert_to_numpy=True, normalize_embeddings=True)
+                if atom_emb.ndim > 1:
+                    atom_emb = atom_emb[0]
+                scores = np.dot(chunk_embs, atom_emb)
+                if scores.size > 0:
+                    top_idx = np.argsort(scores)[-top_k:][::-1]
+                    for idx in top_idx:
+                        if idx < 0 or idx >= len(resume_chunks):
+                            continue
+                        sim_val = float(np.clip(scores[idx], -1.0, 1.0))
+                        if sim_val <= 0 and len(contexts) >= top_k:
+                            continue
+                        contexts.append({
+                            "text": summarize_snippet(resume_chunks[idx]),
+                            "similarity": sim_val
+                        })
+                        sims.append(max(0.0, sim_val))
+            except Exception:
+                pass
+
+        top_similarity = max(sims) if sims else 0.0
+        return contexts[:top_k], float(top_similarity)
+
+    def gather_jd_context(atom):
+        if not jd_text:
+            return {"text": "", "similarity": 0.0}
+
+        lowered_atom = atom.lower() if atom else ""
+        if lowered_atom and lowered_atom in normalized_jd:
+            idx = normalized_jd.find(lowered_atom)
+            if idx != -1:
+                start = max(0, idx - 120)
+                end = min(len(jd_text), idx + len(atom) + 120)
+                snippet = jd_text[start:end]
+                return {"text": summarize_snippet(snippet), "similarity": 1.0}
+
+        if jd_embs is not None and embedder and atom:
+            try:
+                atom_emb = embedder.encode(atom, convert_to_numpy=True, normalize_embeddings=True)
+                if atom_emb.ndim > 1:
+                    atom_emb = atom_emb[0]
+                sims = np.dot(jd_embs, atom_emb)
+                if sims.size > 0:
+                    idx = int(np.argmax(sims))
+                    sim_val = float(np.clip(sims[idx], -1.0, 1.0))
+                    return {"text": summarize_snippet(jd_sentences[idx]), "similarity": sim_val}
+            except Exception:
+                pass
+
+        return {"text": "", "similarity": 0.0}
+
     def assess(atoms, req_type):
         details = {}
-        pending = []
+        queue = []
         for atom in atoms:
-            sim = 0.0
-            token_hit = contains_atom(atom, tokens, resume_text)
-            semantic_hit = False
-            partial = False
-            if chunk_embs is not None:
-                try:
-                    atom_emb = embedder.encode(atom, convert_to_numpy=True, normalize_embeddings=True)
-                    if atom_emb.ndim > 1:
-                        atom_emb = atom_emb[0]
-                    sims = np.dot(chunk_embs, atom_emb)
-                    sim = float(np.max(sims)) if sims.size > 0 else 0.0
-                    semantic_hit = sim >= strict_threshold
-                    if not semantic_hit and sim >= partial_threshold:
-                        partial = True
-                except Exception:
-                    sim = 0.0
+            resume_ctx, top_similarity = gather_resume_contexts(atom)
+            jd_ctx = gather_jd_context(atom)
 
-            # IMPROVED scoring: reward perfect matches, be fair to near-perfect
-            if token_hit or semantic_hit:
-                score = 1.0  # Perfect: token or strong semantic
-            elif partial:
-                score = 0.60  # RAISED from 0.5: partial is meaningful
+            if top_similarity >= strict_threshold:
+                base_score = 0.80
+            elif top_similarity >= partial_threshold:
+                base_score = 0.55
             else:
-                score = 0.0   # No match
+                base_score = 0.0
 
-            # Competency-aware adjustment (gentle, not punishing)
-            score = comp_adjustment(atom, score, req_type)
-                
-            details[atom] = {
-                "token_hit": bool(token_hit),
-                "semantic_hit": bool(semantic_hit),
-                "partial_semantic": bool(partial and score < 1.0),
-                "similarity": sim,
-                "llm_hit": False,
-                "score": score
+            detail = {
+                "req_type": req_type,
+                "similarity": float(top_similarity),
+                "max_similarity": float(top_similarity),
+                "resume_contexts": resume_ctx,
+                "jd_context": jd_ctx,
+                "pre_llm_score": float(base_score),
+                "score": float(base_score),
+                "llm_present": False,
+                "llm_confidence": 0.0,
+                "llm_rationale": ""
             }
+            details[atom] = detail
 
-            # Only use LLM for TRULY borderline cases (0.45-0.70 range)
-            if model and 0.45 <= score < 0.70:
-                pending.append(atom)
+            if model:
+                queue.append({
+                    "requirement": atom,
+                    "req_type": req_type,
+                    "resume_contexts": resume_ctx,
+                    "jd_context": jd_ctx,
+                    "max_similarity": float(top_similarity)
+                })
 
-        # RAG-enhanced LLM verification for borderline cases only
-        if model and pending:
-            llm_results = llm_verify_requirements(
-                model, pending, resume_text, req_type, 
-                faiss_index=faiss_index, chunks=resume_chunks, embedder=embedder
-            )
-            for atom in pending:
-                if llm_results.get(atom):
-                    # LLM can boost to 0.85-0.90 for borderline cases
-                    current = details[atom]["score"]
-                    provisional = 0.85 if current < 0.60 else 0.90
-                    provisional = comp_adjustment(atom, provisional, req_type)
-                    details[atom]["llm_hit"] = True
-                    details[atom]["score"] = max(provisional, current)  # Don't downgrade
-        return details
+        return details, queue
 
-    must_details = assess(must_atoms, "must-have")
-    nice_details = assess(nice_atoms, "nice-to-have") if nice_atoms else {}
+    must_details, must_queue = assess(must_atoms, "must-have")
+    nice_details, nice_queue = assess(nice_atoms, "nice-to-have") if nice_atoms else ({}, [])
+
+    if model and (must_queue or nice_queue):
+        payload = must_queue + nice_queue
+        llm_results = llm_verify_requirements(model, payload, resume_text, jd_text)
+
+        for atom, detail in {**must_details, **nice_details}.items():
+            verdict = llm_results.get(atom)
+            if not verdict:
+                continue
+
+            present = bool(verdict.get("present"))
+            confidence = verdict.get("confidence", 0.0)
+            try:
+                confidence = float(confidence)
+            except Exception:
+                confidence = 0.0
+            confidence = max(0.0, min(1.0, confidence))
+
+            rationale = str(verdict.get("rationale", "") or "").strip()
+            evidence = str(verdict.get("evidence", "") or "").strip()
+
+            detail["llm_present"] = present
+            detail["llm_confidence"] = confidence
+            if evidence and not rationale:
+                rationale = evidence
+            detail["llm_rationale"] = rationale
+            if evidence:
+                detail["llm_evidence"] = evidence
+
+            if present:
+                boosted = 0.90 + 0.10 * confidence
+                detail["score"] = float(np.clip(boosted, 0.0, 1.0))
+            else:
+                dampened = detail["pre_llm_score"] * (0.35 if confidence >= 0.6 else 0.5)
+                detail["score"] = float(np.clip(dampened, 0.0, 1.0))
+
+    for atom, detail in must_details.items():
+        adjusted = comp_adjustment(atom, detail["score"], detail["req_type"])
+        detail["score"] = float(np.clip(adjusted, 0.0, 1.0))
+
+    for atom, detail in nice_details.items():
+        adjusted = comp_adjustment(atom, detail["score"], detail["req_type"])
+        detail["score"] = float(np.clip(adjusted, 0.0, 1.0))
 
     must_scores = [d["score"] for d in must_details.values()]
     nice_scores = [d["score"] for d in nice_details.values()]
 
-    # IMPROVED: Handle scoring more fairly
     must_cov = float(np.mean(must_scores)) if must_scores else 0.0
-    nice_cov = float(np.mean(nice_scores)) if nice_scores else 1.0  # If no nice requirements, full score
-    
-    # Adjusted weighting: 70% must-have, 30% nice-to-have (favor completeness)
+    nice_cov = float(np.mean(nice_scores)) if nice_scores else 1.0
+
     overall = 0.70 * must_cov + 0.30 * nice_cov if must_scores else nice_cov
 
     return {
@@ -1470,99 +1583,244 @@ def llm_json(model, prompt):
         try: return json.loads(s)
         except: return {}
 
-def llm_verify_requirements(model, requirements, resume_text, req_type="must-have", faiss_index=None, chunks=None, embedder=None):
+def llm_verify_requirements(model, requirements_payload, resume_text, jd_text=""):
     """
-    Enhanced LLM-assisted verification with RAG (Retrieval-Augmented Generation).
-    Uses relevant resume chunks retrieved via FAISS for better accuracy.
+    Cross-verify requirement coverage using curated RAG evidence + JD context.
+    Returns a mapping of requirement -> {present, confidence, rationale, evidence}.
     """
-    if not requirements or not resume_text:
+    if not requirements_payload:
         return {}
-    
-    # RAG: Retrieve relevant context for each requirement
-    relevant_contexts = {}
-    if faiss_index and chunks and embedder:
-        for req in requirements:
-            contexts = retrieve_relevant_context(req, faiss_index, chunks, embedder, top_k=2)
-            if contexts:
-                relevant_contexts[req] = "\n".join([ctx[0] for ctx in contexts])
-    
-    req_list = "\n".join([f"{i+1}. {r}" for i, r in enumerate(requirements)])
-    
-    # Build context section with RAG if available
-    context_section = ""
-    if relevant_contexts:
-        context_section = "\n**RELEVANT RESUME EXCERPTS** (most similar sections):\n"
-        for req, ctx in list(relevant_contexts.items())[:5]:  # Limit to 5 for token efficiency
-            context_section += f"\nFor '{req}':\n{ctx[:400]}\n"
-    
-    prompt = f"""You are an expert technical recruiter with deep knowledge of technology synonyms and variations.
 
-**TASK**: For each requirement, determine if there's STRONG EVIDENCE in the resume.
+    def _shorten(text, limit=320):
+        text = (text or "").strip()
+        text = re.sub(r'\s+', ' ', text)
+        if len(text) > limit:
+            text = text[:limit-3].rstrip() + "..."
+        return text
 
-**REQUIREMENTS TO VERIFY** ({req_type}):
-{req_list}
-{context_section}
+    results = {}
+    batch_size = 8
+    resume_excerpt = _shorten(resume_text, 2000)
+    jd_excerpt = _shorten(jd_text, 2000)
 
-**FULL RESUME** (if specific context not found above):
-{resume_text[:4000]}
+    for i in range(0, len(requirements_payload), batch_size):
+        batch = requirements_payload[i:i + batch_size]
+        formatted_batch = []
+        for item in batch:
+            ctxs = []
+            for ctx in (item.get("resume_contexts") or [])[:3]:
+                try:
+                    sim_val = float(ctx.get("similarity", 0.0))
+                except Exception:
+                    sim_val = 0.0
+                ctxs.append({
+                    "similarity": round(sim_val, 3),
+                    "text": _shorten(ctx.get("text", ""), 320)
+                })
 
-**MATCHING INTELLIGENCE**:
-1. Technology Synonyms & Variations:
-   - "AI" or "ML" matches: artificial intelligence, machine learning, AI/ML, ML models, deep learning, neural networks
-   - "Cloud" matches: AWS, Azure, GCP, cloud computing, cloud platforms, serverless
-   - Programming languages match if mentioned in: projects, skills, tools, "worked with X", "experience in X"
-   - "React" matches: React, React.js, ReactJS, React Native
-   - "Node" matches: Node.js, NodeJS, Node, Express
-   - "PostgreSQL" matches: PostgreSQL, Postgres, psql
-   - "CI/CD" matches: continuous integration, continuous deployment, Jenkins, GitLab CI, GitHub Actions
-   
-2. Experience Pattern Matching:
-   - "5+ years Python" is satisfied by: "6 years Python", "Python developer since 2018", "Senior Python dev"
-   - "3+ years experience" matches job titles with "Senior" or longer project durations
-   
-3. Education & Certifications:
-   - "Bachelor degree" matches: BS, B.S., B.Tech, Bachelor of Science, Undergraduate degree
-   - "AWS Certified" matches: AWS Solutions Architect, AWS Developer Associate, any AWS certification
+            jd_ctx = item.get("jd_context") or {}
+            try:
+                max_sim = float(item.get("max_similarity", 0.0))
+            except Exception:
+                max_sim = 0.0
 
-4. Contextual Evidence:
-   - If resume shows projects using a technology, count it as experience
-   - If resume lists technology in skills section, it counts
-   - If technology appears in job responsibilities, it counts
+            formatted_batch.append({
+                "requirement": item.get("requirement", ""),
+                "req_type": item.get("req_type", ""),
+                "max_similarity": round(max_sim, 3),
+                "job_description_focus": _shorten(jd_ctx.get("text", ""), 320),
+                "resume_evidence": ctxs
+            })
 
-**SCORING RULES**:
-- Return `true` if there's REASONABLE EVIDENCE (direct mention, synonym, related project)
-- Return `false` if there's NO EVIDENCE or only vague mentions
-- Be GENEROUS but ACCURATE - if there's valid evidence, mark true
-- Consider the FULL CONTEXT, not just keyword matching
+        prompt = f"""
+You are an expert technical recruiter validating whether each requirement is demonstrably covered by the candidate's resume.
 
-**OUTPUT FORMAT**:
-Return ONLY valid JSON (no markdown, no explanations):
-{{"requirement1_exact_text": true, "requirement2_exact_text": false, ...}}
+REQUIREMENTS (JSON):
+{json.dumps(formatted_batch, indent=2)}
 
-Use the EXACT requirement text as keys.
+RESUME_EXCERPT (fallback if evidence is thin):
+{resume_excerpt}
+
+JOB_DESCRIPTION_EXCERPT (for intent comparison):
+{jd_excerpt}
+
+INSTRUCTIONS:
+- Analyse the provided resume evidence and JD focus for each requirement.
+- Mark `present` true only when the resume evidence clearly satisfies the requirement (consider synonyms, measurable outcomes, and project context).
+- If evidence is weak or absent, mark `present` false and explain the gap.
+- Use JD focus to understand expectations; do not hallucinate technologies not present in the resume evidence.
+- Confidence must be between 0 and 1 (higher when evidence is explicit and recent).
+
+OUTPUT STRICTLY AS JSON (no markdown):
+{{
+  "<requirement text>": {{
+      "present": true/false,
+      "confidence": 0.0-1.0,
+      "rationale": "<=20 words citing evidence or gap",
+      "evidence": "optional direct quote from resume evidence"
+  }},
+  ...
+}}
 """
-    
-    try:
-        result = llm_json(model, prompt)
-        if not isinstance(result, dict):
-            return {}
-        
-        # Normalize keys to match requirements
-        normalized_result = {}
-        for req in requirements:
-            # Try exact match first
-            if req in result:
-                normalized_result[req] = result[req]
-            else:
-                # Try case-insensitive match
-                for k, v in result.items():
-                    if normalize_text(k) == normalize_text(req):
-                        normalized_result[req] = v
+
+        try:
+            raw = llm_json(model, prompt)
+        except Exception:
+            raw = {}
+
+        if not isinstance(raw, dict):
+            continue
+
+        for item in batch:
+            req_text = item.get("requirement", "")
+            if not req_text:
+                continue
+
+            verdict = raw.get(req_text)
+            if verdict is None:
+                for key, value in raw.items():
+                    if normalize_text(key) == normalize_text(req_text):
+                        verdict = value
                         break
-        
-        return normalized_result
+
+            if isinstance(verdict, dict):
+                present = bool(verdict.get("present"))
+                confidence = verdict.get("confidence", verdict.get("confidence_score", 0.0))
+                try:
+                    confidence = float(confidence)
+                except Exception:
+                    confidence = 0.0
+                confidence = max(0.0, min(1.0, confidence))
+
+                rationale = str(verdict.get("rationale", verdict.get("reason", "")) or "").strip()
+                evidence = str(verdict.get("evidence", "") or "").strip()
+
+                results[req_text] = {
+                    "present": present,
+                    "confidence": confidence,
+                    "rationale": rationale,
+                    "evidence": evidence
+                }
+            elif isinstance(verdict, bool):
+                results[req_text] = {
+                    "present": bool(verdict),
+                    "confidence": 0.5,
+                    "rationale": "",
+                    "evidence": ""
+                }
+
+    return results
+
+def compute_cue_alignment(plan, parsed_resume, profile, embedder, faiss_index=None):
+    """Compute cosine-similarity alignment between JD enrichment cues and resume evidence."""
+    jd_cues = [c.strip() for c in (plan.get("enrichment_cues") or []) if isinstance(c, str) and c.strip()]
+    jd_cues = jd_cues[:25]
+
+    def _collect_strings(values):
+        collected = []
+        if isinstance(values, list):
+            for item in values:
+                if isinstance(item, str) and item.strip():
+                    collected.append(item.strip())
+        return collected
+
+    resume_cue_set = set()
+
+    if isinstance(parsed_resume, dict):
+        for skill in _collect_strings(parsed_resume.get("technical_skills")):
+            resume_cue_set.add(skill)
+
+    if isinstance(profile, dict):
+        resume_cue_set.update(_collect_strings(profile.get("core_skills")))
+        resume_cue_set.update(_collect_strings(profile.get("tools")))
+        resume_cue_set.update(_collect_strings(profile.get("cloud_experience")))
+        resume_cue_set.update(_collect_strings(profile.get("ml_ai_experience")))
+        resume_cue_set.update(_collect_strings(profile.get("notable_metrics")))
+
+        projects = profile.get("projects") or []
+        if isinstance(projects, list):
+            for proj in projects:
+                if isinstance(proj, dict):
+                    name = proj.get("name")
+                    desc = proj.get("description")
+                    if isinstance(name, str) and name.strip():
+                        resume_cue_set.add(name.strip())
+                    if isinstance(desc, str) and desc.strip():
+                        resume_cue_set.add(desc.strip())
+
+        summary = profile.get("summary")
+        if isinstance(summary, str) and summary.strip():
+            resume_cue_set.add(summary.strip())
+
+    resume_cues = [c for c in resume_cue_set if len(c) > 2][:60]
+
+    if not jd_cues or not resume_cues or embedder is None:
+        return {
+            "jd_cues": jd_cues,
+            "resume_cues": resume_cues,
+            "alignments": [],
+            "average_similarity": 0.0,
+            "strong_matches": [],
+            "weak_matches": jd_cues
+        }
+
+    try:
+        jd_embs = embedder.encode(jd_cues, convert_to_numpy=True, normalize_embeddings=True)
+        if jd_embs.ndim == 1:
+            jd_embs = jd_embs.reshape(1, -1)
+        resume_embs = embedder.encode(resume_cues, convert_to_numpy=True, normalize_embeddings=True)
+        if resume_embs.ndim == 1:
+            resume_embs = resume_embs.reshape(1, -1)
     except Exception:
-        return {}
+        return {
+            "jd_cues": jd_cues,
+            "resume_cues": resume_cues,
+            "alignments": [],
+            "average_similarity": 0.0,
+            "strong_matches": [],
+            "weak_matches": jd_cues
+        }
+
+    alignments = []
+    strong, weak = [], []
+    resume_chunks = parsed_resume.get("chunks") if isinstance(parsed_resume, dict) else None
+
+    for idx, cue in enumerate(jd_cues):
+        cue_emb = jd_embs[idx]
+        sims = np.dot(resume_embs, cue_emb)
+        best_idx = int(np.argmax(sims)) if sims.size > 0 else -1
+        best_sim = float(np.clip(sims[best_idx], -1.0, 1.0)) if best_idx >= 0 else 0.0
+        best_resume_cue = resume_cues[best_idx] if best_idx >= 0 else ""
+
+        resume_context = ""
+        if faiss_index is not None and resume_chunks and embedder and best_resume_cue:
+            contexts = retrieve_relevant_context(best_resume_cue, faiss_index, resume_chunks, embedder, top_k=1)
+            if contexts:
+                snippet = re.sub(r'\s+', ' ', contexts[0][0]).strip()
+                resume_context = snippet[:257].rstrip() + ("..." if len(snippet) > 260 else "")
+
+        alignments.append({
+            "jd_cue": cue,
+            "matched_resume_cue": best_resume_cue,
+            "similarity": best_sim,
+            "resume_context": resume_context
+        })
+
+        if best_sim >= 0.70:
+            strong.append(cue)
+        elif best_sim < 0.40:
+            weak.append(cue)
+
+    average_similarity = float(np.mean([a["similarity"] for a in alignments])) if alignments else 0.0
+
+    return {
+        "jd_cues": jd_cues,
+        "resume_cues": resume_cues,
+        "alignments": alignments,
+        "average_similarity": average_similarity,
+        "strong_matches": strong,
+        "weak_matches": weak
+    }
 
 def jd_plan_prompt(jd, preview):
     return f"""
@@ -1700,49 +1958,94 @@ BAD OUTPUT (DO NOT DO THIS):
 Return ONLY valid JSON. No markdown, no explanations.
 """
 
-def analysis_prompt(jd, plan, profile, global_sem, cov_final, cov_parts):
+def analysis_prompt(jd, plan, profile, coverage_summary, cue_alignment, global_sem, cov_final):
+    must_details = (coverage_summary.get("details") or {}).get("must", {})
+    nice_details = (coverage_summary.get("details") or {}).get("nice", {})
+
+    def _pick_atoms(source, threshold_low, threshold_high=None, limit=8):
+        picked = []
+        for atom, info in source.items():
+            score = float(info.get("score", 0.0))
+            if threshold_high is None:
+                if score >= threshold_low:
+                    picked.append(atom)
+            else:
+                if threshold_low <= score < threshold_high:
+                    picked.append(atom)
+        return picked[:limit]
+
+    coverage_brief = {
+        "must_coverage": round(coverage_summary.get("must", 0.0), 3),
+        "nice_coverage": round(coverage_summary.get("nice", 1.0), 3),
+        "overall": round(coverage_summary.get("overall", 0.0), 3),
+        "must_found": _pick_atoms(must_details, 0.85),
+        "must_partial": _pick_atoms(must_details, 0.50, 0.85),
+        "must_missing": _pick_atoms(must_details, 0.0, 0.50),
+        "nice_found": _pick_atoms(nice_details, 0.85),
+        "nice_partial": _pick_atoms(nice_details, 0.50, 0.85),
+        "nice_missing": _pick_atoms(nice_details, 0.0, 0.50)
+    }
+
+    cue_brief = {
+        "average_similarity": round(cue_alignment.get("average_similarity", 0.0), 3),
+        "strong_matches": (cue_alignment.get("strong_matches") or [])[:10],
+        "weak_matches": (cue_alignment.get("weak_matches") or [])[:10],
+        "sample_alignments": (cue_alignment.get("alignments") or [])[:6]
+    }
+
+    coverage_json = json.dumps(coverage_brief, indent=2)[:1200]
+    cue_json = json.dumps(cue_brief, indent=2)[:1100]
+    plan_json = json.dumps(plan, indent=2)[:800]
+    profile_json = json.dumps(profile, indent=2)[:1200]
+
     return f"""
-You are a STRICT technical recruiter evaluating candidate fit. Be critical and demanding.
+You are a PRINCIPLED senior technical recruiter. Deliver a concise, critical assessment strictly grounded in the supplied evidence.
 
-Return ONLY JSON with:
-cultural_fit, technical_strength, experience_relevance (<=60 words each),
-top_strengths (string[]),
-improvement_areas (string[]),
-overall_comment (<=80 words),
-risk_flags (string[]),
-followup_questions (string[]),
-fit_score (0-10 integer).
+Return ONLY JSON with the following keys:
+- cultural_fit (<=60 words)
+- technical_strength (<=60 words)
+- experience_relevance (<=60 words)
+- top_strengths (string[])
+- improvement_areas (string[])
+- overall_comment (<=80 words)
+- risk_flags (string[])
+- followup_questions (string[])
+- fit_score (integer 0-10)
 
-**Scoring Guide** (be CRITICAL):
-- 9-10: Exceptional, exceeds all requirements, rare talent
-- 7-8: Strong fit, meets all must-haves + most nice-to-haves
-- 5-6: Adequate, meets most must-haves, some gaps
-- 3-4: Weak fit, missing key requirements
-- 0-2: Poor fit, not recommended
+SCORING FRAMEWORK (NO EXCEPTIONS):
+- 9-10: Outstanding; must-haves fully met, strong semantic + cue alignment, differentiated impact
+- 7-8: Strong fit; must-haves solid, minor gaps acceptable, cues mostly aligned
+- 5-6: Moderate; several gaps or weak evidence, investigate further
+- 3-4: Weak; missing core requirements or semantic alignment poor
+- 0-2: Not viable; critical skills absent
 
-**Key Factors**:
-- Must-have coverage: {cov_parts.get('must_coverage', 0):.2f} ({cov_parts.get('must_atoms_count', 0)} requirements)
-- Nice-to-have coverage: {cov_parts.get('nice_coverage', 0):.2f} ({cov_parts.get('nice_atoms_count', 0)} requirements)
+HARD GUARDRAILS:
+- If must_coverage < 0.50 → fit_score ≤ 5
+- If must_coverage < 0.30 → fit_score ≤ 3
+- Penalise missing core competencies even if soft cues are strong
+- Reference cue alignment: weak cues signal cultural/context gaps
+- Reflect years/seniority alignment using resume experience only
+
+CORE METRICS:
 - Semantic similarity: {global_sem:.3f}
 - Overall requirement match: {cov_final:.3f}
 
-**CRITICAL RULES**:
-1. If must-have coverage < 0.5, fit_score MUST be ≤ 5
-2. If must-have coverage < 0.3, fit_score MUST be ≤ 3
-3. Missing critical skills → significant score penalty
-4. Soft skills alone don't compensate for technical gaps
-5. Years of experience must match seniority requirements
+REQUIREMENT COVERAGE SNAPSHOT:
+{coverage_json}
 
-JOB_DESCRIPTION:
+CUE ALIGNMENT SNAPSHOT:
+{cue_json}
+
+ANALYSIS PLAN:
+{plan_json}
+
+RESUME PROFILE:
+{profile_json}
+
+JOB DESCRIPTION (TRUNCATED):
 {jd[:1500]}
 
-ANALYSIS_PLAN:
-{json.dumps(plan, indent=2)[:800]}
-
-RESUME_PROFILE:
-{json.dumps(profile, indent=2)[:1200]}
-
-Return ONLY valid JSON. Be brutally honest in assessment.
+Produce ONLY valid JSON. Be direct, specific, and evidence-led.
 """
 
 def extract_structured_entities(text, nlp):
@@ -2778,8 +3081,8 @@ with tab1:
                 # ---------- Coverage (semantic similarity over chunks) ----------
                 show_status(0.58, "📊", "Computing requirement coverage with RAG...", "green")
                 coverage_summary = evaluate_requirement_coverage(
-                    must_atoms, nice_atoms, parsed.get("text", ""), parsed.get("chunks", []), 
-                    embedder, model, faiss_index=parsed.get("faiss"), nlp=nlp
+                    must_atoms, nice_atoms, parsed.get("text", ""), parsed.get("chunks", []),
+                    embedder, model, faiss_index=parsed.get("faiss"), nlp=nlp, jd_text=jd
                 )
                 cov_final = coverage_summary["overall"]
                 must_cov = coverage_summary["must"]
@@ -2792,14 +3095,19 @@ with tab1:
 
                 # ---------- LLM narrative & fit ----------
                 show_status(0.78, "✨", "Generating LLM narrative assessment...", "pink")
+                cue_alignment = compute_cue_alignment(plan, parsed, profile, embedder, parsed.get("faiss"))
                 cov_parts = {
-                    "must_coverage": round(must_cov,3),
-                    "nice_coverage": round(nice_cov,3),
+                    "must_coverage": round(must_cov, 3),
+                    "nice_coverage": round(nice_cov, 3),
+                    "overall": round(cov_final, 3),
                     "must_atoms_count": len(must_atoms),
                     "nice_atoms_count": len(nice_atoms),
-                    "overall": round(cov_final,3)
+                    "cue_average_similarity": round(cue_alignment.get("average_similarity", 0.0), 3)
                 }
-                llm_out = llm_json(model, analysis_prompt(jd, plan, profile, global_sem01, cov_final, cov_parts))
+                llm_out = llm_json(
+                    model,
+                    analysis_prompt(jd, plan, profile, coverage_summary, cue_alignment, global_sem01, cov_final)
+                )
                 fit_score = llm_out.get("fit_score")
                 if not isinstance(fit_score, (int, float)):
                     # Enhanced fallback: better balance between semantic and coverage
@@ -2861,6 +3169,7 @@ with tab1:
                     "coverage_parts": cov_parts,
                     "coverage_summary": coverage_summary,
                     "atom_matches": coverage_summary.get("details", {}),
+                    "cue_alignment": cue_alignment,
                     "atoms": {"must": must_atoms, "nice": nice_atoms},
                     "plan": plan,
                     "resume_profile": profile,
@@ -3249,16 +3558,36 @@ with tab1:
             for atom in atoms:
                 info = dict(source.get(atom, {}))
                 info.setdefault("score", 0.0)
-                info.setdefault("token_hit", False)
-                info.setdefault("semantic_hit", False)
-                info.setdefault("partial_semantic", False)
-                info.setdefault("llm_hit", False)
                 info.setdefault("similarity", 0.0)
+                info.setdefault("max_similarity", info.get("similarity", 0.0))
+                info.setdefault("resume_contexts", [])
+                info.setdefault("jd_context", {"text": "", "similarity": 0.0})
+                info.setdefault("pre_llm_score", 0.0)
+                info.setdefault("llm_present", False)
+                info.setdefault("llm_confidence", 0.0)
+                info.setdefault("llm_rationale", "")
+                info.setdefault("req_type", "")
                 detail_map[atom] = info
             return detail_map
 
         must_detail_map = build_detail_map(must_atoms, matches.get("must", {}))
         nice_detail_map = build_detail_map(nice_atoms, matches.get("nice", {}))
+
+        def _snippet_html(text, empty_label="No direct evidence"):
+            if not text:
+                return f"<span style=\"color:#64748b;font-style:italic;\">{empty_label}</span>"
+            safe = html.escape(text)
+            return safe.replace("\n", "<br>")
+
+        def _resume_snippet(info):
+            contexts = info.get("resume_contexts") or []
+            if contexts:
+                return _snippet_html(contexts[0].get("text", ""), "No resume snippet")
+            return _snippet_html("", "No resume snippet")
+
+        def _jd_snippet(info):
+            jd_ctx = info.get("jd_context") or {}
+            return _snippet_html(jd_ctx.get("text", ""), "No JD snippet")
 
         def split_status(detail_map):
             full, partial, missing = [], [], []
@@ -3388,15 +3717,19 @@ with tab1:
                     
                     for idx, (req, info) in enumerate(must_full, 1):
                         signals = []
-                        if info.get("token_hit"):
-                            signals.append("Token match")
-                        if info.get("semantic_hit"):
-                            signals.append("Semantic match")
-                        if info.get("llm_hit"):
-                            signals.append("LLM verified")
-                        if not signals and info.get("similarity", 0.0) > 0:
+                        if info.get("llm_present"):
+                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
+                            signals.append(f"LLM ✓ ({conf_pct}% conf)")
+                        elif info.get("llm_confidence", 0.0) > 0:
+                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
+                            signals.append(f"LLM review ({conf_pct}% conf)")
+                        if info.get("similarity", 0.0) > 0:
                             signals.append(f"Sim {info['similarity']:.2f}")
-                        signal_html = " • ".join(signals) if signals else "Signal not captured"
+                        signal_html = " • ".join(signals) if signals else "Verified via RAG + LLM"
+                        resume_html = _resume_snippet(info)
+                        jd_html = _jd_snippet(info)
+                        rationale = (info.get("llm_rationale") or "").strip()
+                        rationale_html = f"<div style=\"margin-top:8px;color:#e2e8f0;font-size:12px;font-style:italic;\">{html.escape(rationale)}</div>" if rationale else ""
                         st.markdown(f"""
                         <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
                                     border:2px solid rgba(16,185,129,.4);border-left:5px solid #10b981;
@@ -3413,6 +3746,11 @@ with tab1:
                             <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
                                 <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
                                 <span style="color:#94a3b8;font-size:12px;font-weight:500;">{signal_html}</span>
+                                <div style="margin-top:10px;font-size:12px;color:#e2e8f0;line-height:1.6;">
+                                    <div><span style="color:#38bdf8;">JD:</span> {jd_html}</div>
+                                    <div style="margin-top:6px;"><span style="color:#22d3ee;">Resume:</span> {resume_html}</div>
+                                    {rationale_html}
+                                </div>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
@@ -3441,13 +3779,22 @@ with tab1:
 
                     for idx, (req, info) in enumerate(must_partial, 1):
                         signals = []
-                        if info.get("token_hit"):
-                            signals.append("Token evidence")
-                        if info.get("partial_semantic") or info.get("semantic_hit"):
-                            signals.append(f"Semantic {info.get('similarity',0.0):.2f}")
-                        if info.get("llm_hit"):
-                            signals.append("LLM verified")
-                        signal_html = " • ".join(signals) if signals else "Weak evidence"
+                        if info.get("llm_present"):
+                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
+                            signals.append(f"LLM ✓ ({conf_pct}% conf)")
+                        else:
+                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
+                            if conf_pct > 0:
+                                signals.append(f"LLM unsure ({conf_pct}% conf)")
+                        if info.get("similarity", 0.0) > 0:
+                            signals.append(f"Sim {info['similarity']:.2f}")
+                        elif info.get("pre_llm_score", 0.0) > 0:
+                            signals.append("Partial semantic")
+                        signal_html = " • ".join(signals) if signals else "Needs stronger evidence"
+                        resume_html = _resume_snippet(info)
+                        jd_html = _jd_snippet(info)
+                        rationale = (info.get("llm_rationale") or "").strip()
+                        rationale_html = f"<div style=\"margin-top:8px;color:#fde68a;font-size:12px;font-style:italic;\">{html.escape(rationale)}</div>" if rationale else ""
                         st.markdown(f"""
                         <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
                                     border:2px solid rgba(251,191,36,.4);border-left:5px solid #fbbf24;
@@ -3464,6 +3811,11 @@ with tab1:
                             <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
                                 <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
                                 <span style="color:#94a3b8;font-size:12px;font-weight:500;">{signal_html}</span>
+                                <div style="margin-top:10px;font-size:12px;color:#f8fafc;line-height:1.6;">
+                                    <div><span style="color:#fde68a;">JD:</span> {jd_html}</div>
+                                    <div style="margin-top:6px;"><span style="color:#facc15;">Resume:</span> {resume_html}</div>
+                                    {rationale_html}
+                                </div>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
@@ -3491,13 +3843,22 @@ with tab1:
                     """, unsafe_allow_html=True)
                     
                     for idx, (req, info) in enumerate(must_missing, 1):
-                        similarity_note = info.get("similarity", 0.0)
                         signals = []
+                        similarity_note = info.get("similarity", 0.0)
+                        if info.get("llm_present"):
+                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
+                            signals.append(f"LLM flagged ({conf_pct}% conf)")
+                        else:
+                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
+                            if conf_pct > 0:
+                                signals.append(f"LLM missing ({conf_pct}% conf)")
                         if similarity_note > 0.05:
                             signals.append(f"Best sim {similarity_note:.2f}")
-                        if info.get("token_hit"):
-                            signals.append("tokens present")
                         signal_html = " • ".join(signals) if signals else "No supporting evidence"
+                        resume_html = _resume_snippet(info)
+                        jd_html = _jd_snippet(info)
+                        rationale = (info.get("llm_rationale") or "").strip()
+                        rationale_html = f"<div style=\"margin-top:8px;color:#fca5a5;font-size:12px;font-style:italic;\">{html.escape(rationale)}</div>" if rationale else ""
                         st.markdown(f"""
                         <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
                                     border:2px solid rgba(239,68,68,.4);border-left:5px solid #ef4444;
@@ -3513,7 +3874,12 @@ with tab1:
                                          box-shadow:0 4px 15px rgba(239,68,68,.4);position:relative;z-index:1;">✗</span>
                             <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
                                 <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
-                                <span style="color:#94a3b8;font-size:12px;font-weight:500;">{signal_html}</span>
+                                <span style="color:#fca5a5;font-size:12px;font-weight:600;">{signal_html}</span>
+                                <div style="margin-top:10px;font-size:12px;color:#fca5a5;line-height:1.6;">
+                                    <div><span style="color:#f87171;">JD:</span> {jd_html}</div>
+                                    <div style="margin-top:6px;"><span style="color:#f87171;">Resume:</span> {resume_html}</div>
+                                    {rationale_html}
+                                </div>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
@@ -3546,15 +3912,19 @@ with tab1:
                     
                     for idx, (req, info) in enumerate(nice_full, 1):
                         signals = []
-                        if info.get("token_hit"):
-                            signals.append("Token match")
-                        if info.get("semantic_hit"):
-                            signals.append("Semantic match")
-                        if info.get("llm_hit"):
-                            signals.append("LLM verified")
-                        if not signals and info.get("similarity", 0.0) > 0:
+                        if info.get("llm_present"):
+                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
+                            signals.append(f"LLM ✓ ({conf_pct}% conf)")
+                        elif info.get("llm_confidence", 0.0) > 0:
+                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
+                            signals.append(f"LLM review ({conf_pct}% conf)")
+                        if info.get("similarity", 0.0) > 0:
                             signals.append(f"Sim {info['similarity']:.2f}")
-                        signal_html = " • ".join(signals) if signals else "Signal not captured"
+                        signal_html = " • ".join(signals) if signals else "Verified via RAG + LLM"
+                        resume_html = _resume_snippet(info)
+                        jd_html = _jd_snippet(info)
+                        rationale = (info.get("llm_rationale") or "").strip()
+                        rationale_html = f"<div style=\"margin-top:8px;color:#c7d2fe;font-size:12px;font-style:italic;\">{html.escape(rationale)}</div>" if rationale else ""
                         st.markdown(f"""
                         <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
                                     border:2px solid rgba(139,92,246,.4);border-left:5px solid #8b5cf6;
@@ -3570,7 +3940,12 @@ with tab1:
                                          box-shadow:0 4px 15px rgba(139,92,246,.4);position:relative;z-index:1;">⭐</span>
                             <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
                                 <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
-                                <span style="color:#94a3b8;font-size:12px;font-weight:500;">{signal_html}</span>
+                                <span style="color:#c7d2fe;font-size:12px;font-weight:500;">{signal_html}</span>
+                                <div style="margin-top:10px;font-size:12px;color:#e0e7ff;line-height:1.6;">
+                                    <div><span style="color:#a5b4fc;">JD:</span> {jd_html}</div>
+                                    <div style="margin-top:6px;"><span style="color:#a78bfa;">Resume:</span> {resume_html}</div>
+                                    {rationale_html}
+                                </div>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
@@ -3599,13 +3974,22 @@ with tab1:
 
                     for idx, (req, info) in enumerate(nice_partial, 1):
                         signals = []
-                        if info.get("token_hit"):
-                            signals.append("Token evidence")
-                        if info.get("partial_semantic") or info.get("semantic_hit"):
-                            signals.append(f"Semantic {info.get('similarity',0.0):.2f}")
-                        if info.get("llm_hit"):
-                            signals.append("LLM verified")
-                        signal_html = " • ".join(signals) if signals else "Weak evidence"
+                        if info.get("llm_present"):
+                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
+                            signals.append(f"LLM ✓ ({conf_pct}% conf)")
+                        else:
+                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
+                            if conf_pct > 0:
+                                signals.append(f"LLM unsure ({conf_pct}% conf)")
+                        if info.get("similarity", 0.0) > 0:
+                            signals.append(f"Sim {info['similarity']:.2f}")
+                        elif info.get("pre_llm_score", 0.0) > 0:
+                            signals.append("Partial semantic")
+                        signal_html = " • ".join(signals) if signals else "Needs more resume detail"
+                        resume_html = _resume_snippet(info)
+                        jd_html = _jd_snippet(info)
+                        rationale = (info.get("llm_rationale") or "").strip()
+                        rationale_html = f"<div style=\"margin-top:8px;color:#dbeafe;font-size:12px;font-style:italic;\">{html.escape(rationale)}</div>" if rationale else ""
                         st.markdown(f"""
                         <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
                                     border:2px solid rgba(96,165,250,.4);border-left:5px solid #60a5fa;
@@ -3621,7 +4005,12 @@ with tab1:
                                          box-shadow:0 4px 15px rgba(96,165,250,.4);position:relative;z-index:1;">△</span>
                             <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
                                 <span style="color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
-                                <span style="color:#94a3b8;font-size:12px;font-weight:500;">{signal_html}</span>
+                                <span style="color:#dbeafe;font-size:12px;font-weight:500;">{signal_html}</span>
+                                <div style="margin-top:10px;font-size:12px;color:#dbeafe;line-height:1.6;">
+                                    <div><span style="color:#bfdbfe;">JD:</span> {jd_html}</div>
+                                    <div style="margin-top:6px;"><span style="color:#93c5fd;">Resume:</span> {resume_html}</div>
+                                    {rationale_html}
+                                </div>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
@@ -3649,13 +4038,22 @@ with tab1:
                     """, unsafe_allow_html=True)
                     
                     for idx, (req, info) in enumerate(nice_missing, 1):
-                        similarity_note = info.get("similarity", 0.0)
                         signals = []
+                        similarity_note = info.get("similarity", 0.0)
+                        if info.get("llm_present"):
+                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
+                            signals.append(f"LLM flagged ({conf_pct}% conf)")
+                        else:
+                            conf_pct = int(round(info.get("llm_confidence", 0.0) * 100))
+                            if conf_pct > 0:
+                                signals.append(f"LLM missing ({conf_pct}% conf)")
                         if similarity_note > 0.05:
                             signals.append(f"Best sim {similarity_note:.2f}")
-                        if info.get("token_hit"):
-                            signals.append("tokens present")
                         signal_html = " • ".join(signals) if signals else "No supporting evidence"
+                        resume_html = _resume_snippet(info)
+                        jd_html = _jd_snippet(info)
+                        rationale = (info.get("llm_rationale") or "").strip()
+                        rationale_html = f"<div style=\"margin-top:8px;color:#93c5fd;font-size:12px;font-style:italic;\">{html.escape(rationale)}</div>" if rationale else ""
                         st.markdown(f"""
                         <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
                                     border:2px solid rgba(99,102,241,.4);border-left:5px solid #6366f1;
@@ -3671,7 +4069,12 @@ with tab1:
                                          box-shadow:0 4px 15px rgba(99,102,241,.4);position:relative;z-index:1;">○</span>
                             <div style="display:flex;flex-direction:column;gap:4px;position:relative;z-index:1;">
                                 <span style="color:#cbd5e1;font-size:16px;font-weight:600;line-height:1.6;">{req}</span>
-                                <span style="color:#94a3b8;font-size:12px;font-weight:500;">{signal_html}</span>
+                                <span style="color:#a5b4fc;font-size:12px;font-weight:500;">{signal_html}</span>
+                                <div style="margin-top:10px;font-size:12px;color:#c7d2fe;line-height:1.6;">
+                                    <div><span style="color:#a5b4fc;">JD:</span> {jd_html}</div>
+                                    <div style="margin-top:6px;"><span style="color:#818cf8;">Resume:</span> {resume_html}</div>
+                                    {rationale_html}
+                                </div>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)

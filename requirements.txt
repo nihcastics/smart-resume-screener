@@ -9,3 +9,4 @@ python-dotenv
 plotly
 google-generativeai
 pymongo
+pyflakes
