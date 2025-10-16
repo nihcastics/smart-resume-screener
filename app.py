@@ -1170,24 +1170,45 @@ with st.sidebar:
     st.caption("Tip: Turn on for atoms/coverage internals.")
 
 with st.spinner('🔄 Initializing AI models and database...'):
-    model, nlp, embedder, models_ok = load_models()
-    resumes_collection, analyses_collection, mongo_ok = init_mongodb()
-
-if not models_ok:
-    st.error("❌ **AI Model Initialization Failed**")
-    st.markdown("""
-    **Possible issues:**
-    1. Missing or invalid `GEMINI_API_KEY` in `.env` file
-    2. spaCy model not installed - Run: `python -m spacy download en_core_web_sm`
-    3. Internet connection required for first-time model downloads
+    try:
+        model, nlp, embedder, models_ok = load_models()
+    except Exception as e:
+        st.error(f"❌ **Model Loading Error**: {str(e)[:200]}")
+        model, nlp, embedder, models_ok = None, None, None, False
     
-    **Quick fix:**
-    - Ensure `.env` file contains: `GEMINI_API_KEY=your_key_here`
-    - Restart the application after adding the key
-    """)
-    st.stop()
+    try:
+        resumes_collection, analyses_collection, mongo_ok = init_mongodb()
+    except Exception as e:
+        st.warning(f"⚠️ MongoDB connection failed: {str(e)[:100]}")
+        resumes_collection, analyses_collection, mongo_ok = None, None, False
+
+# Show status but don't stop the app
+if not models_ok:
+    st.error("❌ **AI Models Not Available - Setup Required**")
+    with st.expander("📋 Click here for setup instructions", expanded=True):
+        st.markdown("""
+        ### Quick Setup Steps:
+        
+        **1. Check your `.env` file** (in the project root):
+        ```env
+        GEMINI_API_KEY=your_api_key_here
+        ```
+        
+        **2. Install spaCy model**:
+        ```bash
+        python -m spacy download en_core_web_sm
+        ```
+        
+        **3. Restart the application**:
+        ```bash
+        streamlit run app.py
+        ```
+        
+        **Need an API key?** Get one free at: https://makersuite.google.com/app/apikey
+        """)
+    st.warning("⚠️ File upload is available below, but analysis requires model setup.")
 else:
-    st.success("✅ AI models loaded successfully!")
+    st.success("✅ AI models loaded successfully!", icon="🎉")
 
 # ===== HERO HEADER =====
 st.markdown("""
@@ -1244,8 +1265,11 @@ with tab1:
     st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
     
     # Show button status
-    can_analyze = up is not None and jd and len(jd) >= 50
-    if not can_analyze:
+    can_analyze = up is not None and jd and len(jd) >= 50 and models_ok
+    
+    if not models_ok:
+        st.error("⚠️ Cannot analyze - AI models not loaded. See setup instructions above.")
+    elif not can_analyze:
         if not up:
             st.info("👆 Upload a resume PDF to begin")
         elif not jd or len(jd) < 50:
@@ -1259,10 +1283,12 @@ with tab1:
     )
 
     if go_analyze:
-        if not up:
-            st.error("Upload a resume PDF.")
+        if not models_ok:
+            st.error("❌ Cannot analyze - AI models not loaded. Please complete setup first.")
+        elif not up:
+            st.error("❌ Upload a resume PDF.")
         elif not jd or len(jd)<50:
-            st.error("Enter a detailed job description (min 50 chars).")
+            st.error("❌ Enter a detailed job description (min 50 chars).")
         else:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                 tmp.write(up.getvalue())

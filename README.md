@@ -234,12 +234,50 @@ else:  credit = 0.0   # No match
 ## 🚀 Installation
 
 ### Prerequisites
-- Python 3.12 or higher
-- Google Gemini API key ([Get here](https://ai.google.dev/))
-- MongoDB Atlas account ([Sign up](https://www.mongodb.com/cloud/atlas))
-- Hugging Face account ([Optional, for model downloads](https://huggingface.co/))
+- Python 3.8 or higher
+- Google Gemini API key ([Get FREE key here](https://makersuite.google.com/app/apikey))
+- MongoDB Atlas account ([OPTIONAL - Sign up](https://www.mongodb.com/cloud/atlas))
+- Hugging Face account ([OPTIONAL - for model downloads](https://huggingface.co/))
 
-### Local Setup
+### Quick Start (Recommended)
+
+1. **Clone Repository**
+   ```bash
+   git clone https://github.com/nihcastics/smart-resume-screener.git
+   cd smart-resume-screener
+   ```
+
+2. **Run Automated Setup** 🎯
+   ```bash
+   python setup.py
+   ```
+   
+   This will:
+   - Check Python version
+   - Install all dependencies
+   - Download required models
+   - Create .env template
+   - Verify installation
+
+3. **Configure API Key**
+   
+   Edit `.env` file (created by setup script):
+   ```env
+   GEMINI_API_KEY=your_google_gemini_api_key_here
+   ```
+   
+   Get FREE API key: https://makersuite.google.com/app/apikey
+
+4. **Run Application**
+   ```bash
+   streamlit run app.py
+   ```
+
+5. **Access Dashboard**
+   
+   Open browser: `http://localhost:8501`
+
+### Manual Setup (If Setup Script Fails)
 
 1. **Clone Repository**
    ```bash
@@ -263,23 +301,49 @@ else:  credit = 0.0   # No match
    pip install -r requirements.txt
    ```
 
-4. **Configure Environment**
+4. **Download spaCy Model**
+   ```bash
+   python -m spacy download en_core_web_sm
+   ```
+
+5. **Configure Environment**
    
    Create `.env` file in root directory:
    ```env
+   # REQUIRED
    GEMINI_API_KEY=your_google_gemini_api_key
+   
+   # OPTIONAL
    MONGO_URI=your_mongodb_connection_string
    HF_TOKEN=your_huggingface_token
    ```
 
-5. **Run Application**
+6. **Run Application**
    ```bash
    streamlit run app.py
    ```
 
-6. **Access Dashboard**
+7. **Access Dashboard**
    
    Open browser: `http://localhost:8501`
+
+### Troubleshooting
+
+#### File Upload Button Disabled?
+1. Check if models loaded successfully (look for ✅ success message)
+2. Verify GEMINI_API_KEY in .env file
+3. Run: `python -m spacy download en_core_web_sm`
+4. Restart the app
+
+#### "AI Models Not Available" Error?
+1. Get free API key: https://makersuite.google.com/app/apikey
+2. Add to .env file: `GEMINI_API_KEY=your_key_here`
+3. Restart the application
+
+#### MongoDB Connection Failed?
+- MongoDB is OPTIONAL - app works without it
+- Local analysis history still available
+- To enable: Add MONGO_URI to .env file
 
 ---
 
