@@ -4936,11 +4936,27 @@ with tab1:
 with tab2:
     st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
     
-    # Combine all recent activities
+    # Combine all recent activities from database AND session
     recent_db = get_recent(db_conn, db_ok, limit=15)
     all_activities = []
     
-    # Add uploads
+    # Add database records (persistent across sessions)
+    for db_record in recent_db:
+        all_activities.append({
+            "type": "analysis",
+            "name": db_record.get("candidate", "Unknown"),
+            "score": float(db_record.get("final_score", 0)),
+            "semantic": float(db_record.get("semantic_score", 0)),
+            "coverage": float(db_record.get("coverage_score", 0)),
+            "fit": float(db_record.get("fit_score", 0)),
+            "email": db_record.get("email", "N/A"),
+            "file": "Resume",
+            "timestamp": db_record.get("timestamp", 0),
+            "emoji": "✨",
+            "source": "database"
+        })
+    
+    # Add uploads from current session (if not already in DB)
     for u in st.session_state.uploads_history[:12]:
         all_activities.append({
             "type": "upload",
@@ -4949,26 +4965,33 @@ with tab2:
             "email": u.get("email", "N/A"),
             "phone": u.get("phone", "N/A"),
             "timestamp": u.get("timestamp", 0),
-            "emoji": "📄"
+            "emoji": "📄",
+            "source": "session"
         })
     
-    # Add analyses
+    # Add analyses from current session (deduplicate with database)
+    db_timestamps = {a.get("timestamp") for a in all_activities if a.get("source") == "database"}
     for i, entry in enumerate(st.session_state.analysis_history[:10] if st.session_state.analysis_history else []):
-        all_activities.append({
-            "type": "analysis",
-            "name": entry.get("resume_meta", {}).get("name", "Unknown"),
-            "score": entry.get("score", 0),
-            "semantic": entry.get("semantic_score", 0),
-            "coverage": entry.get("coverage_score", 0),
-            "fit": entry.get("llm_fit_score", 0),
-            "email": entry.get("resume_meta", {}).get("email", ""),
-            "file": entry.get("resume_meta", {}).get("file_name", ""),
-            "timestamp": entry.get("timestamp", 0),
-            "emoji": "✨"
-        })
+        entry_timestamp = entry.get("timestamp", 0)
+        # Only add if not already in database (within 5 second window)
+        if not any(abs(entry_timestamp - db_ts) < 5 for db_ts in db_timestamps):
+            all_activities.append({
+                "type": "analysis",
+                "name": entry.get("resume_meta", {}).get("name", "Unknown"),
+                "score": entry.get("score", 0),
+                "semantic": entry.get("semantic_score", 0),
+                "coverage": entry.get("coverage_score", 0),
+                "fit": entry.get("llm_fit_score", 0),
+                "email": entry.get("resume_meta", {}).get("email", ""),
+                "file": entry.get("resume_meta", {}).get("file_name", ""),
+                "timestamp": entry.get("timestamp", 0),
+                "emoji": "✨",
+                "source": "session"
+            })
     
-    # Sort by timestamp descending
+    # Sort by timestamp descending and limit
     all_activities.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+    all_activities = all_activities[:20]  # Show top 20 most recent
     
     if not all_activities:
         st.markdown("""
@@ -5016,6 +5039,8 @@ with tab2:
             if activity["type"] == "analysis":
                 score = activity.get("score", 0)
                 color_class = "score-excellent" if score >= 8 else "score-good" if score >= 6 else "score-fair" if score >= 4 else "score-poor"
+                source_badge = "💾" if activity.get("source") == "database" else "⚡"
+                source_tooltip = "Saved to database" if activity.get("source") == "database" else "Current session"
                 
                 st.markdown(f"""
                 <div style="
@@ -5039,6 +5064,10 @@ with tab2:
                                     color:#f1f5f9;
                                     font-family:'Space Grotesk',sans-serif;
                                 ">{activity['name']}</span>
+                                <span title="{source_tooltip}" style="
+                                    font-size:14px;
+                                    opacity:0.7;
+                                ">{source_badge}</span>
                             </div>
                             <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;">
                                 <span style="color:#cbd5e1;font-size:13px;"><strong>Email:</strong> {activity['email']}</span>
