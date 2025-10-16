@@ -1641,134 +1641,99 @@ def llm_verify_requirements(model, requirements_payload, resume_text, jd_text=""
                 "resume_evidence": ctxs
             })
 
-        prompt = f"""You are a senior technical recruiter validating requirement coverage with forensic precision. Analyze whether each requirement is demonstrably satisfied by the resume evidence.
+        prompt = f"""You are an expert technical recruiter. Your task: Verify if each requirement is satisfied by examining ACTUAL evidence from the candidate's resume.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 REQUIREMENTS TO VALIDATE (with RAG evidence)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+**REQUIREMENTS TO VERIFY:**
 {json.dumps(formatted_batch, indent=2)}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📄 FULL CONTEXT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-RESUME EXCERPT (broader context if RAG evidence is thin):
+**CANDIDATE'S RESUME:**
 {resume_excerpt}
 
-JOB DESCRIPTION EXCERPT (understand requirement intent):
+**JOB DESCRIPTION (for context):**
 {jd_excerpt}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚖️ VALIDATION RULES
+📋 VERIFICATION METHODOLOGY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Mark `present: true` when:
-  ✅ Resume EXPLICITLY mentions the technology/skill by name
-  ✅ Synonyms or variants clearly indicate the same skill (e.g., "JS" = "JavaScript")
-  ✅ Concrete project/work experience demonstrates hands-on usage
-  ✅ Measurable outcomes or production deployments mentioned
-  ✅ Resume_evidence similarity ≥ 0.55 AND contextually relevant
-  ✅ Experience years meet or exceed requirement (if specified)
+For each requirement, determine:
 
-Mark `present: false` when:
-  ❌ Technology/skill not explicitly mentioned anywhere
-  ❌ Only vague/generic mention without specifics
-  ❌ Resume_evidence similarity < 0.45 OR off-topic
-  ❌ Experience years fall short of requirement
-  ❌ Skill listed but no project/work evidence of actual usage
-  ❌ Outdated experience (>5 years old for fast-evolving tech)
+1. **Is it present?** (true/false)
+   - Search resume for EXACT skill/technology name or clear synonyms
+   - Check if candidate has USED it in projects/work (not just listed)
+   - Verify experience duration meets requirement (if years specified)
 
-Confidence scoring (0.0-1.0):
-  • 0.9-1.0: Explicit mention + strong project evidence + recent
-  • 0.7-0.89: Clear mention + some context but limited depth
-  • 0.5-0.69: Implied or partial evidence, borderline case
-  • 0.3-0.49: Weak signals, likely doesn't meet requirement
-  • 0.0-0.29: No credible evidence, definitively absent
+2. **How confident are you?** (0.0 to 1.0)
+   - 0.9-1.0: Direct mention + concrete project usage + metrics
+   - 0.7-0.9: Clear mention + described experience
+   - 0.5-0.7: Mentioned but limited details or borderline match
+   - 0.3-0.5: Weak/indirect evidence
+   - 0.0-0.3: Not found or clearly insufficient
+
+3. **What's the evidence?** (brief, factual)
+   - Quote the SPECIFIC line from resume that proves it
+   - If absent, state what's missing in 1 sentence
+   - Keep rationale under 25 words
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 SPECIAL CASES
+✅ EXAMPLES OF GOOD VERIFICATION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Experience Years:
-  • "5+ years Python" requirement + resume shows "3 years" → present: false, confidence: 0.3
-  • "3+ years AWS" requirement + resume shows "5 years" → present: true, confidence: 0.95
+Requirement: "Python"
+Resume says: "Built REST APIs using Python and Django for 3 years"
+→ present: true, confidence: 0.95, rationale: "3 years Python with Django APIs", evidence: "Built REST APIs using Python and Django"
 
-Version-Specific:
-  • Requirement: "Python 3.9+" + Resume: "Python 3.11" → present: true, confidence: 1.0
-  • Requirement: "React 18" + Resume: "React 16" → present: true, confidence: 0.7 (note version gap)
+Requirement: "5+ years AWS"  
+Resume says: "2 years experience with AWS Lambda and S3"
+→ present: false, confidence: 0.4, rationale: "Has AWS but only 2 years vs 5+ required", evidence: ""
 
-Frameworks/Libraries:
-  • Requirement: "Django" + Resume: "Django REST Framework" → present: true, confidence: 0.95
-  • Requirement: "Spring Boot" + Resume: "Spring Framework" → present: true, confidence: 0.85
+Requirement: "Docker"
+Resume says: "Technologies: Git, Jenkins, Kubernetes"
+→ present: false, confidence: 0.2, rationale: "No Docker mentioned, only K8s", evidence: ""
 
-Cloud Services:
-  • Requirement: "AWS Lambda" + Resume: "AWS (EC2, S3, Lambda)" → present: true, confidence: 1.0
-  • Requirement: "AWS" + Resume: "AWS Lambda, S3" → present: true, confidence: 0.95
-
-Related Skills:
-  • Requirement: "Kubernetes" + Resume: "Docker, K8s, Helm" → present: true (K8s=Kubernetes), confidence: 0.95
-  • Requirement: "PostgreSQL" + Resume: "SQL, MySQL" → present: false (different DB), confidence: 0.2
+Requirement: "React"
+Resume says: "Frontend: React 18, TypeScript, Redux. Built 5 production apps"
+→ present: true, confidence: 1.0, rationale: "React 18 with 5 production apps", evidence: "Frontend: React 18, TypeScript, Redux"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📤 OUTPUT FORMAT (STRICT JSON)
+🎯 MATCHING RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Return ONLY valid JSON with this structure:
+**Accept as matches:**
+- Exact names: "PostgreSQL" matches "PostgreSQL"
+- Common abbreviations: "K8s" = "Kubernetes", "JS" = "JavaScript"
+- Version variants: "Python 3.11" satisfies "Python 3.9+"
+- Framework variations: "Django REST" satisfies "Django"
+- Cloud specifics: "AWS Lambda" satisfies both "AWS" and "Lambda"
+
+**Reject as non-matches:**
+- Different technologies: "MySQL" ≠ "PostgreSQL"
+- Generic categories: "databases" ≠ "MongoDB" (too vague)
+- Insufficient years: "2 years Python" ≠ "5+ years Python"
+- Listed but not used: Skill in "Technologies" list with no project evidence
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📤 OUTPUT FORMAT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Return ONLY valid JSON (no markdown, no explanations):
+
 {{
-  "<requirement text>": {{
-    "present": true/false,
-    "confidence": 0.0-1.0,
-    "rationale": "10-20 words citing specific evidence or explaining gap",
-    "evidence": "Optional: direct quote from resume (if present=true)"
-  }},
-  ...
-}}
-
-Example responses:
-
-Good response (requirement met):
-{{
-  "5+ years python": {{
-    "present": true,
-    "confidence": 0.95,
-    "rationale": "7 years Python experience, Django/Flask projects with production deployments",
-    "evidence": "Python Developer (2017-2024) - Built scalable APIs with Django"
+  "requirement_name": {{
+    "present": true or false,
+    "confidence": number between 0.0 and 1.0,
+    "rationale": "brief factual statement under 25 words",
+    "evidence": "direct quote from resume if present=true, empty string if false"
   }}
 }}
 
-Good response (requirement not met):
-{{
-  "kubernetes": {{
-    "present": false,
-    "confidence": 0.15,
-    "rationale": "No mention of Kubernetes, K8s, or container orchestration in resume",
-    "evidence": ""
-  }}
-}}
+**CRITICAL:** 
+- Base answers ONLY on resume content provided
+- Do NOT invent or assume skills
+- Do NOT add explanatory text outside JSON
+- Keep rationale concise and factual
 
-Good response (borderline case):
-{{
-  "react 18": {{
-    "present": true,
-    "confidence": 0.65,
-    "rationale": "React experience confirmed but version not specified, may need update",
-    "evidence": "Frontend: React, Redux, TypeScript"
-  }}
-}}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ CRITICAL INSTRUCTIONS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-• DO NOT hallucinate - base answers strictly on provided evidence
-• DO NOT mark absent skills as present
-• DO consider synonyms and industry-standard abbreviations
-• DO cite specific evidence in rationale (project names, dates, metrics)
-• DO assess recency - older experience gets lower confidence
-• Output ONLY JSON, no markdown formatting or extra text
-
-BEGIN VALIDATION NOW:
+BEGIN VERIFICATION:
 """
 
         try:
@@ -1802,6 +1767,25 @@ BEGIN VALIDATION NOW:
 
                 rationale = str(verdict.get("rationale", verdict.get("reason", "")) or "").strip()
                 evidence = str(verdict.get("evidence", "") or "").strip()
+                
+                # Clean gibberish: remove repetitive patterns and truncate long text
+                def clean_text(text, max_words=30):
+                    if not text:
+                        return ""
+                    # Remove code artifacts
+                    text = text.replace("```", "").replace("json", "").replace("python", "")
+                    # Remove common gibberish patterns
+                    text = re.sub(r'(\b\w+\b)(\s+\1){3,}', r'\1', text)  # Remove word repetition
+                    text = re.sub(r'([^\w\s])\1{2,}', r'\1', text)  # Remove symbol repetition
+                    text = re.sub(r'\s+', ' ', text).strip()  # Normalize whitespace
+                    # Truncate to reasonable length (keep first sentence if too long)
+                    words = text.split()
+                    if len(words) > max_words:
+                        text = ' '.join(words[:max_words]) + "..."
+                    return text
+                
+                rationale = clean_text(rationale, max_words=25)
+                evidence = clean_text(evidence, max_words=30)
 
                 results[req_text] = {
                     "present": present,
