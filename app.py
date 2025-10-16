@@ -1134,7 +1134,7 @@ def refine_atom_list(atoms, nlp=None, reserved_canonicals=None, limit=40):
     return refined, reserved
 
 def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_chunks, embedder, model=None,
-                                   faiss_index=None, strict_threshold=0.55, partial_threshold=0.45):
+                                   faiss_index=None, strict_threshold=0.55, partial_threshold=0.45, nlp=None):
     """
     Enhanced requirement coverage with optimized thresholds for better accuracy.
     Stricter thresholds (0.55/0.45) prevent false positives while maintaining recall.
@@ -1148,6 +1148,45 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
                 chunk_embs = chunk_embs.reshape(1, -1)
         except Exception:
             chunk_embs = None
+
+    # Pre-compute competency signals for semantic context awareness (if nlp available)
+    if nlp is not None:
+        try:
+            comp_scores, comp_evd = compute_competency_scores(
+                resume_text, resume_chunks, embedder, nlp, model=model, faiss_index=faiss_index
+            )
+        except Exception:
+            comp_scores, comp_evd = {}, {}
+    else:
+        comp_scores, comp_evd = {}, {}
+
+    catalog = build_competency_catalog()
+    atom_to_comp_must, atom_kind_must = map_atoms_to_competencies(must_atoms, catalog)
+    atom_to_comp_nice, atom_kind_nice = map_atoms_to_competencies(nice_atoms, catalog)
+
+    def comp_adjustment(atom, base_score, req_type):
+        # Adjust atom score based on competency strength: core terms require ecosystem proof
+        a_norm = normalize_text(atom)
+        if req_type == "must-have":
+            comp_id = atom_to_comp_must.get(a_norm)
+            kind = atom_kind_must.get(a_norm)
+        else:
+            comp_id = atom_to_comp_nice.get(a_norm)
+            kind = atom_kind_nice.get(a_norm)
+        if not comp_id:
+            return base_score
+        cscore = float(comp_scores.get(comp_id, 0.0))
+        if (kind or "framework") == "core":
+            # For core items (e.g., "java"), require stronger competency for full credit
+            if base_score >= 1.0 and cscore < 0.65:
+                return 0.5  # downgrade to partial if ecosystem isn't demonstrated
+            if base_score >= 0.85 and cscore < 0.55:
+                return 0.5
+        else:
+            # Framework/tool atoms get slight downgrade if ecosystem very weak
+            if base_score >= 1.0 and cscore < 0.45:
+                return 0.85
+        return base_score
 
     def assess(atoms, req_type):
         details = {}
@@ -1177,6 +1216,9 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
                 score = 0.5  # Reduced from 0.55 for clearer distinction
             else:
                 score = 0.0
+
+            # Competency-aware adjustment before LLM step
+            score = comp_adjustment(atom, score, req_type)
                 
             details[atom] = {
                 "token_hit": bool(token_hit),
@@ -1199,8 +1241,11 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
             )
             for atom in pending:
                 if llm_results.get(atom):
+                    # LLM can promote to 0.85, but competency may still cap it
+                    provisional = 0.85
+                    provisional = comp_adjustment(atom, provisional, req_type)
                     details[atom]["llm_hit"] = True
-                    details[atom]["score"] = 0.85  # Between partial and full for LLM-verified
+                    details[atom]["score"] = provisional
         return details
 
     must_details = assess(must_atoms, "must-have")
@@ -1219,7 +1264,8 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
         "overall": overall,
         "must": must_cov,
         "nice": nice_cov,
-        "details": {"must": must_details, "nice": nice_details}
+        "details": {"must": must_details, "nice": nice_details},
+        "competencies": {"scores": comp_scores, "evidence": comp_evd}
     }
 
 # ---- LLM wrappers / prompts ----
@@ -1732,6 +1778,186 @@ def retrieve_relevant_context(query, faiss_index, chunks, embedder, top_k=3):
         return results
     except Exception:
         return []
+
+def build_competency_catalog():
+    """
+    Define competency bundles that represent real-world capability beyond a single keyword.
+    Each competency includes:
+    - core: anchor terms (usually languages or role-defining tech)
+    - frameworks/tools: ecosystem items that strengthen competency
+    - project_verbs: verbs that indicate hands-on building
+    - queries: suggested RAG queries
+    """
+    return {
+        "java_ecosystem": {
+            "core": ["java", "java 8", "java 11", "java 17"],
+            "frameworks": [
+                "spring", "spring boot", "spring cloud", "spring mvc",
+                "hibernate", "jpa", "jakarta", "microservices", "rest api",
+                "maven", "gradle", "junit", "mockito", "kafka"
+            ],
+            "project_verbs": ["built", "developed", "implemented", "designed", "maintained", "deployed"],
+            "queries": ["java spring boot project", "java microservices", "spring hibernate"]
+        },
+        "python_backend": {
+            "core": ["python", "python 3", "python 3.x"],
+            "frameworks": [
+                "django", "django rest framework", "flask", "fastapi",
+                "pandas", "numpy", "celery", "sqlalchemy", "pytest"
+            ],
+            "project_verbs": ["built", "developed", "implemented", "designed", "maintained", "deployed"],
+            "queries": ["python django api", "fastapi production", "flask project"]
+        },
+        "node_backend": {
+            "core": ["node", "node.js", "nodejs"],
+            "frameworks": ["express", "nest", "nestjs", "typescript", "prisma", "sequelize", "jest"],
+            "project_verbs": ["built", "developed", "implemented", "designed", "maintained", "deployed"],
+            "queries": ["node express api", "node microservices", "nestjs project"]
+        },
+        "frontend_js": {
+            "core": ["javascript", "typescript"],
+            "frameworks": ["react", "react 18", "nextjs", "next.js", "angular", "vue", "redux", "vite", "webpack"],
+            "project_verbs": ["built", "developed", "implemented", "designed", "maintained", "deployed"],
+            "queries": ["react project", "typescript react", "nextjs production"]
+        },
+        "devops_cloud": {
+            "core": ["docker", "kubernetes", "k8s"],
+            "frameworks": [
+                "ci/cd", "jenkins", "github actions", "gitlab ci", "terraform", "ansible", "helm",
+                "aws", "azure", "gcp", "prometheus", "grafana"
+            ],
+            "project_verbs": ["deployed", "automated", "scaled", "containerized", "orchestrated"],
+            "queries": ["kubernetes deployment", "terraform ci/cd", "docker production"]
+        },
+        "data_ml": {
+            "core": ["machine learning", "ml", "ai", "deep learning"],
+            "frameworks": [
+                "scikit-learn", "sklearn", "tensorflow", "pytorch", "keras", "xgboost", "lightgbm",
+                "mlflow", "airflow", "sagemaker", "vertex ai"
+            ],
+            "project_verbs": ["trained", "deployed", "optimized", "built", "developed"],
+            "queries": ["ml production", "tensorflow deployment", "pytorch project"]
+        }
+    }
+
+def _find_terms_in_text(terms, tokens, full_text):
+    hits = set()
+    for t in terms:
+        if contains_atom(t, tokens, full_text):
+            hits.add(normalize_text(t))
+    return hits
+
+def _recent_years_present(text, window=4):
+    try:
+        from datetime import datetime as _dt
+        year_now = _dt.now().year
+    except Exception:
+        year_now = 2025
+    yrs = {str(y) for y in range(year_now-window+1, year_now+1)}
+    return any(y in text for y in yrs)
+
+def compute_competency_scores(resume_text, chunks, embedder, nlp, model=None, faiss_index=None):
+    """
+    Compute a competency score per ecosystem using primarily local evidence, with LLM support for borderline cases.
+    Scoring (0..1): core (0.3) + frameworks (up to 0.45) + projects evidence (0.15) + recency (0.1)
+    Returns (scores, evidence) where evidence has keys: frameworks_found, project_contexts, recent
+    """
+    catalog = build_competency_catalog()
+    tokens = token_set(resume_text)
+    scores = {}
+    evidences = {}
+
+    for comp_id, spec in catalog.items():
+        core = spec["core"]
+        frameworks = spec["frameworks"]
+        verbs = spec["project_verbs"]
+        queries = spec["queries"]
+
+        core_hits = _find_terms_in_text(core, tokens, resume_text)
+        fw_hits = _find_terms_in_text(frameworks, tokens, resume_text)
+
+        # RAG contexts to check project verbs & recency
+        contexts = []
+        if faiss_index and chunks and embedder:
+            for q in queries[:2]:
+                ctxs = retrieve_relevant_context(q, faiss_index, chunks, embedder, top_k=2)
+                for t, s in ctxs:
+                    contexts.append(t)
+        # Deduplicate and trim
+        contexts = list(dict.fromkeys(contexts))[:5]
+        ctx_text = "\n".join(contexts)
+
+        # Project verb evidence if appears near core/framework contexts
+        project_evidence = 0
+        if contexts:
+            for c in contexts:
+                if any(v in c.lower() for v in verbs):
+                    project_evidence += 1
+        recent = _recent_years_present(ctx_text) or _recent_years_present(resume_text)
+
+        # Score aggregation
+        score = 0.0
+        if core_hits:
+            score += 0.30
+        # Frameworks: diminishing returns up to 0.45
+        fw_count = len(fw_hits)
+        if fw_count > 0:
+            score += min(0.45, 0.20 + 0.12 * min(3, fw_count-1))
+        # Projects
+        if project_evidence > 0:
+            score += min(0.15, 0.07 + 0.04 * min(2, project_evidence-1))
+        # Recency
+        if recent:
+            score += 0.10
+
+        # Optional LLM boost for borderline cases (supportive only)
+        if model and 0.45 <= score < 0.75 and contexts:
+            try:
+                verdict = llm_json(model, f"""
+Return ONLY JSON: {{"substantial": true|false}}
+You are validating if the resume shows SUBSTANTIAL, PRACTICAL experience in the competency: {comp_id}.
+Consider these resume excerpts:
+{ctx_text[:1200]}
+Criteria: multiple ecosystem frameworks, projects built, deployments, or tests. Answer conservatively.
+                """)
+                if isinstance(verdict, dict) and bool(verdict.get("substantial")):
+                    score = min(0.80, score + 0.12)
+            except Exception:
+                pass
+
+        scores[comp_id] = float(np.clip(score, 0.0, 1.0))
+        evidences[comp_id] = {
+            "frameworks_found": sorted(list(fw_hits))[:10],
+            "core_found": sorted(list(core_hits))[:5],
+            "project_contexts": contexts,
+            "recent": bool(recent),
+            "frameworks_count": int(fw_count)
+        }
+
+    return scores, evidences
+
+def map_atoms_to_competencies(atoms, catalog):
+    """
+    Map requirement atoms to competency IDs with kind: core/framework/tool.
+    Returns: (atom_to_comp, atom_kind)
+    """
+    atom_to_comp = {}
+    atom_kind = {}
+    for a in atoms:
+        a_norm = normalize_text(a)
+        for comp_id, spec in catalog.items():
+            # core match
+            if any(t in a_norm for t in spec["core"]):
+                atom_to_comp[a_norm] = comp_id
+                atom_kind[a_norm] = "core"
+                break
+            # framework match
+            if any(t in a_norm for t in spec["frameworks"]):
+                atom_to_comp[a_norm] = comp_id
+                atom_kind[a_norm] = "framework"
+                break
+        # If not matched, leave unmapped
+    return atom_to_comp, atom_kind
 
 def parse_resume_pdf(path, nlp, embedder):
     """
@@ -2275,7 +2501,7 @@ with tab1:
                 show_status(0.58, "📊", "Scoring requirement coverage...", "rgba(16,185,129,.15)", "rgba(5,150,105,.12)")
                 coverage_summary = evaluate_requirement_coverage(
                     must_atoms, nice_atoms, parsed.get("text", ""), parsed.get("chunks", []), 
-                    embedder, model, faiss_index=parsed.get("faiss")
+                    embedder, model, faiss_index=parsed.get("faiss"), nlp=nlp
                 )
                 cov_final = coverage_summary["overall"]
                 must_cov = coverage_summary["must"]
