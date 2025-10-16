@@ -477,58 +477,114 @@ hr::before{
     font-size:15px!important;
 }
 
-/* ===== ELEGANT GLOWING PROGRESS BAR ===== */
+/* ===== IMMERSIVE FUTURISTIC PROGRESS BAR ===== */
 .stProgress{
-    margin:20px 0;
+    margin:28px 0;
     position:relative;
+    height:20px!important;
 }
 .stProgress>div{
-    background:linear-gradient(90deg,rgba(99,102,241,.12),rgba(139,92,246,.10));
-    border-radius:16px!important;
+    background:linear-gradient(135deg,
+        rgba(15,23,42,.95) 0%,
+        rgba(30,41,59,.9) 50%,
+        rgba(15,23,42,.95) 100%);
+    border-radius:24px!important;
     overflow:visible!important;
-    box-shadow:inset 0 1px 4px rgba(0,0,0,.25),0 2px 15px rgba(99,102,241,.18);
-    height:12px!important;
-    border:1px solid rgba(99,102,241,.15);
+    box-shadow:
+        inset 0 2px 8px rgba(0,0,0,.6),
+        inset 0 -2px 4px rgba(255,255,255,.03),
+        0 4px 24px rgba(99,102,241,.15),
+        0 0 60px rgba(139,92,246,.08);
+    height:20px!important;
+    border:1.5px solid rgba(99,102,241,.25);
+    position:relative;
+    backdrop-filter:blur(10px);
+}
+.stProgress>div::before{
+    content:'';
+    position:absolute;
+    top:0;left:0;right:0;bottom:0;
+    border-radius:24px;
+    background:linear-gradient(90deg,
+        transparent 0%,
+        rgba(99,102,241,.08) 25%,
+        rgba(139,92,246,.12) 50%,
+        rgba(236,72,153,.08) 75%,
+        transparent 100%);
+    background-size:200% 100%;
+    animation:shimmerTrack 3s linear infinite;
+    opacity:0.6;
+}
+@keyframes shimmerTrack{
+    0%{background-position:200% 0}
+    100%{background-position:-200% 0}
 }
 .stProgress>div>div{
-    background:linear-gradient(90deg,#6366f1,#8b5cf6,#a855f7,#8b5cf6,#6366f1);
-    background-size:200% 100%;
-    border-radius:16px!important;
-    box-shadow:0 0 20px rgba(139,92,246,.7),
-               0 0 40px rgba(99,102,241,.5),
-               inset 0 1px 2px rgba(255,255,255,.3);
+    background:linear-gradient(135deg,
+        #6366f1 0%,
+        #8b5cf6 25%,
+        #a855f7 50%,
+        #ec4899 75%,
+        #f43f5e 100%);
+    background-size:300% 100%;
+    border-radius:24px!important;
+    box-shadow:
+        0 0 30px rgba(139,92,246,.9),
+        0 0 50px rgba(99,102,241,.6),
+        0 0 80px rgba(236,72,153,.4),
+        inset 0 2px 6px rgba(255,255,255,.4),
+        inset 0 -1px 3px rgba(0,0,0,.3);
     position:relative!important;
-    height:12px!important;
-    transition:width 0.3s ease-out!important;
-    animation:progressGlow 3s ease-in-out infinite;
+    height:20px!important;
+    transition:width 0.4s cubic-bezier(0.4,0,0.2,1)!important;
+    animation:progressFlow 4s ease-in-out infinite;
+    overflow:visible!important;
 }
-@keyframes progressGlow{
-    0%,100%{background-position:0% 50%;filter:brightness(1)}
-    50%{background-position:100% 50%;filter:brightness(1.2)}
+@keyframes progressFlow{
+    0%{background-position:0% 50%;filter:brightness(1) saturate(1)}
+    50%{background-position:100% 50%;filter:brightness(1.3) saturate(1.2)}
+    100%{background-position:0% 50%;filter:brightness(1) saturate(1)}
+}
+.stProgress>div>div::before{
+    content:'';
+    position:absolute;
+    top:3px;left:6px;right:6px;
+    height:6px;
+    background:linear-gradient(90deg,
+        rgba(255,255,255,.6) 0%,
+        rgba(255,255,255,.3) 50%,
+        rgba(255,255,255,.1) 100%);
+    border-radius:12px;
+    opacity:0.8;
 }
 .stProgress>div>div::after{
     content:'';
     position:absolute;
     top:50%;
-    right:-8px;
+    right:-10px;
     transform:translateY(-50%);
-    width:20px;
-    height:20px;
+    width:28px;
+    height:28px;
     background:radial-gradient(circle at 35% 35%,
         rgba(255,255,255,1) 0%,
-        rgba(236,72,153,.9) 25%,
-        rgba(139,92,246,.7) 50%,
-        rgba(99,102,241,.4) 75%,
+        rgba(236,72,153,1) 20%,
+        rgba(139,92,246,.95) 40%,
+        rgba(99,102,241,.7) 60%,
+        rgba(99,102,241,.3) 80%,
         transparent 100%);
     border-radius:50%;
-    box-shadow:0 0 20px rgba(236,72,153,.9),
-               0 0 35px rgba(139,92,246,.6);
-    animation:pulse 2s ease-in-out infinite;
+    box-shadow:
+        0 0 25px rgba(236,72,153,1),
+        0 0 45px rgba(139,92,246,.8),
+        0 0 65px rgba(99,102,241,.5),
+        inset 0 0 8px rgba(255,255,255,.5);
+    animation:orbPulse 2s ease-in-out infinite;
     z-index:10;
 }
-@keyframes pulse{
-    0%,100%{transform:translateY(-50%) scale(1);opacity:1}
-    50%{transform:translateY(-50%) scale(1.15);opacity:0.9}
+@keyframes orbPulse{
+    0%{transform:translateY(-50%) scale(1);opacity:1;filter:brightness(1)}
+    50%{transform:translateY(-50%) scale(1.2);opacity:0.95;filter:brightness(1.4)}
+    100%{transform:translateY(-50%) scale(1);opacity:1;filter:brightness(1)}
 }
 
 /* ===== PREMIUM GLOWING SCROLLBAR ===== */
@@ -2547,46 +2603,143 @@ with tab1:
                 prog = st.empty()
                 stat = st.empty()
 
-                # Helper function for beautiful status messages with fade
-                def show_status(progress_val, emoji, message, color_start, color_end):
+                # Immersive status display with modern design
+                def show_status(progress_val, emoji, message, theme="purple"):
+                    """Display beautiful animated status messages during processing"""
                     prog.progress(progress_val)
+                    
+                    # Theme color palettes
+                    themes = {
+                        "purple": {
+                            "bg_start": "rgba(99,102,241,.18)",
+                            "bg_end": "rgba(139,92,246,.15)",
+                            "border": "rgba(139,92,246,.4)",
+                            "shadow_main": "rgba(139,92,246,.35)",
+                            "shadow_glow": "rgba(99,102,241,.2)",
+                            "text": "#c7d2fe"
+                        },
+                        "pink": {
+                            "bg_start": "rgba(236,72,153,.18)",
+                            "bg_end": "rgba(219,39,119,.15)",
+                            "border": "rgba(236,72,153,.4)",
+                            "shadow_main": "rgba(236,72,153,.35)",
+                            "shadow_glow": "rgba(219,39,119,.2)",
+                            "text": "#fbcfe8"
+                        },
+                        "blue": {
+                            "bg_start": "rgba(59,130,246,.18)",
+                            "bg_end": "rgba(37,99,235,.15)",
+                            "border": "rgba(59,130,246,.4)",
+                            "shadow_main": "rgba(59,130,246,.35)",
+                            "shadow_glow": "rgba(37,99,235,.2)",
+                            "text": "#bfdbfe"
+                        },
+                        "green": {
+                            "bg_start": "rgba(16,185,129,.18)",
+                            "bg_end": "rgba(5,150,105,.15)",
+                            "border": "rgba(16,185,129,.4)",
+                            "shadow_main": "rgba(16,185,129,.35)",
+                            "shadow_glow": "rgba(5,150,105,.2)",
+                            "text": "#a7f3d0"
+                        },
+                        "amber": {
+                            "bg_start": "rgba(245,158,11,.18)",
+                            "bg_end": "rgba(217,119,6,.15)",
+                            "border": "rgba(245,158,11,.4)",
+                            "shadow_main": "rgba(245,158,11,.35)",
+                            "shadow_glow": "rgba(217,119,6,.2)",
+                            "text": "#fde68a"
+                        }
+                    }
+                    
+                    colors = themes.get(theme, themes["purple"])
+                    
                     stat.markdown(f"""
                     <div style="
-                        background:linear-gradient(135deg,{color_start},{color_end});
-                        border-radius:12px;
-                        padding:14px 24px;
-                        margin:8px 0;
-                        box-shadow:0 4px 16px {color_start}50,0 0 30px {color_end}40;
-                        backdrop-filter:blur(20px);
-                        animation:statusFade 1.2s ease-in-out;
-                        border:none;
-                        display:flex;
-                        align-items:center;
-                        gap:12px;
+                        background:linear-gradient(135deg,{colors['bg_start']},{colors['bg_end']});
+                        border:2px solid {colors['border']};
+                        border-radius:20px;
+                        padding:20px 32px;
+                        margin:16px 0;
+                        box-shadow:
+                            0 8px 32px {colors['shadow_main']},
+                            0 0 60px {colors['shadow_glow']},
+                            inset 0 1px 0 rgba(255,255,255,.1),
+                            inset 0 -1px 0 rgba(0,0,0,.2);
+                        backdrop-filter:blur(24px);
+                        animation:statusSlideIn 0.6s cubic-bezier(0.34,1.56,0.64,1);
+                        position:relative;
+                        overflow:hidden;
                     ">
-                        <span style="font-size:24px;animation:bounce 1s ease-in-out infinite;flex-shrink:0;">{emoji}</span>
-                        <span style="
-                            font-size:15px;
-                            font-weight:600;
-                            color:#f1f5f9;
-                            font-family:'Inter',sans-serif;
-                            letter-spacing:0.2px;
-                            flex:1;
-                        ">{message}</span>
+                        <div style="
+                            position:absolute;
+                            top:-50%;left:-50%;
+                            width:200%;height:200%;
+                            background:radial-gradient(circle at 50% 50%,rgba(255,255,255,.08) 0%,transparent 70%);
+                            animation:orbitalGlow 8s linear infinite;
+                        "></div>
+                        <div style="
+                            display:flex;
+                            align-items:center;
+                            gap:20px;
+                            position:relative;
+                            z-index:1;
+                        ">
+                            <span style="
+                                font-size:36px;
+                                animation:emojiFloat 2s ease-in-out infinite;
+                                filter:drop-shadow(0 4px 12px rgba(0,0,0,.4));
+                                flex-shrink:0;
+                            ">{emoji}</span>
+                            <div style="flex:1;">
+                                <div style="
+                                    font-size:17px;
+                                    font-weight:700;
+                                    color:{colors['text']};
+                                    font-family:'Inter','Segoe UI',sans-serif;
+                                    letter-spacing:0.3px;
+                                    text-shadow:0 2px 8px rgba(0,0,0,.3);
+                                    line-height:1.4;
+                                ">{message}</div>
+                                <div style="
+                                    margin-top:8px;
+                                    height:2px;
+                                    background:linear-gradient(90deg,
+                                        transparent 0%,
+                                        {colors['border']} 20%,
+                                        {colors['border']} 80%,
+                                        transparent 100%);
+                                    background-size:200% 100%;
+                                    animation:progressShimmer 2s linear infinite;
+                                    border-radius:4px;
+                                "></div>
+                            </div>
+                        </div>
                     </div>
                     <style>
-                        @keyframes statusFade {{
-                            0% {{ opacity:0; transform:translateY(-8px); }}
-                            10% {{ opacity:1; transform:translateY(0); }}
-                            90% {{ opacity:1; transform:translateY(0); }}
-                            100% {{ opacity:0.1; transform:translateY(-8px); }}
+                        @keyframes statusSlideIn {{
+                            0% {{ opacity:0; transform:translateY(-20px) scale(0.95); }}
+                            100% {{ opacity:1; transform:translateY(0) scale(1); }}
+                        }}
+                        @keyframes emojiFloat {{
+                            0%, 100% {{ transform:translateY(0) rotate(0deg); }}
+                            25% {{ transform:translateY(-6px) rotate(-5deg); }}
+                            75% {{ transform:translateY(6px) rotate(5deg); }}
+                        }}
+                        @keyframes orbitalGlow {{
+                            0% {{ transform:rotate(0deg); }}
+                            100% {{ transform:rotate(360deg); }}
+                        }}
+                        @keyframes progressShimmer {{
+                            0% {{ background-position:200% 0; }}
+                            100% {{ background-position:-200% 0; }}
                         }}
                     </style>
                     """, unsafe_allow_html=True)
-                    time.sleep(0.08)
+                    time.sleep(0.05)
 
                 # ---------- Parse resume ----------
-                show_status(0.12, "📄", "Parsing resume...", "rgba(139,92,246,.15)", "rgba(99,102,241,.12)")
+                show_status(0.12, "📄", "Parsing resume and extracting text...", "purple")
                 parsed = parse_resume_pdf(tmp_path, nlp, embedder)
                 if not parsed:
                     st.error("No text parsed from the PDF."); st.stop()
@@ -2595,7 +2748,7 @@ with tab1:
                 st.session_state.uploads_history.insert(0, {"file_name":up.name,"name":parsed["name"],"email":parsed["email"],"phone":parsed["phone"],"timestamp":time.time()})
 
                 # ---------- Plan & profile ----------
-                show_status(0.28, "🎯", "Deriving analysis plan...", "rgba(236,72,153,.15)", "rgba(219,39,119,.12)")
+                show_status(0.28, "🎯", "Deriving intelligent analysis plan...", "pink")
                 plan = llm_json(model, jd_plan_prompt(jd, preview))
                 if not plan or not isinstance(plan, dict):
                     plan = {"role_title":"","seniority":"",
@@ -2607,12 +2760,12 @@ with tab1:
                 if not isinstance(w, dict) or not all(k in w for k in ("semantic","coverage","llm_fit")):
                     plan["scoring_weights"] = DEFAULT_WEIGHTS.copy()
 
-                show_status(0.36, "👤", "Parsing resume profile...", "rgba(99,102,241,.15)", "rgba(79,70,229,.12)")
+                show_status(0.36, "👤", "Building candidate profile...", "blue")
                 profile = llm_json(model, resume_profile_prompt(parsed["text"])) or {}
                 parsed["llm_profile"] = profile
 
                 # ---------- Atomic requirements (LLM + heuristic) ----------
-                show_status(0.46, "🔍", "Extracting atomic requirements...", "rgba(139,92,246,.15)", "rgba(124,58,237,.12)")
+                show_status(0.46, "🔍", "Extracting atomic requirements with NLP...", "purple")
                 atoms_llm = llm_json(model, atomicize_requirements_prompt(jd, preview)) or {}
                 jd_atoms_raw = extract_atoms_from_text(jd, nlp, max_atoms=60)
 
@@ -2623,7 +2776,7 @@ with tab1:
                 nice_atoms, _ = refine_atom_list(nice_candidates, nlp, reserved_canonicals=must_canon, limit=30)
 
                 # ---------- Coverage (semantic similarity over chunks) ----------
-                show_status(0.58, "📊", "Scoring requirement coverage...", "rgba(16,185,129,.15)", "rgba(5,150,105,.12)")
+                show_status(0.58, "📊", "Computing requirement coverage with RAG...", "green")
                 coverage_summary = evaluate_requirement_coverage(
                     must_atoms, nice_atoms, parsed.get("text", ""), parsed.get("chunks", []), 
                     embedder, model, faiss_index=parsed.get("faiss"), nlp=nlp
@@ -2633,12 +2786,12 @@ with tab1:
                 nice_cov = coverage_summary["nice"]
 
                 # ---------- Global semantic ----------
-                show_status(0.68, "🧠", "Computing semantic similarity...", "rgba(236,72,153,.15)", "rgba(219,39,119,.12)")
+                show_status(0.68, "🧠", "Analyzing semantic similarity...", "purple")
                 global_sem = compute_global_semantic(embedder, parsed.get("embs"), jd)
                 global_sem01 = (global_sem + 1.0) / 2.0  # map [-1,1] -> [0,1]
 
                 # ---------- LLM narrative & fit ----------
-                show_status(0.78, "✨", "LLM narrative assessment...", "rgba(99,102,241,.15)", "rgba(79,70,229,.12)")
+                show_status(0.78, "✨", "Generating LLM narrative assessment...", "pink")
                 cov_parts = {
                     "must_coverage": round(must_cov,3),
                     "nice_coverage": round(nice_cov,3),
@@ -2731,41 +2884,112 @@ with tab1:
                 st.session_state.analysis_history = st.session_state.analysis_history[:100]
                 st.session_state.current_analysis = (parsed, result)
 
-                # Final success with beautiful fade
+                # Final success with immersive celebration
                 prog.progress(1.0)
                 stat.markdown("""
                 <div style="
-                    background:linear-gradient(135deg,rgba(16,185,129,.2),rgba(5,150,105,.15));
-                    border:2px solid rgba(16,185,129,.5);
-                    border-radius:16px;
-                    padding:18px 32px;
-                    margin:12px 0;
-                    box-shadow:0 8px 32px rgba(16,185,129,.4),0 0 60px rgba(5,150,105,.3);
-                    backdrop-filter:blur(20px);
-                    animation:successFadeOut 1.5s ease-in-out forwards;
+                    background:linear-gradient(135deg,
+                        rgba(16,185,129,.25) 0%,
+                        rgba(5,150,105,.20) 50%,
+                        rgba(16,185,129,.25) 100%);
+                    border:3px solid rgba(16,185,129,.6);
+                    border-radius:24px;
+                    padding:32px 48px;
+                    margin:20px 0;
+                    box-shadow:
+                        0 10px 50px rgba(16,185,129,.5),
+                        0 0 100px rgba(5,150,105,.3),
+                        inset 0 2px 0 rgba(255,255,255,.2),
+                        inset 0 -2px 0 rgba(0,0,0,.2);
+                    backdrop-filter:blur(30px);
+                    animation:successZoomIn 1s cubic-bezier(0.34,1.56,0.64,1) forwards;
+                    position:relative;
+                    overflow:hidden;
                 ">
-                    <div style="display:flex;align-items:center;justify-content:center;gap:16px;">
-                        <span style="font-size:32px;animation:bounce 0.6s ease-in-out 3;">✅</span>
+                    <div style="
+                        position:absolute;
+                        top:50%;left:50%;
+                        transform:translate(-50%,-50%);
+                        width:300px;height:300px;
+                        background:radial-gradient(circle,rgba(16,185,129,.3) 0%,transparent 70%);
+                        animation:successPulse 2s ease-in-out infinite;
+                    "></div>
+                    <div style="
+                        position:absolute;
+                        top:0;left:0;right:0;bottom:0;
+                        background:linear-gradient(45deg,
+                            transparent 25%,
+                            rgba(255,255,255,.05) 25%,
+                            rgba(255,255,255,.05) 50%,
+                            transparent 50%,
+                            transparent 75%,
+                            rgba(255,255,255,.05) 75%,
+                            rgba(255,255,255,.05));
+                        background-size:40px 40px;
+                        animation:patternMove 20s linear infinite;
+                        opacity:0.3;
+                    "></div>
+                    <div style="
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                        gap:24px;
+                        position:relative;
+                        z-index:1;
+                    ">
                         <span style="
-                            font-size:18px;
-                            font-weight:900;
-                            color:#6ee7b7;
-                            font-family:'Space Grotesk',sans-serif;
-                            letter-spacing:0.5px;
-                        ">Analysis Complete!</span>
-                        <span style="font-size:32px;animation:bounce 0.6s ease-in-out 3;animation-delay:0.2s;">🚀</span>
+                            font-size:56px;
+                            animation:successBounce 1s ease-in-out 3;
+                            filter:drop-shadow(0 8px 16px rgba(0,0,0,.4));
+                        ">✅</span>
+                        <div style="text-align:center;">
+                            <div style="
+                                font-size:28px;
+                                font-weight:900;
+                                color:#6ee7b7;
+                                font-family:'Space Grotesk','Poppins',sans-serif;
+                                letter-spacing:1px;
+                                text-shadow:0 2px 12px rgba(0,0,0,.4);
+                                margin-bottom:8px;
+                            ">Analysis Complete!</div>
+                            <div style="
+                                font-size:14px;
+                                font-weight:600;
+                                color:#a7f3d0;
+                                opacity:0.9;
+                                letter-spacing:0.5px;
+                            ">Resume successfully evaluated</div>
+                        </div>
+                        <span style="
+                            font-size:56px;
+                            animation:successBounce 1s ease-in-out 3;
+                            animation-delay:0.15s;
+                            filter:drop-shadow(0 8px 16px rgba(0,0,0,.4));
+                        ">🚀</span>
                     </div>
                 </div>
                 <style>
-                    @keyframes successFadeOut {
-                        0% { opacity:0; transform:scale(0.9); }
-                        15% { opacity:1; transform:scale(1); }
-                        85% { opacity:1; transform:scale(1); }
-                        100% { opacity:0; transform:scale(0.95); }
+                    @keyframes successZoomIn {
+                        0% { opacity:0; transform:scale(0.85) rotateX(10deg); }
+                        100% { opacity:1; transform:scale(1) rotateX(0deg); }
+                    }
+                    @keyframes successBounce {
+                        0%, 100% { transform:translateY(0) scale(1); }
+                        25% { transform:translateY(-20px) scale(1.15); }
+                        50% { transform:translateY(0) scale(1); }
+                        75% { transform:translateY(-10px) scale(1.08); }
+                    }
+                    @keyframes successPulse {
+                        0%, 100% { transform:translate(-50%,-50%) scale(1); opacity:0.5; }
+                        50% { transform:translate(-50%,-50%) scale(1.3); opacity:0.8; }
+                    }
+                    @keyframes patternMove {
+                        0% { background-position:0 0; }
+                        100% { background-position:40px 40px; }
                     }
                 </style>
                 """, unsafe_allow_html=True)
-                time.sleep(1.2)
+                time.sleep(1.5)
                 prog.empty()
                 stat.empty()
                 st.rerun()
