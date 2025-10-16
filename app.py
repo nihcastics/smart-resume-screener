@@ -1346,87 +1346,123 @@ with tab1:
         </style>
         """, unsafe_allow_html=True)
         
-        # Build table rows
-        table_rows = []
-        priority_num = 1
-        
-        for idx, a in enumerate(must):
-            is_covered = contains_atom(a, tok)
-            status_html = f'<span class="status-badge status-covered">✓ Covered</span>' if is_covered else f'<span class="status-badge status-missing">✗ Missing</span>'
-            type_html = '<span class="req-type-badge type-must">Must-Have</span>'
-            priority_icon = '🔴'
-            
-            table_rows.append(f"""
-            <tr>
-                <td style="text-align:center;font-size:20px;">{priority_icon}</td>
-                <td><strong style="color:#f1f5f9;">{a}</strong></td>
-                <td style="text-align:center;">{type_html}</td>
-                <td style="text-align:center;">{status_html}</td>
-            </tr>
-            """)
-            priority_num += 1
-        
-        for idx, a in enumerate(nice):
-            is_covered = contains_atom(a, tok)
-            status_html = f'<span class="status-badge status-covered">✓ Covered</span>' if is_covered else f'<span class="status-badge status-missing">✗ Missing</span>'
-            type_html = '<span class="req-type-badge type-nice">Nice-to-Have</span>'
-            priority_icon = '⭐'
-            
-            table_rows.append(f"""
-            <tr>
-                <td style="text-align:center;font-size:20px;">{priority_icon}</td>
-                <td style="color:#cbd5e1;">{a}</td>
-                <td style="text-align:center;">{type_html}</td>
-                <td style="text-align:center;">{status_html}</td>
-            </tr>
-            """)
-            priority_num += 1
-        
-        # Render beautiful table
-        table_rows_html = ''.join(table_rows)
-        table_html = f"""
-        <table class="coverage-table">
-            <thead>
-                <tr>
-                    <th style="width:60px;text-align:center;">Priority</th>
-                    <th style="width:50%;">Requirement</th>
-                    <th style="width:150px;text-align:center;">Type</th>
-                    <th style="width:150px;text-align:center;">Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {table_rows_html}
-            </tbody>
-        </table>
-        """
-        st.markdown(table_html, unsafe_allow_html=True)
-        
-        # Coverage summary stats
+        # Calculate coverage stats
         must_covered = sum(1 for a in must if contains_atom(a, tok))
+        must_missing = len(must) - must_covered
         nice_covered = sum(1 for a in nice if contains_atom(a, tok))
+        nice_missing = len(nice) - nice_covered
         total_covered = must_covered + nice_covered
         total_req = len(must) + len(nice)
+        coverage_pct = int(total_covered/total_req*100) if total_req > 0 else 0
         
+        # Summary stats cards
         st.markdown(f"""
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:24px;">
-            <div class="metric-card" style="text-align:center;border-left:4px solid #10b981;">
-                <p style="margin:0;font-size:12px;color:#7a8b99;text-transform:uppercase;">Total Covered</p>
-                <h3 style="margin:8px 0 0 0;font-size:32px;color:#10b981;font-weight:900;">{total_covered}/{total_req}</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin-bottom:40px;">
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(5,150,105,.1));
+                        border:2px solid rgba(16,185,129,.4);text-align:center;padding:24px;">
+                <p style="margin:0;font-size:13px;color:#6ee7b7;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Total Requirements</p>
+                <h3 style="margin:12px 0 0 0;font-size:42px;color:#10b981;font-weight:900;">{total_req}</h3>
+                <p style="margin:8px 0 0 0;font-size:14px;color:#94a3b8;"><span style="color:#10b981;font-weight:700;">{total_covered} covered</span> · {total_req - total_covered} missing</p>
             </div>
-            <div class="metric-card" style="text-align:center;border-left:4px solid #ef4444;">
-                <p style="margin:0;font-size:12px;color:#7a8b99;text-transform:uppercase;">Must-Have</p>
-                <h3 style="margin:8px 0 0 0;font-size:32px;color:#ef4444;font-weight:900;">{must_covered}/{len(must)}</h3>
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(239,68,68,.15),rgba(220,38,38,.1));
+                        border:2px solid rgba(239,68,68,.4);text-align:center;padding:24px;">
+                <p style="margin:0;font-size:13px;color:#fca5a5;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Must-Have Skills</p>
+                <h3 style="margin:12px 0 0 0;font-size:42px;color:#ef4444;font-weight:900;">{len(must)}</h3>
+                <p style="margin:8px 0 0 0;font-size:14px;color:#94a3b8;"><span style="color:#10b981;font-weight:700;">{must_covered} ✓</span> · <span style="color:#ef4444;font-weight:700;">{must_missing} ✗</span></p>
             </div>
-            <div class="metric-card" style="text-align:center;border-left:4px solid #3b82f6;">
-                <p style="margin:0;font-size:12px;color:#7a8b99;text-transform:uppercase;">Nice-to-Have</p>
-                <h3 style="margin:8px 0 0 0;font-size:32px;color:#3b82f6;font-weight:900;">{nice_covered}/{len(nice)}</h3>
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(37,99,235,.1));
+                        border:2px solid rgba(59,130,246,.4);text-align:center;padding:24px;">
+                <p style="margin:0;font-size:13px;color:#93c5fd;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Nice-to-Have</p>
+                <h3 style="margin:12px 0 0 0;font-size:42px;color:#3b82f6;font-weight:900;">{len(nice) if len(nice) > 0 else '—'}</h3>
+                <p style="margin:8px 0 0 0;font-size:14px;color:#94a3b8;">{'<span style="color:#10b981;font-weight:700;">' + str(nice_covered) + ' ✓</span> · <span style="color:#3b82f6;font-weight:700;">' + str(nice_missing) + ' ✗</span>' if len(nice) > 0 else 'None specified'}</p>
             </div>
-            <div class="metric-card" style="text-align:center;border-left:4px solid #f59e0b;">
-                <p style="margin:0;font-size:12px;color:#7a8b99;text-transform:uppercase;">Coverage Rate</p>
-                <h3 style="margin:8px 0 0 0;font-size:32px;color:#f59e0b;font-weight:900;">{int(total_covered/total_req*100) if total_req > 0 else 0}%</h3>
+            <div class="metric-card" style="background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(217,119,6,.1));
+                        border:2px solid rgba(245,158,11,.4);text-align:center;padding:24px;">
+                <p style="margin:0;font-size:13px;color:#fcd34d;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Coverage Rate</p>
+                <h3 style="margin:12px 0 0 0;font-size:42px;color:#f59e0b;font-weight:900;">{coverage_pct}%</h3>
+                <p style="margin:8px 0 0 0;font-size:14px;color:#94a3b8;">{'Excellent' if coverage_pct >= 80 else 'Good' if coverage_pct >= 60 else 'Fair' if coverage_pct >= 40 else 'Needs Improvement'}</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
+        
+        # Beautiful requirement cards
+        col1, col2 = st.columns(2)
+        
+        # Must-Have requirements
+        with col1:
+            st.markdown("""
+            <div style="text-align:center;margin-bottom:20px;">
+                <h3 style="color:#fca5a5;font-size:20px;font-weight:800;font-family:'Poppins',sans-serif;
+                           text-transform:uppercase;letter-spacing:1px;display:inline-flex;align-items:center;gap:10px;">
+                    🔴 MUST-HAVE REQUIREMENTS
+                </h3>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            for idx, req in enumerate(must):
+                is_covered = contains_atom(req, tok)
+                bg_color = "rgba(16,185,129,.12)" if is_covered else "rgba(239,68,68,.12)"
+                border_color = "rgba(16,185,129,.5)" if is_covered else "rgba(239,68,68,.5)"
+                icon = "✓" if is_covered else "✗"
+                icon_color = "#10b981" if is_covered else "#ef4444"
+                status_text = "Covered" if is_covered else "Missing"
+                
+                st.markdown(f"""
+                <div class="metric-card" style="background:{bg_color};border-left:4px solid {border_color};
+                            padding:16px 20px;margin-bottom:12px;transition:all .3s;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
+                        <div style="flex:1;">
+                            <p style="margin:0;color:#f1f5f9;font-size:16px;font-weight:600;line-height:1.5;">{req}</p>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span style="font-size:20px;color:{icon_color};font-weight:900;">{icon}</span>
+                            <span style="font-size:12px;color:{icon_color};font-weight:700;text-transform:uppercase;">{status_text}</span>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Nice-to-Have requirements
+        with col2:
+            if len(nice) > 0:
+                st.markdown("""
+                <div style="text-align:center;margin-bottom:20px;">
+                    <h3 style="color:#93c5fd;font-size:20px;font-weight:800;font-family:'Poppins',sans-serif;
+                               text-transform:uppercase;letter-spacing:1px;display:inline-flex;align-items:center;gap:10px;">
+                        ⭐ NICE-TO-HAVE
+                    </h3>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                for idx, req in enumerate(nice):
+                    is_covered = contains_atom(req, tok)
+                    bg_color = "rgba(16,185,129,.12)" if is_covered else "rgba(59,130,246,.12)"
+                    border_color = "rgba(16,185,129,.5)" if is_covered else "rgba(59,130,246,.5)"
+                    icon = "✓" if is_covered else "○"
+                    icon_color = "#10b981" if is_covered else "#3b82f6"
+                    status_text = "Covered" if is_covered else "Not Found"
+                    
+                    st.markdown(f"""
+                    <div class="metric-card" style="background:{bg_color};border-left:4px solid {border_color};
+                                padding:16px 20px;margin-bottom:12px;transition:all .3s;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
+                            <div style="flex:1;">
+                                <p style="margin:0;color:#cbd5e1;font-size:16px;font-weight:600;line-height:1.5;">{req}</p>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-size:20px;color:{icon_color};font-weight:900;">{icon}</span>
+                                <span style="font-size:12px;color:{icon_color};font-weight:700;text-transform:uppercase;">{status_text}</span>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div class="metric-card" style="background:rgba(59,130,246,.08);border:2px dashed rgba(59,130,246,.3);
+                            padding:40px;text-align:center;">
+                    <p style="margin:0;color:#7a8b99;font-size:16px;">No nice-to-have requirements specified</p>
+                </div>
+                """, unsafe_allow_html=True)
         
         # ===== Beautiful Candidate Assessment =====
         st.markdown("""
