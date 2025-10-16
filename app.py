@@ -1383,6 +1383,7 @@ with tab1:
             priority_num += 1
         
         # Render beautiful table
+        table_rows_html = ''.join(table_rows)
         table_html = f"""
         <table class="coverage-table">
             <thead>
@@ -1394,7 +1395,7 @@ with tab1:
                 </tr>
             </thead>
             <tbody>
-                {''.join(table_rows)}
+                {table_rows_html}
             </tbody>
         </table>
         """
