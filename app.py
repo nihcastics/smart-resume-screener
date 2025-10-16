@@ -477,17 +477,44 @@ hr::before{
     font-size:15px!important;
 }
 
-/* ===== ANIMATED GLOW PROGRESS BARS ===== */
+/* ===== ANIMATED GLOW PROGRESS BARS WITH TIP GLOW ===== */
+.stProgress{
+    position:relative;
+}
+.stProgress>div{
+    background:rgba(21,10,46,.6)!important;
+    border-radius:14px!important;
+    overflow:visible!important;
+    box-shadow:inset 0 2px 8px rgba(0,0,0,.4)!important;
+}
 .stProgress>div>div{
     background:linear-gradient(90deg,#8b5cf6,#ec4899,#6366f1)!important;
     background-size:200% 200%!important;
     border-radius:12px!important;
     box-shadow:0 4px 20px rgba(139,92,246,.6),0 0 30px rgba(236,72,153,.4)!important;
     animation:progressGlow 3s ease-in-out infinite!important;
+    position:relative!important;
+}
+.stProgress>div>div::after{
+    content:'';
+    position:absolute;
+    top:50%;
+    right:0;
+    transform:translate(50%,-50%);
+    width:24px;
+    height:24px;
+    background:radial-gradient(circle,rgba(236,72,153,1) 0%,rgba(139,92,246,.8) 40%,transparent 70%);
+    border-radius:50%;
+    box-shadow:0 0 30px rgba(236,72,153,1),0 0 60px rgba(139,92,246,.8),0 0 90px rgba(99,102,241,.6);
+    animation:tipGlow 2s ease-in-out infinite;
 }
 @keyframes progressGlow{
     0%,100%{background-position:0% 50%;filter:brightness(1)}
     50%{background-position:100% 50%;filter:brightness(1.3)}
+}
+@keyframes tipGlow{
+    0%,100%{opacity:.8;transform:translate(50%,-50%) scale(1)}
+    50%{opacity:1;transform:translate(50%,-50%) scale(1.3)}
 }
 
 /* ===== PREMIUM GLOWING SCROLLBAR ===== */
@@ -1518,8 +1545,44 @@ with tab1:
                 prog = st.empty()
                 stat = st.empty()
 
+                # Helper function for beautiful status messages with fade
+                def show_status(progress_val, emoji, message, color_start, color_end):
+                    prog.progress(progress_val)
+                    stat.markdown(f"""
+                    <div style="
+                        background:linear-gradient(135deg,{color_start},{color_end});
+                        border:2px solid rgba(139,92,246,.3);
+                        border-radius:16px;
+                        padding:16px 28px;
+                        margin:12px 0;
+                        box-shadow:0 6px 24px {color_start}40,0 0 40px {color_end}30;
+                        backdrop-filter:blur(20px);
+                        animation:statusFade 1.2s ease-in-out;
+                    ">
+                        <div style="display:flex;align-items:center;gap:14px;">
+                            <span style="font-size:28px;animation:bounce 1s ease-in-out infinite;">{emoji}</span>
+                            <span style="
+                                font-size:16px;
+                                font-weight:700;
+                                color:#e2e8f0;
+                                font-family:'Space Grotesk',sans-serif;
+                                letter-spacing:0.3px;
+                            ">{message}</span>
+                        </div>
+                    </div>
+                    <style>
+                        @keyframes statusFade {{
+                            0% {{ opacity:0; transform:translateX(-20px); }}
+                            20% {{ opacity:1; transform:translateX(0); }}
+                            80% {{ opacity:1; transform:translateX(0); }}
+                            100% {{ opacity:0.3; transform:translateX(0); }}
+                        }}
+                    </style>
+                    """, unsafe_allow_html=True)
+                    time.sleep(0.1)
+
                 # ---------- Parse resume ----------
-                prog.progress(0.12); stat.info("Parsing resume...")
+                show_status(0.12, "📄", "Parsing resume...", "rgba(139,92,246,.15)", "rgba(99,102,241,.12)")
                 parsed = parse_resume_pdf(tmp_path, nlp, embedder)
                 if not parsed:
                     st.error("No text parsed from the PDF."); st.stop()
@@ -1528,7 +1591,7 @@ with tab1:
                 st.session_state.uploads_history.insert(0, {"file_name":up.name,"name":parsed["name"],"email":parsed["email"],"phone":parsed["phone"],"timestamp":time.time()})
 
                 # ---------- Plan & profile ----------
-                prog.progress(0.28); stat.info("Deriving analysis plan...")
+                show_status(0.28, "🎯", "Deriving analysis plan...", "rgba(236,72,153,.15)", "rgba(219,39,119,.12)")
                 plan = llm_json(model, jd_plan_prompt(jd, preview))
                 if not plan or not isinstance(plan, dict):
                     plan = {"role_title":"","seniority":"",
@@ -1540,12 +1603,12 @@ with tab1:
                 if not isinstance(w, dict) or not all(k in w for k in ("semantic","coverage","llm_fit")):
                     plan["scoring_weights"] = DEFAULT_WEIGHTS.copy()
 
-                prog.progress(0.36); stat.info("Parsing resume profile...")
+                show_status(0.36, "👤", "Parsing resume profile...", "rgba(99,102,241,.15)", "rgba(79,70,229,.12)")
                 profile = llm_json(model, resume_profile_prompt(parsed["text"])) or {}
                 parsed["llm_profile"] = profile
 
                 # ---------- Atomic requirements (LLM + heuristic) ----------
-                prog.progress(0.46); stat.info("Extracting atomic requirements...")
+                show_status(0.46, "🔍", "Extracting atomic requirements...", "rgba(139,92,246,.15)", "rgba(124,58,237,.12)")
                 atoms_llm = llm_json(model, atomicize_requirements_prompt(jd, preview)) or {}
                 jd_atoms_raw = extract_atoms_from_text(jd, nlp, max_atoms=60)
 
@@ -1562,18 +1625,18 @@ with tab1:
                 nice_atoms = clean_atoms((atoms_llm.get("nice_atoms") or []) + jd_atoms_raw[30:60])
 
                 # ---------- Coverage (semantic similarity over chunks) ----------
-                prog.progress(0.58); stat.info("Scoring requirement coverage...")
+                show_status(0.58, "📊", "Scoring requirement coverage...", "rgba(16,185,129,.15)", "rgba(5,150,105,.12)")
                 cov_final, must_cov, nice_cov, must_hits, nice_hits = coverage_from_atoms_semantic(
                     must_atoms, nice_atoms, parsed.get("chunks", []), embedder, threshold=0.28
                 )
 
                 # ---------- Global semantic ----------
-                prog.progress(0.68); stat.info("Computing semantic similarity...")
+                show_status(0.68, "🧠", "Computing semantic similarity...", "rgba(236,72,153,.15)", "rgba(219,39,119,.12)")
                 global_sem = compute_global_semantic(embedder, parsed.get("embs"), jd)
                 global_sem01 = (global_sem + 1.0) / 2.0  # map [-1,1] -> [0,1]
 
                 # ---------- LLM narrative & fit ----------
-                prog.progress(0.78); stat.info("LLM narrative assessment...")
+                show_status(0.78, "✨", "LLM narrative assessment...", "rgba(99,102,241,.15)", "rgba(79,70,229,.12)")
                 cov_parts = {
                     "must_coverage": round(must_cov,3),
                     "nice_coverage": round(nice_cov,3),
@@ -1629,8 +1692,43 @@ with tab1:
                 st.session_state.analysis_history = st.session_state.analysis_history[:100]
                 st.session_state.current_analysis = (parsed, result)
 
-                prog.progress(1.0); stat.success("Done")
-                time.sleep(0.2); prog.empty(); stat.empty()
+                # Final success with beautiful fade
+                prog.progress(1.0)
+                stat.markdown("""
+                <div style="
+                    background:linear-gradient(135deg,rgba(16,185,129,.2),rgba(5,150,105,.15));
+                    border:2px solid rgba(16,185,129,.5);
+                    border-radius:16px;
+                    padding:18px 32px;
+                    margin:12px 0;
+                    box-shadow:0 8px 32px rgba(16,185,129,.4),0 0 60px rgba(5,150,105,.3);
+                    backdrop-filter:blur(20px);
+                    animation:successFadeOut 1.5s ease-in-out forwards;
+                ">
+                    <div style="display:flex;align-items:center;justify-content:center;gap:16px;">
+                        <span style="font-size:32px;animation:bounce 0.6s ease-in-out 3;">✅</span>
+                        <span style="
+                            font-size:18px;
+                            font-weight:900;
+                            color:#6ee7b7;
+                            font-family:'Space Grotesk',sans-serif;
+                            letter-spacing:0.5px;
+                        ">Analysis Complete!</span>
+                        <span style="font-size:32px;animation:bounce 0.6s ease-in-out 3;animation-delay:0.2s;">🚀</span>
+                    </div>
+                </div>
+                <style>
+                    @keyframes successFadeOut {
+                        0% { opacity:0; transform:scale(0.9); }
+                        15% { opacity:1; transform:scale(1); }
+                        85% { opacity:1; transform:scale(1); }
+                        100% { opacity:0; transform:scale(0.95); }
+                    }
+                </style>
+                """, unsafe_allow_html=True)
+                time.sleep(1.2)
+                prog.empty()
+                stat.empty()
                 st.rerun()
             finally:
                 try: os.unlink(tmp_path)
