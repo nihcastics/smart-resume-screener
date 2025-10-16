@@ -392,11 +392,12 @@ DEFAULT_WEIGHTS = {"semantic":0.35, "coverage":0.50, "llm_fit":0.15}
 # --- Models / DB ---
 @st.cache_resource(show_spinner=False)
 def load_models():
-    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    # Try Streamlit secrets first (for cloud deployment), then fall back to environment variables
+    api_key = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", "")).strip()
     if not api_key: return None, None, None, False
     genai.configure(api_key=api_key)
 
-    preferred = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
+    preferred = st.secrets.get("GEMINI_MODEL_NAME", os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")).strip() or "gemini-2.5-flash"
     fallbacks = [
         preferred, "gemini-2.5-pro", "gemini-flash-latest", "gemini-pro-latest",
         "gemini-1.5-pro-latest", "gemini-1.5-flash-latest", "gemini-1.0-pro"
@@ -440,7 +441,8 @@ def load_models():
 
 @st.cache_resource(show_spinner=False)
 def init_mongodb():
-    uri = os.getenv("MONGO_URI", "").strip()
+    # Try Streamlit secrets first (for cloud deployment), then fall back to environment variables
+    uri = st.secrets.get("MONGO_URI", os.getenv("MONGO_URI", "")).strip()
     if not uri: return None, None, False
     try:
         client = MongoClient(uri, serverSelectionTimeoutMS=3000, connectTimeoutMS=3000)
