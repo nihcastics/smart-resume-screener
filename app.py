@@ -2112,7 +2112,91 @@ Return ONLY valid JSON. No markdown, no explanations.
 """
 
 def atomicize_requirements_prompt(jd, resume_preview):
-    return f"""Extract technical skills from this job description. Follow rules EXACTLY to avoid gibberish.
+    return f"""Extract ALL technical skills, technologies, tools, qualifications, and requirements from this job description.
+
+INSTRUCTIONS:
+1. Read the ENTIRE job description carefully
+2. Extract EVERY skill, technology, tool, framework, language, platform, and qualification mentioned
+3. For each item, create variations to improve matching:
+   - Extract both abbreviations AND full forms (e.g., "AWS" → ["aws", "amazon web services"])
+   - Split compound terms (e.g., "Java/Python" → ["java", "python"])
+   - Add common variations (e.g., "JavaScript" → ["javascript", "js"])
+4. Remove ONLY generic qualifiers like "good knowledge", "experience with", "proficient in"
+   - Extract the actual skill, not the qualifier
+5. Keep terms simple and lowercase (1-6 words each)
+6. Classify as "must_atoms" if required/essential, "nice_atoms" if preferred/bonus
+
+WHAT TO EXTRACT:
+- Programming languages (Python, Java, etc.)
+- Frameworks and libraries (React, Django, etc.)
+- Databases (PostgreSQL, MongoDB, etc.)
+- Cloud platforms and services (AWS, Lambda, S3, etc.)
+- DevOps tools (Docker, Kubernetes, etc.)
+- CS fundamentals (DBMS, OS, algorithms, OOP, etc.)
+- APIs and protocols (REST, GraphQL, etc.)
+- Testing frameworks (pytest, Jest, etc.)
+- Version control (Git, GitHub, etc.)
+- Development tools (VS Code, Postman, etc.)
+- Methodologies (Agile, Scrum, TDD, etc.)
+- Security technologies (OAuth, JWT, etc.)
+- ML/AI technologies (TensorFlow, NLP, etc.)
+- Years of experience requirements
+- Education requirements
+- Certifications
+- ANY other technical skill or requirement mentioned
+
+EXAMPLES:
+
+Example 1:
+INPUT: "Good knowledge with AWS services, Core IT fundamentals (DBMS/OS/CN), API handling, Strong foundation in Java/Python"
+
+OUTPUT:
+{{
+  "must_atoms": [
+    "aws", "aws services", "amazon web services",
+    "it fundamentals", "computer science fundamentals",
+    "dbms", "database management systems", "databases",
+    "os", "operating systems",
+    "cn", "computer networks", "networking",
+    "api", "rest api", "api development",
+    "java",
+    "python"
+  ],
+  "nice_atoms": []
+}}
+
+Example 2:
+INPUT: "Required: 5+ years Python, Django/Flask, PostgreSQL, Docker, REST APIs. Preferred: React, Redis, Kubernetes, AWS"
+
+OUTPUT:
+{{
+  "must_atoms": [
+    "5+ years python", "python",
+    "django",
+    "flask",
+    "postgresql", "postgres",
+    "docker",
+    "rest api", "api"
+  ],
+  "nice_atoms": [
+    "react",
+    "redis",
+    "kubernetes", "k8s",
+    "aws", "amazon web services"
+  ]
+}}
+
+JOB DESCRIPTION:
+{jd[:5000]}
+
+Extract ALL skills and requirements from the job description above. Return ONLY valid JSON with no explanations or markdown.
+
+OUTPUT FORMAT:
+{{
+  "must_atoms": ["skill1", "skill2", "skill3", ...],
+  "nice_atoms": ["skill1", "skill2", ...]
+}}
+"""
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎯 EXTRACTION RULES (STRICT - NO EXCEPTIONS)
