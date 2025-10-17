@@ -1209,13 +1209,13 @@ def _tokenize_atom(atom: str):
 
 def _is_valid_atom(atom: str):
     """
-    ULTRA-STRICT validation to eliminate gibberish entirely.
-    Only accepts concrete, specific technical requirements.
+    Balanced validation: Filter gibberish while preserving valid technical terms.
+    Uses pattern matching and heuristics instead of hardcoded lists.
     """
     s = normalize_text(atom)
     
-    # ===== EARLY EXIT FILTERS =====
-    if len(s) < 2:
+    # ===== BASIC SANITY CHECKS =====
+    if len(s) < 2 or len(s) > 60:
         return False
     if _detect_gibberish(s):
         return False
@@ -1223,106 +1223,107 @@ def _is_valid_atom(atom: str):
         return False
     
     tokens = _tokenize_atom(s)
-    if not tokens or len(tokens) == 0:
+    if not tokens:
         return False
     
     # ===== MEANINGFUL TOKEN CHECK =====
     meaningful = [t for t in tokens if t not in ATOM_GENERIC_TOKENS]
+    
+    # Must have at least one non-generic token
     if not meaningful:
         return False
     
-    # Single token must be STRONG technical indicator
+    # ===== TECHNICAL HEURISTICS (pattern-based, not list-based) =====
+    
+    # Single token validation
     if len(meaningful) == 1:
-        if meaningful[0] in ATOM_WEAK_SINGLE:
+        token = meaningful[0]
+        
+        # Reject if in weak list
+        if token in ATOM_WEAK_SINGLE:
             return False
-        # Single token must be in strong tech list
-        strong_techs = {
-            # Core languages
-            'python','java','javascript','typescript','go','rust','php','ruby','kotlin','scala','c++','csharp',
-            # Core frameworks
-            'react','angular','vue','django','flask','spring','express','fastapi','nextjs','nestjs',
-            # Databases
-            'postgresql','mongodb','mysql','redis','elasticsearch','cassandra','dynamodb','oracle',
-            # Cloud
-            'aws','azure','gcp','docker','kubernetes','jenkins','terraform','git',
-            # Tools/Platform
-            'git','github','gitlab','jira','kubernetes','kafka','graphql','api',
-            # Specializations
-            'machine learning','deep learning','ai','ml','nlp','devops','ci/cd','microservices',
-            # Languages/runtimes
-            'node','jvm','runtime','framework','library','sdk','database','sql'
-        }
-        if meaningful[0] not in strong_techs:
-            return False
-        return True
+        
+        # Accept if has technical indicators (numbers, caps, common patterns)
+        # Examples: python3, AWS, k8s, C++, .NET, Node.js
+        if any([
+            any(c.isdigit() for c in token),  # Has numbers (python3, angular17, java11)
+            any(c.isupper() for c in atom),  # Has uppercase (AWS, GCP, REST, API, SQL)
+            '+' in atom or '#' in atom or '.' in atom,  # C++, C#, Node.js
+            token.endswith('js') or token.endswith('sql'),  # JavaScript, MySQL
+            token in {'api', 'rest', 'graphql', 'sql', 'nosql', 'oop', 'tdd', 'ci', 'cd', 'ml', 'ai', 'nlp'},
+            len(token) <= 4 and token.isalpha(),  # Short acronyms (AWS, GCP, git, npm)
+        ]):
+            return True
+        
+        # Accept if matches common tech patterns
+        tech_patterns = [
+            r'.*script$',  # JavaScript, TypeScript
+            r'.*sql$',     # MySQL, PostgreSQL
+            r'.*db$',      # MongoDB, DynamoDB
+            r'.*py$',      # NumPy, SciPy
+            r'^[a-z]+\d+$',  # python3, java11, react18
+        ]
+        if any(re.match(pattern, token) for pattern in tech_patterns):
+            return True
+        
+        # Reject single generic tokens (unless matched above)
+        return False
     
     # ===== MULTI-TOKEN VALIDATION =====
-    # Must have at least 1-2 meaningful (non-generic) tokens
-    if len(meaningful) < 1:
-        return False
+    # Multiple meaningful tokens - more lenient (likely compound skills)
     
-    # COMPREHENSIVE TECH INDICATORS (must match)
-    comprehensive_techs = {
-        # Programming languages (exact matches)
-        'python','python3','python310','python311','python312','java','java8','java11','java17','java21',
-        'javascript','typescript','typescript4','typescript5','golang','go','rust','php','ruby','kotlin',
-        'scala','csharp','c#','cpp','c++','swift','matlab','r','perl',
-        # Frontend frameworks
-        'react','reactjs','react18','nextjs','next.js','angular','angularjs','vue','vuejs','vue3','svelte',
-        'ember','backbone','polymer','preact',
-        # Backend frameworks
-        'django','django4','django5','flask','fastapi','express','nestjs','nest','spring','springboot',
-        'rails','ruby on rails','laravel','symfony','asp','asp.net','asp.netcore','dotnet',
-        # Databases
-        'sql','nosql','postgresql','postgres','mysql','mongodb','mongo','redis','cassandra','oracle','dynamodb',
-        'elasticsearch','neo4j','sqlite','firestore','supabase','fauna',
-        # Cloud & DevOps
-        'aws','amazon','azure','gcp','google cloud','heroku','digitalocean','linode',
-        'docker','kubernetes','k8s','jenkins','gitlab','github','circleci','travis','terraform','ansible',
-        'helm','prometheus','grafana','datadog','newrelic','elk','splunk',
-        # Data & ML
-        'tensorflow','pytorch','scikit','sklearn','keras','pandas','numpy','scipy','spark','hadoop',
-        'kafka','airflow','mlflow','sagemaker','kubeflow','xgboost','lightgbm',
-        'machine learning','deep learning','nlp','natural language','computer vision','cv',
-        # Monitoring & observability
-        'prometheus','grafana','datadog','newrelic','splunk','elk','cloudwatch','stackdriver',
-        # Message queues & streaming
-        'kafka','rabbitmq','activemq','nats','redis','pubsub','sqs','sns',
-        # Containers & orchestration
-        'docker','podman','kubernetes','ecs','aks','gke','nomad','swarm',
-        # API & protocols
-        'rest','graphql','grpc','soap','http','websocket','mqtt',
-        # Tools
-        'git','github','gitlab','bitbucket','jira','confluence','slack','trello','asana',
-        'vscode','intellij','eclipse','vim','neovim','sublime','atom',
-        'npm','pip','maven','gradle','cargo','composer','go mod',
-        'webpack','babel','vite','parcel','esbuild',
-        'jest','pytest','unittest','mocha','chai','rspec','jUnit',
-        # Security & compliance
-        'oauth','openid','jwt','ssl','tls','https','saml','ldap','mfa','2fa',
-        # Other specializations
-        'microservices','api','rest api','ci/cd','devops','automation','containerization',
-        'agile','scrum','kanban','devops','site reliability','sre',
-        'testing','unit test','integration test','end to end','e2e',
-    }
+    # For multi-token phrases, check if they're meaningful compound skills
+    # Examples: "react native", "machine learning", "rest api", "data structures"
     
-    # At least one meaningful token must be a known tech
-    if not any(t in comprehensive_techs for t in meaningful):
-        return False
+    # Accept if has experience/year qualifiers (e.g., "5+ years python")
+    if any(re.search(r'\d+\s*(year|yr|month|mo)', s) for s in [atom, s]):
+        return True
     
-    # Check for version numbers (indicates specific skill)
-    has_version = any(re.search(r'\d+', t) for t in tokens)
+    # Accept if has technical suffixes/prefixes
+    technical_patterns = [
+        r'.*script$',      # javascript, typescript
+        r'.*sql$',         # mysql, postgresql
+        r'.*db$',          # mongodb, dynamodb  
+        r'.*py$',          # numpy, scipy
+        r'.*js$',          # reactjs, vuejs, nodejs
+        r'.*\.net$',       # asp.net
+        r'^micro.*',       # microservices
+        r'^web.*',         # web development, websocket
+        r'^data.*',        # data science, data structures
+        r'^full.*stack$',  # full stack
+        r'^front.*end$',   # front end
+        r'^back.*end$',    # back end
+    ]
     
-    # FINAL MULTI-TOKEN ACCEPTANCE RULES
-    # - Has meaningful tech + either version OR multi-word phrase
-    if len(meaningful) >= 1 and (has_version or len(meaningful) >= 2):
-        # Additional check: must not be mostly adjectives
+    if any(re.match(pattern, s, re.IGNORECASE) for pattern in technical_patterns):
+        return True
+    
+    # Accept if contains numbers (version numbers, year requirements)
+    if any(c.isdigit() for c in s):
+        return True
+    
+    # Accept if contains uppercase in original (AWS, REST, SQL, API, CI/CD)
+    if any(c.isupper() for c in atom):
+        return True
+    
+    # Accept if contains special chars indicating tech (C++, C#, .NET)
+    if any(char in atom for char in ['+', '#', '.']):
+        return True
+    
+    # Accept compound phrases with 2-4 meaningful tokens
+    # These are likely legitimate compound skills
+    if 2 <= len(meaningful) <= 4:
+        # Reject if too many adjectives
         adj_count = sum(1 for t in tokens if t in ATOM_LEADING_ADJECTIVES)
-        if adj_count / max(len(tokens), 1) > 0.8:
+        if adj_count / max(len(tokens), 1) > 0.5:
             return False
         return True
     
-    return False
+    # Accept single meaningful tokens that are short (likely acronyms)
+    if len(meaningful) == 1 and len(meaningful[0]) <= 5:
+        return True
+    
+    return True  # Default to accepting if passed all filters above
 
 def _canonical_atom(atom: str, nlp=None):
     s = normalize_text(atom)
@@ -1505,28 +1506,65 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
             detail["llm_rationale"] = verdict.get("rationale", "")
             detail["llm_evidence"] = verdict.get("evidence", "")
             
-            # Calculate final score based on LLM verdict
+            # Calculate final score using enhanced algorithm
             if present:
-                # Present: score based on confidence (0.7 to 1.0 range)
-                detail["score"] = 0.70 + (0.30 * confidence)
+                # Skill is present - score based on confidence and evidence quality
+                # Range: 0.60 to 1.0
+                base_score = 0.60
+                confidence_bonus = 0.40 * confidence
+                detail["score"] = base_score + confidence_bonus
+                
+                # Boost for strong evidence (high semantic similarity)
+                if detail["max_similarity"] >= 0.85:
+                    detail["score"] = min(1.0, detail["score"] * 1.10)  # 10% boost
+                elif detail["max_similarity"] >= 0.75:
+                    detail["score"] = min(1.0, detail["score"] * 1.05)  # 5% boost
+                    
             else:
-                # Not present: reduce score based on confidence in absence
-                if confidence >= 0.7:
-                    detail["score"] = 0.0  # Confidently absent
-                elif confidence >= 0.5:
-                    detail["score"] = 0.15  # Likely absent
+                # Skill is absent - penalize based on confidence
+                if confidence >= 0.8:
+                    # Highly confident it's missing - zero points
+                    detail["score"] = 0.0
+                elif confidence >= 0.6:
+                    # Likely missing - small residual score
+                    detail["score"] = 0.10
+                elif confidence >= 0.4:
+                    # Uncertain - give some benefit of doubt
+                    detail["score"] = 0.25
                 else:
-                    detail["score"] = detail["pre_llm_score"] * 0.5  # Uncertain, keep some score
+                    # Low confidence in absence - maybe present but unclear
+                    # Use semantic similarity as tiebreaker
+                    detail["score"] = min(0.40, detail["pre_llm_score"] * 0.8)
 
-    # Step 4: Calculate overall coverage scores
+    # Step 4: Calculate overall coverage with sophisticated weighting
     must_scores = [d["score"] for d in must_details.values()]
     nice_scores = [d["score"] for d in nice_details.values()]
 
+    # Must-have coverage: strict average (all must be met)
     must_coverage = float(np.mean(must_scores)) if must_scores else 0.0
+    
+    # Nice-to-have coverage: more forgiving (bonus, not required)
     nice_coverage = float(np.mean(nice_scores)) if nice_scores else 1.0
     
-    # Overall: 70% must-have, 30% nice-to-have
-    overall_coverage = (0.70 * must_coverage + 0.30 * nice_coverage) if must_scores else nice_coverage
+    # Apply penalty if too many must-haves are missing
+    must_present_count = sum(1 for d in must_details.values() if d.get("llm_present", False))
+    must_total = len(must_details) if must_details else 1
+    must_fulfillment_rate = must_present_count / must_total
+    
+    # Penalty factor: reduces overall score if many must-haves missing
+    if must_fulfillment_rate < 0.5:  # Less than 50% must-haves present
+        penalty_factor = 0.70  # 30% penalty
+    elif must_fulfillment_rate < 0.7:  # 50-70% present
+        penalty_factor = 0.85  # 15% penalty
+    else:
+        penalty_factor = 1.0  # No penalty
+    
+    # Calculate overall: 75% must-have, 25% nice-to-have (must-haves matter more)
+    if must_scores:
+        raw_overall = (0.75 * must_coverage + 0.25 * nice_coverage)
+        overall_coverage = raw_overall * penalty_factor
+    else:
+        overall_coverage = nice_coverage
 
     return {
         "overall": round(overall_coverage, 3),
@@ -1591,73 +1629,102 @@ def llm_verify_requirements_clean(model, requirements_payload, resume_text):
                 "evidence": evidence_snippets
             })
         
-        prompt = f"""You are an expert technical recruiter. Verify if each requirement is met by the candidate's resume.
+        prompt = f"""You are an expert technical recruiter analyzing a candidate's resume for specific requirements. Your task is to provide UNIQUE, SPECIFIC assessments for each requirement.
 
-**REQUIREMENTS TO VERIFY:**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 REQUIREMENTS TO VERIFY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 {json.dumps(formatted_reqs, indent=2)}
 
-**CANDIDATE'S FULL RESUME:**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📄 CANDIDATE'S RESUME
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 {resume_excerpt}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-INSTRUCTIONS
+🎯 ASSESSMENT CRITERIA
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-For each requirement, determine:
+For EACH requirement, provide:
 
-1. **present** (true/false): Is this skill/technology clearly mentioned and used in the resume?
-   - true: Explicitly mentioned with project usage or experience
-   - false: Not mentioned OR just listed without evidence of use
+1. **present** (boolean): Is the skill/technology actually used?
+   ✅ TRUE if: Mentioned in projects/experience + specific use cases described
+   ❌ FALSE if: Not mentioned OR only in skills list without usage proof
 
-2. **confidence** (0.0 to 1.0): How certain are you?
-   - 1.0: Direct mention with concrete examples
-   - 0.8: Clearly stated with some details
-   - 0.6: Mentioned but limited evidence
-   - 0.4: Weak/indirect evidence
-   - 0.2: Barely mentioned or unclear
-   - 0.0: Not found
+2. **confidence** (0.0 to 1.0): Certainty level
+   - 0.9-1.0: Used in multiple projects with detailed descriptions
+   - 0.7-0.8: Used in at least one project with clear description
+   - 0.5-0.6: Mentioned with minimal context or only in skills list
+   - 0.3-0.4: Weak/indirect mention or possible related skill
+   - 0.0-0.2: Not found or only vague reference
 
-3. **rationale** (max 20 words): Brief factual explanation
+3. **rationale** (15-25 words): SPECIFIC, UNIQUE explanation
+   ⚠️ MUST BE UNIQUE PER REQUIREMENT - Don't use generic phrases!
+   ✅ GOOD: "Used Python in E-commerce Platform project for backend APIs and data processing"
+   ✅ GOOD: "No PostgreSQL mention; uses MySQL in Project X instead"
+   ✅ GOOD: "React expertise shown in Healthcare Dashboard with Redux state management"
+   ❌ BAD: "Clearly demonstrated in projects" (too generic)
+   ❌ BAD: "Mentioned in resume" (too vague)
+   ❌ BAD: "Experience with technology" (not specific)
+   
+   REQUIRED FORMAT:
+   - If present=true: Mention the PROJECT NAME or CONTEXT where used
+   - If present=false: State what's missing or what alternative is used instead
 
-4. **evidence** (max 30 words): Quote the specific line from resume that proves it (if present=true)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MATCHING RULES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-✅ **Accept as matches:**
-- Exact names: "Python" = "Python"
-- Common abbreviations: "K8s" = "Kubernetes", "JS" = "JavaScript"
-- Version variants: "React 18" satisfies "React"
-- Framework specifics: "Django REST" satisfies "Django"
-
-❌ **Reject as non-matches:**
-- Different tech: "MySQL" ≠ "PostgreSQL"
-- Vague categories: "databases" ≠ "MongoDB"
-- Insufficient years: "2 years Python" ≠ "5+ years Python"
-- Listed only: Skill in tech list but no project usage = weak match (confidence < 0.6)
+4. **evidence** (20-40 words): Direct quote with PROJECT CONTEXT
+   - Include the PROJECT/COMPANY NAME if possible
+   - Quote the SPECIFIC LINE that proves usage
+   - If not present, leave empty ("")
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-OUTPUT FORMAT (JSON only, no explanations)
+✅ MATCHING RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Accept as matches:**
+- Exact/common names: Python=Python, K8s=Kubernetes, JS=JavaScript
+- Versions: React 18 satisfies "React"
+- Specifics: Django REST satisfies "Django"
+
+**Reject as non-matches:**
+- Wrong tech: MySQL ≠ PostgreSQL
+- Vague: "databases" ≠ "MongoDB"
+- Insufficient duration: "1 yr Python" ≠ "5+ yrs Python"
+- List-only: Skill listed but zero project usage = LOW confidence (0.4-0.5)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📤 OUTPUT FORMAT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Return ONLY valid JSON (no markdown, no ```json):
 
 {{
   "requirement_name": {{
-    "present": true or false,
-    "confidence": number (0.0 to 1.0),
-    "rationale": "brief explanation (max 20 words)",
-    "evidence": "direct quote from resume (empty if present=false)"
+    "present": true/false,
+    "confidence": 0.0-1.0,
+    "rationale": "Specific explanation mentioning project/context (15-25 words)",
+    "evidence": "Quoted text with project name (if present, else empty)"
   }}
 }}
 
-CRITICAL:
-- Base answers ONLY on resume content
-- Do NOT invent or assume skills
-- Keep rationale under 20 words
-- Keep evidence under 30 words
-- Return ONLY valid JSON (no markdown, no extra text)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ CRITICAL ANTI-REPETITION RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-BEGIN:
+1. Each rationale MUST be UNIQUE - no copy-paste explanations
+2. MUST mention specific PROJECT NAMES or CONTEXTS from resume
+3. NO generic phrases like "demonstrated", "mentioned", "experience with"
+4. If skill is absent, explain WHY or what's used INSTEAD
+5. Be forensic: cite actual project names, company names, or specific contexts
+
+EXAMPLE OF GOOD (UNIQUE, SPECIFIC) RATIONALES:
+- "Python used extensively in E-commerce Platform project for REST API development and data pipelines"
+- "No Docker mentioned; deployment appears to be traditional VM-based per DevOps section"
+- "Strong React skills evidenced in Healthcare Dashboard project using hooks and context API"
+- "AWS mentioned in resume but only S3 storage; no Lambda or serverless experience shown"
+
+BEGIN ANALYSIS:
 """
 
         try:
@@ -2112,90 +2179,141 @@ Return ONLY valid JSON. No markdown, no explanations.
 """
 
 def atomicize_requirements_prompt(jd, resume_preview):
-    return f"""Extract ALL technical skills, technologies, tools, qualifications, and requirements from this job description.
+    return f"""You are an expert technical recruiter analyzing a job description. Extract ALL requirements in a structured, comprehensive way.
 
-INSTRUCTIONS:
-1. Read the ENTIRE job description carefully
-2. Extract EVERY skill, technology, tool, framework, language, platform, and qualification mentioned
-3. For each item, create variations to improve matching:
-   - Extract both abbreviations AND full forms (e.g., "AWS" → ["aws", "amazon web services"])
-   - Split compound terms (e.g., "Java/Python" → ["java", "python"])
-   - Add common variations (e.g., "JavaScript" → ["javascript", "js"])
-4. Remove ONLY generic qualifiers like "good knowledge", "experience with", "proficient in"
-   - Extract the actual skill, not the qualifier
-5. Keep terms simple and lowercase (1-6 words each)
-6. Classify as "must_atoms" if required/essential, "nice_atoms" if preferred/bonus
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 EXTRACTION CATEGORIES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-WHAT TO EXTRACT:
-- Programming languages (Python, Java, etc.)
-- Frameworks and libraries (React, Django, etc.)
-- Databases (PostgreSQL, MongoDB, etc.)
-- Cloud platforms and services (AWS, Lambda, S3, etc.)
-- DevOps tools (Docker, Kubernetes, etc.)
-- CS fundamentals (DBMS, OS, algorithms, OOP, etc.)
-- APIs and protocols (REST, GraphQL, etc.)
-- Testing frameworks (pytest, Jest, etc.)
-- Version control (Git, GitHub, etc.)
-- Development tools (VS Code, Postman, etc.)
-- Methodologies (Agile, Scrum, TDD, etc.)
-- Security technologies (OAuth, JWT, etc.)
-- ML/AI technologies (TensorFlow, NLP, etc.)
-- Years of experience requirements
-- Education requirements
-- Certifications
-- ANY other technical skill or requirement mentioned
+Extract requirements into 4 distinct categories:
 
-EXAMPLES:
+1. **hard_skills**: Technical skills, technologies, tools, frameworks
+   - Languages: Python, Java, JavaScript, C++, Go, Rust, etc.
+   - Frameworks: React, Angular, Django, Flask, Spring Boot, etc.
+   - Databases: PostgreSQL, MySQL, MongoDB, Redis, Cassandra, etc.
+   - Cloud: AWS, Azure, GCP, specific services (Lambda, S3, EC2, etc.)
+   - DevOps: Docker, Kubernetes, Jenkins, CI/CD, Terraform, etc.
+   - Tools: Git, Postman, VS Code, JIRA, etc.
+   - Concepts: REST API, GraphQL, Microservices, OOP, etc.
 
-Example 1:
-INPUT: "Good knowledge with AWS services, Core IT fundamentals (DBMS/OS/CN), API handling, Strong foundation in Java/Python"
+2. **fundamentals**: Core CS/IT concepts and foundations
+   - DBMS, Operating Systems, Computer Networks, Data Structures
+   - Algorithms, System Design, Software Architecture
+   - Security principles, Design patterns, etc.
+
+3. **experience**: Years of experience, seniority, specific domains
+   - "5+ years Python", "3 years backend development"
+   - "Senior level", "Mid-level", "Experience with fintech"
+   - Industry experience requirements
+
+4. **qualifications**: Education, certifications, degrees
+   - "Bachelor's in CS", "Master's preferred"
+   - "AWS Certified", "PMP Certification"
+   - Specific degree requirements
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 EXTRACTION RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ **DO:**
+- Extract EVERY specific technology/tool mentioned
+- Include common abbreviations (AWS, K8s, JS, etc.)
+- Extract version-specific mentions (Python 3.x, React 18, etc.)
+- Include compound skills as separate items (Django/Flask → both)
+- Keep original casing for proper nouns (React, MongoDB, AWS)
+- Extract implicit requirements (mentions "Lambda" → add "AWS")
+- Add common variations (JavaScript → also add JS)
+
+❌ **DON'T:**
+- Include vague qualifiers ("good knowledge", "strong understanding")
+- Extract generic words ("experience", "skills", "work")
+- Include soft skills here (teamwork, communication) - skip these
+- Add items not in the JD
+- Be repetitive (don't list "Python" 10 times)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔍 PRIORITY CLASSIFICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For each category, classify items as MUST-HAVE or NICE-TO-HAVE:
+
+**must**: Required, mandatory, essential
+- Keywords: "required", "must have", "essential", "mandatory"
+- Core tech stack items
+- Minimum experience requirements
+
+**nice**: Preferred, bonus, optional
+- Keywords: "preferred", "nice to have", "bonus", "plus"
+- Secondary technologies
+- "Good to have" items
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 EXAMPLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Example 1:**
+INPUT: "Required: 5+ years Python, strong Django/Flask experience, PostgreSQL, Docker. Core IT fundamentals (DBMS/OS/CN) essential. Bachelor's in CS required. Preferred: AWS, Kubernetes, React."
 
 OUTPUT:
 {{
-  "must_atoms": [
-    "aws", "aws services", "amazon web services",
-    "it fundamentals", "computer science fundamentals",
-    "dbms", "database management systems", "databases",
-    "os", "operating systems",
-    "cn", "computer networks", "networking",
-    "api", "rest api", "api development",
-    "java",
-    "python"
-  ],
-  "nice_atoms": []
+  "hard_skills": {{
+    "must": ["Python", "Django", "Flask", "PostgreSQL", "Docker"],
+    "nice": ["AWS", "Kubernetes", "K8s", "React"]
+  }},
+  "fundamentals": {{
+    "must": ["DBMS", "Database Management", "Operating Systems", "OS", "Computer Networks", "Networking", "CN"],
+    "nice": []
+  }},
+  "experience": {{
+    "must": ["5+ years Python", "5 years Python experience"],
+    "nice": []
+  }},
+  "qualifications": {{
+    "must": ["Bachelor's in Computer Science", "CS degree", "Bachelor's degree"],
+    "nice": []
+  }}
 }}
 
-Example 2:
-INPUT: "Required: 5+ years Python, Django/Flask, PostgreSQL, Docker, REST APIs. Preferred: React, Redis, Kubernetes, AWS"
+**Example 2:**
+INPUT: "Looking for Full Stack Engineer with React, Node.js, MongoDB. Good understanding of REST APIs, microservices. Experience with AWS Lambda, S3. Agile methodology. Nice to have: TypeScript, GraphQL, Redis."
 
 OUTPUT:
 {{
-  "must_atoms": [
-    "5+ years python", "python",
-    "django",
-    "flask",
-    "postgresql", "postgres",
-    "docker",
-    "rest api", "api"
-  ],
-  "nice_atoms": [
-    "react",
-    "redis",
-    "kubernetes", "k8s",
-    "aws", "amazon web services"
-  ]
+  "hard_skills": {{
+    "must": ["React", "Node.js", "Node", "MongoDB", "Mongo", "REST API", "REST", "Microservices", "AWS Lambda", "Lambda", "AWS S3", "S3", "AWS", "Agile"],
+    "nice": ["TypeScript", "TS", "GraphQL", "Redis"]
+  }},
+  "fundamentals": {{
+    "must": [],
+    "nice": []
+  }},
+  "experience": {{
+    "must": ["Full Stack development experience"],
+    "nice": []
+  }},
+  "qualifications": {{
+    "must": [],
+    "nice": []
+  }}
 }}
 
-JOB DESCRIPTION:
-{jd[:5000]}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📄 JOB DESCRIPTION TO ANALYZE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Extract ALL skills and requirements from the job description above. Return ONLY valid JSON with no explanations or markdown.
+{jd[:6000]}
 
-OUTPUT FORMAT:
-{{
-  "must_atoms": ["skill1", "skill2", "skill3", ...],
-  "nice_atoms": ["skill1", "skill2", ...]
-}}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ CRITICAL INSTRUCTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Read the ENTIRE job description above
+2. Extract EVERY specific technical requirement
+3. Be thorough - missing skills hurts accuracy
+4. Return ONLY valid JSON (no markdown, no explanations)
+5. Use the EXACT structure shown in examples
+
+BEGIN EXTRACTION:
 """
 
 def analysis_prompt(jd, plan, profile, coverage_summary, cue_alignment, global_sem, cov_final):
@@ -3465,13 +3583,44 @@ with tab1:
                 # ---------- Atomic requirements (LLM + heuristic) ----------
                 show_status(0.46, "🔍", "Extracting atomic requirements with NLP...", "purple")
                 atoms_llm = llm_json(model, atomicize_requirements_prompt(jd, preview)) or {}
-                jd_atoms_raw = extract_atoms_from_text(jd, nlp, max_atoms=80)
+                jd_atoms_raw = extract_atoms_from_text(jd, nlp, max_atoms=100)
 
-                must_candidates = (atoms_llm.get("must_atoms") or []) + jd_atoms_raw[:40]
-                must_atoms, must_canon = refine_atom_list(must_candidates, nlp, limit=45)
-
-                nice_candidates = (atoms_llm.get("nice_atoms") or []) + jd_atoms_raw[40:100]
-                nice_atoms, _ = refine_atom_list(nice_candidates, nlp, reserved_canonicals=must_canon, limit=35)
+                # Extract from new structured format
+                must_candidates = []
+                nice_candidates = []
+                
+                # Add hard skills (most important)
+                hard_skills = atoms_llm.get("hard_skills", {})
+                must_candidates.extend(hard_skills.get("must", []))
+                nice_candidates.extend(hard_skills.get("nice", []))
+                
+                # Add fundamentals
+                fundamentals = atoms_llm.get("fundamentals", {})
+                must_candidates.extend(fundamentals.get("must", []))
+                nice_candidates.extend(fundamentals.get("nice", []))
+                
+                # Add experience requirements
+                experience = atoms_llm.get("experience", {})
+                must_candidates.extend(experience.get("must", []))
+                nice_candidates.extend(experience.get("nice", []))
+                
+                # Add qualifications
+                quals = atoms_llm.get("qualifications", {})
+                must_candidates.extend(quals.get("must", []))
+                nice_candidates.extend(quals.get("nice", []))
+                
+                # Fallback: try old format for backward compatibility
+                if not must_candidates and not nice_candidates:
+                    must_candidates = atoms_llm.get("must_atoms", [])
+                    nice_candidates = atoms_llm.get("nice_atoms", [])
+                
+                # Add heuristic extractions as supplements
+                must_candidates.extend(jd_atoms_raw[:50])
+                nice_candidates.extend(jd_atoms_raw[50:120])
+                
+                # Refine and deduplicate with higher limits
+                must_atoms, must_canon = refine_atom_list(must_candidates, nlp, limit=60)
+                nice_atoms, _ = refine_atom_list(nice_candidates, nlp, reserved_canonicals=must_canon, limit=40)
 
                 # ---------- Coverage (semantic similarity over chunks) ----------
                 show_status(0.58, "📊", "Computing requirement coverage with RAG...", "green")
@@ -4983,7 +5132,7 @@ with tab2:
             "score": float(db_record.get("final_score", 0)) * 10,  # Scale 0-1 to 0-10
             "semantic": float(db_record.get("semantic_score", 0)) * 10,  # Scale 0-1 to 0-10
             "coverage": float(db_record.get("coverage_score", 0)) * 10,  # Scale 0-1 to 0-10
-            "fit": float(db_record.get("fit_score", 0)) / 10,  # Scale 0-100 to 0-10 for display
+            "fit": float(db_record.get("fit_score", 0)),  # Already stored as 0-10 integer
             "email": db_record.get("email", "N/A"),
             "file": "Resume",
             "timestamp": db_record.get("timestamp", 0),
