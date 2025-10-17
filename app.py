@@ -2112,149 +2112,137 @@ Return ONLY valid JSON. No markdown, no explanations.
 """
 
 def atomicize_requirements_prompt(jd, resume_preview):
-    return f"""You are a PRECISION technical skill extractor. Extract EVERY technical skill, technology, tool, and qualification from the job description.
+    return f"""MISSION: Extract EVERY technical skill from this JD with ZERO TOLERANCE for missing skills.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 EXTRACTION STRATEGY - READ CAREFULLY
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔴 CRITICAL: ABBREVIATIONS IN PARENTHESES LIKE "(DBMS/OS/CN)" MUST BE FULLY EXPANDED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-STEP 1: CLEAN DESCRIPTIVE PHRASES
-Strip away qualifiers and verbs, extract ONLY the technical term:
+When you see "(DBMS/OS/CN)" or similar abbreviations, you MUST extract:
+✅ Abbreviation: "dbms", "os", "cn"  
+✅ Full form: "database management systems", "operating systems", "computer networks"
+✅ Variations: "databases", "sql", "networking", "tcp/ip"
+
+Missing ANY of these = FAILURE
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 EXTRACTION PROTOCOL (4 STEPS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 1: REMOVE QUALIFIERS (extract only the skill name)
+  ❌ "good knowledge with AWS" → Extract: "aws", "amazon web services"
+  ❌ "hands on experience with Docker" → Extract: "docker"
+  ❌ "strong foundation in Java" → Extract: "java"
+
+STEP 2: EXPAND ABBREVIATIONS (CRITICAL!)
+  ✅ "(DBMS/OS/CN)" →  
+     - dbms, database management systems, databases, sql
+     - os, operating systems
+     - cn, computer networks, networking, tcp/ip
   
-  ❌ DON'T Extract: "highly skilled", "good knowledge", "hands on experience", "strong foundation", "must know"
-  ✅ DO Extract: The actual technology/skill name
+  ✅ "IT fundamentals" → it fundamentals, cs fundamentals, computer science fundamentals
+  ✅ "API" → api, rest api, api development, api integration
 
-  Examples:
-  • "Highly skilled in AWS Services" → "aws services", "aws", "amazon web services"
-  • "Good knowledge with DBMS/OS/CN" → "dbms", "database management systems", "os", "operating systems", "cn", "computer networks", "networking"
-  • "Hands on experience with Docker" → "docker"
-  • "Strong foundation in Java/Python" → "java", "python"
-  • "API handling" → "api", "api handling", "rest api"
+STEP 3: SPLIT COMPOUNDS
+  ✅ "Java/Python" → java, python (separate)
+  ✅ "Django/Flask" → django, flask
+  ✅ "AWS (Lambda, S3)" → aws, amazon web services, aws lambda, lambda, aws s3, s3
 
-STEP 2: EXPAND ABBREVIATIONS
-When you see abbreviations (especially in parentheses), extract BOTH short AND full forms:
-  
-  • DBMS → "dbms", "database management systems", "databases", "sql"
-  • OS → "os", "operating systems"
-  • CN → "cn", "computer networks", "networking", "tcp/ip"
-  • API → "api", "rest api", "api development", "api integration"
-  • CI/CD → "ci/cd", "continuous integration", "continuous deployment"
-  • IT fundamentals → "it fundamentals", "computer science fundamentals", "cs fundamentals"
+STEP 4: ADD VARIATIONS (meaningful only)
+  ✅ "Python" → python, python 3
+  ✅ "JavaScript" → javascript, js
+  ✅ "Kubernetes" → kubernetes, k8s
 
-STEP 3: SPLIT COMPOUND TERMS
-Split terms separated by slashes, "or", "and":
-  
-  • "Java/Python" → ["java", "python"]
-  • "Django or Flask" → ["django", "flask"]
-  • "AWS (Lambda, S3, EC2)" → ["aws", "aws lambda", "lambda", "aws s3", "s3", "aws ec2", "ec2"]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 EXAMPLE: YOUR EXACT SCENARIO (FOLLOW THIS PATTERN!)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-STEP 4: ADD COMMON VARIATIONS
-For each extracted skill, add commonly used variations:
-  
-  • "Python" → "python", "python 3", "py"
-  • "JavaScript" → "javascript", "js", "es6"
-  • "PostgreSQL" → "postgresql", "postgres", "psql"
-  • "Kubernetes" → "kubernetes", "k8s"
-  • "Docker" → "docker", "containerization"
+INPUT: "Good Knowledge with AWS services, Core IT fundamentals (DBMS/OS/CN), API handling, Strong foundation in Java/Python"
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 CATEGORIES TO EXTRACT (Scan JD for ALL of these)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-1. Languages: Python, Java, JavaScript, TypeScript, C++, C#, Go, Rust, PHP, Ruby
-2. Frameworks: React, Angular, Vue, Django, Flask, FastAPI, Spring, Express, .NET
-3. Databases: PostgreSQL, MySQL, MongoDB, Redis, Oracle, Cassandra, DynamoDB
-4. Cloud: AWS, Azure, GCP, and specific services (Lambda, S3, EC2, etc.)
-5. DevOps: Docker, Kubernetes, Terraform, Ansible, Jenkins, GitHub Actions
-6. CS Fundamentals: DBMS, OS, CN, DSA, algorithms, data structures, OOP
-7. API: REST, GraphQL, gRPC, SOAP, API development, API handling
-8. Testing: Jest, pytest, JUnit, Selenium, unit testing, integration testing
-9. Security: OAuth, JWT, SSL/TLS, security practices, encryption
-10. Tools: Git, GitHub, VS Code, Postman, Jira, Confluence
-11. Methodologies: Agile, Scrum, Kanban, TDD, CI/CD, DevOps practices
-12. ML/AI: TensorFlow, PyTorch, scikit-learn, NLP, machine learning
-13. Experience: "5+ years", "3-5 years", "senior level"
-14. Education: Bachelor's, Master's, Computer Science, Engineering
-15. Certifications: AWS Certified, CKA, CKAD, Azure Certified
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ CRITICAL RULES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-1. NO DUPLICATES: Each unique skill appears ONCE (lowercase, normalized)
-2. NO QUALIFIERS: Never extract "highly skilled", "good knowledge", "hands on"
-3. BOTH FORMS: Always extract abbreviation + full name (e.g., "os" + "operating systems")
-4. SPLIT SLASHES: "X/Y/Z" → extract each separately
-5. ADD VARIATIONS: Add common synonyms and abbreviations
-6. LOWERCASE: All extracted terms in lowercase
-7. 2-8 WORDS: Keep terms concise (2-8 words max)
-8. CLASSIFY CORRECTLY:
-   - "Required"/"Must"/"Essential" → must_atoms
-   - "Nice to have"/"Preferred"/"Bonus" → nice_atoms
-   - If ambiguous → must_atoms
-9. TARGET: 25-60 must_atoms, 10-35 nice_atoms
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-� COMPLETE EXAMPLES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Example 1 - User's Exact Scenario:
-INPUT: "Good Knowledge with AWS services and hands on experience with it, Core IT fundamentals (DBMS/OS/CN), API handling, Strong foundation in Java/Python"
-
-OUTPUT:
+CORRECT OUTPUT:
 {{
   "must_atoms": [
-    "aws services", "aws", "amazon web services",
-    "it fundamentals", "computer science fundamentals", "cs fundamentals",
-    "dbms", "database management systems", "databases", "sql",
-    "os", "operating systems",
-    "cn", "computer networks", "networking", "tcp/ip",
-    "api handling", "api", "rest api", "api development", "api integration",
-    "java", "python"
+    "aws services",
+    "aws",
+    "amazon web services",
+    "core it fundamentals",
+    "it fundamentals",
+    "cs fundamentals",
+    "computer science fundamentals",
+    "dbms",
+    "database management systems",
+    "databases",
+    "sql",
+    "os",
+    "operating systems",
+    "cn",
+    "computer networks",
+    "networking",
+    "tcp/ip",
+    "api handling",
+    "api",
+    "rest api",
+    "api development",
+    "api integration",
+    "java",
+    "python"
   ],
   "nice_atoms": []
 }}
 
-Example 2 - Complex Technical JD:
-INPUT: "Required: 5+ years Python, Django/Flask, PostgreSQL, AWS (Lambda, S3), Docker, REST APIs, microservices. Preferred: React, Redis, Kubernetes"
+Count: 24 atoms extracted. This is COMPLETE extraction.
 
-OUTPUT:
-{{
-  "must_atoms": [
-    "5+ years python", "python", "python 3",
-    "django", "flask",
-    "postgresql", "postgres", "sql",
-    "aws", "amazon web services", "aws lambda", "lambda", "aws s3", "s3",
-    "docker", "containerization",
-    "rest api", "api", "api development",
-    "microservices", "microservices architecture"
-  ],
-  "nice_atoms": [
-    "react", "reactjs",
-    "redis",
-    "kubernetes", "k8s", "container orchestration"
-  ]
-}}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ EXTRACTION CATEGORIES (scan JD for ALL of these)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📝 YOUR TASK
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Languages: Python, Java, JavaScript, TypeScript, C++, C#, Go, Ruby, PHP, Rust
+2. Frameworks: React, Angular, Vue, Django, Flask, FastAPI, Spring, Express, .NET
+3. Databases: PostgreSQL, MySQL, MongoDB, Redis, Cassandra, DynamoDB, SQL, NoSQL
+4. Cloud: AWS, Azure, GCP (+ specific services: Lambda, S3, EC2, etc.)
+5. DevOps: Docker, Kubernetes, Terraform, Ansible, Jenkins, CI/CD, GitLab CI
+6. CS Fundamentals: DBMS, OS, CN, DSA, OOP, algorithms, data structures
+7. APIs: REST API, GraphQL, gRPC, SOAP, API development, API handling
+8. Testing: Jest, pytest, JUnit, Selenium, unit testing, integration testing
+9. Security: OAuth, JWT, SSL/TLS, encryption, security practices
+10. Tools: Git, GitHub, VS Code, Postman, Jira, Confluence
+11. Methodologies: Agile, Scrum, Kanban, TDD, DevOps practices
+12. ML/AI: TensorFlow, PyTorch, scikit-learn, NLP, machine learning
+13. Experience: "5+ years Python", "3+ years", "senior level"
+14. Education: Bachelor's, Master's, Computer Science
+15. Certifications: AWS Certified, CKA, CKAD
 
-JOB DESCRIPTION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ RULES (MANDATORY)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. ✅ VARIATIONS ARE NOT DUPLICATES: "dbms" + "database management systems" = both needed
+2. ✅ EXPAND ALL ABBREVIATIONS: Never skip (DBMS/OS/CN) expansion
+3. ✅ SPLIT ALL SLASHES: "X/Y" = extract X and Y separately
+4. ❌ NO QUALIFIERS: Remove "good knowledge", "hands on", "highly skilled"
+5. ✅ LOWERCASE: All atoms lowercase
+6. ✅ CLASSIFY: "Required"/"Must" → must_atoms, "Preferred"/"Bonus" → nice_atoms
+7. ✅ TARGET: 20-60 must_atoms (more is better for matching)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 EXTRACT FROM THIS JD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 {jd[:5000]}
 
-INSTRUCTIONS:
-1. Read ENTIRE JD above word-by-word
-2. Extract EVERY technical term following the 4-step strategy
-3. Remove qualifiers, expand abbreviations, split compounds, add variations
-4. Deduplicate and normalize (lowercase)
-5. Classify as must_atoms or nice_atoms
-6. Return ONLY valid JSON (no markdown, no explanation)
+STEPS:
+1. Read ENTIRE JD above
+2. Find ALL technical terms (use 15 categories)
+3. Remove qualifiers
+4. Expand abbreviations (DBMS→full names, OS→full names, CN→full names)
+5. Split compounds
+6. Add variations
+7. Return ONLY valid JSON
 
-Return format:
+OUTPUT FORMAT:
 {{
-  "must_atoms": ["skill1", "skill2", ...],
-  "nice_atoms": ["skill1", "skill2", ...]
+  "must_atoms": ["atom1", "atom2", ...],
+  "nice_atoms": ["atom1", ...]
 }}
 """
 
