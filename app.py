@@ -478,114 +478,59 @@ hr::before{
     font-size:15px!important;
 }
 
-/* ===== IMMERSIVE FUTURISTIC PROGRESS BAR ===== */
-.stProgress{
-    margin:28px 0;
-    position:relative;
-    height:20px!important;
+/* ===== SIMPLIFIED GLOWY PROGRESS BAR ===== */
+.stProgress {
+    margin: 24px 0;
+    position: relative;
+    height: 12px !important;
 }
-.stProgress>div{
-    background:linear-gradient(135deg,
-        rgba(15,23,42,.95) 0%,
-        rgba(30,41,59,.9) 50%,
-        rgba(15,23,42,.95) 100%);
-    border-radius:24px!important;
-    overflow:visible!important;
-    box-shadow:
-        inset 0 2px 8px rgba(0,0,0,.6),
-        inset 0 -2px 4px rgba(255,255,255,.03),
-        0 4px 24px rgba(99,102,241,.15),
-        0 0 60px rgba(139,92,246,.08);
-    height:20px!important;
-    border:1.5px solid rgba(99,102,241,.25);
-    position:relative;
-    backdrop-filter:blur(10px);
+
+.stProgress > div {
+    background: linear-gradient(135deg, rgba(30,41,59,0.6), rgba(15,23,42,0.8));
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    box-shadow: 
+        inset 0 1px 3px rgba(0,0,0,0.4),
+        0 2px 8px rgba(99,102,241,0.2);
+    height: 12px !important;
+    border: 1px solid rgba(99,102,241,0.3);
+    position: relative;
 }
-.stProgress>div::before{
-    content:'';
-    position:absolute;
-    top:0;left:0;right:0;bottom:0;
-    border-radius:24px;
-    background:linear-gradient(90deg,
-        transparent 0%,
-        rgba(99,102,241,.08) 25%,
-        rgba(139,92,246,.12) 50%,
-        rgba(236,72,153,.08) 75%,
-        transparent 100%);
-    background-size:200% 100%;
-    animation:shimmerTrack 3s linear infinite;
-    opacity:0.6;
+
+.stProgress > div > div {
+    background: linear-gradient(90deg, 
+        #6366f1 0%, 
+        #8b5cf6 50%, 
+        #ec4899 100%);
+    border-radius: 12px !important;
+    box-shadow: 
+        0 0 20px rgba(139,92,246,0.8),
+        0 0 40px rgba(99,102,241,0.4),
+        inset 0 1px 2px rgba(255,255,255,0.3);
+    position: relative !important;
+    height: 12px !important;
+    transition: width 0.3s ease !important;
+    overflow: hidden !important;
 }
-@keyframes shimmerTrack{
-    0%{background-position:200% 0}
-    100%{background-position:-200% 0}
+
+/* Glowing shimmer effect */
+.stProgress > div > div::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(255,255,255,0.4), 
+        transparent);
+    animation: shimmer 2s infinite;
 }
-.stProgress>div>div{
-    background:linear-gradient(135deg,
-        #6366f1 0%,
-        #8b5cf6 25%,
-        #a855f7 50%,
-        #ec4899 75%,
-        #f43f5e 100%);
-    background-size:300% 100%;
-    border-radius:24px!important;
-    box-shadow:
-        0 0 30px rgba(139,92,246,.9),
-        0 0 50px rgba(99,102,241,.6),
-        0 0 80px rgba(236,72,153,.4),
-        inset 0 2px 6px rgba(255,255,255,.4),
-        inset 0 -1px 3px rgba(0,0,0,.3);
-    position:relative!important;
-    height:20px!important;
-    transition:width 0.4s cubic-bezier(0.4,0,0.2,1)!important;
-    animation:progressFlow 4s ease-in-out infinite;
-    overflow:visible!important;
-}
-@keyframes progressFlow{
-    0%{background-position:0% 50%;filter:brightness(1) saturate(1)}
-    50%{background-position:100% 50%;filter:brightness(1.3) saturate(1.2)}
-    100%{background-position:0% 50%;filter:brightness(1) saturate(1)}
-}
-.stProgress>div>div::before{
-    content:'';
-    position:absolute;
-    top:3px;left:6px;right:6px;
-    height:6px;
-    background:linear-gradient(90deg,
-        rgba(255,255,255,.6) 0%,
-        rgba(255,255,255,.3) 50%,
-        rgba(255,255,255,.1) 100%);
-    border-radius:12px;
-    opacity:0.8;
-}
-.stProgress>div>div::after{
-    content:'';
-    position:absolute;
-    top:50%;
-    right:-10px;
-    transform:translateY(-50%);
-    width:28px;
-    height:28px;
-    background:radial-gradient(circle at 35% 35%,
-        rgba(255,255,255,1) 0%,
-        rgba(236,72,153,1) 20%,
-        rgba(139,92,246,.95) 40%,
-        rgba(99,102,241,.7) 60%,
-        rgba(99,102,241,.3) 80%,
-        transparent 100%);
-    border-radius:50%;
-    box-shadow:
-        0 0 25px rgba(236,72,153,1),
-        0 0 45px rgba(139,92,246,.8),
-        0 0 65px rgba(99,102,241,.5),
-        inset 0 0 8px rgba(255,255,255,.5);
-    animation:orbPulse 2s ease-in-out infinite;
-    z-index:10;
-}
-@keyframes orbPulse{
-    0%{transform:translateY(-50%) scale(1);opacity:1;filter:brightness(1)}
-    50%{transform:translateY(-50%) scale(1.2);opacity:0.95;filter:brightness(1.4)}
-    100%{transform:translateY(-50%) scale(1);opacity:1;filter:brightness(1)}
+
+@keyframes shimmer {
+    0% { left: -100%; }
+    100% { left: 100%; }
 }
 
 /* ===== PREMIUM GLOWING SCROLLBAR ===== */
@@ -851,7 +796,42 @@ def init_postgresql():
         conn.commit()
         print("✅ PostgreSQL connected successfully!")
         print("📊 Database ready with tables: resumes, analyses")
-        st.success("💾 Database connected successfully!")
+        
+        # Beautiful fade-out success message
+        st.markdown("""
+        <style>
+        @keyframes databaseFadeOut {
+            0% { opacity: 0; transform: translateY(-20px); }
+            10% { opacity: 1; transform: translateY(0); }
+            85% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-10px); }
+        }
+        </style>
+        <div style="
+            position: fixed;
+            top: 80px;
+            right: 30px;
+            z-index: 9999;
+            background: linear-gradient(135deg, rgba(16,185,129,0.95), rgba(5,150,105,0.95));
+            color: white;
+            padding: 18px 28px;
+            border-radius: 16px;
+            box-shadow: 0 12px 40px rgba(16,185,129,0.5), 0 0 60px rgba(16,185,129,0.3);
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border: 2px solid rgba(255,255,255,0.3);
+            backdrop-filter: blur(10px);
+            animation: databaseFadeOut 4s ease-in-out forwards;
+        ">
+            <span style="font-size: 24px;">💾</span>
+            <span>Database Connected Successfully!</span>
+        </div>
+        """, unsafe_allow_html=True)
+        
         return conn, True
     except Exception as e:
         print(f"❌ PostgreSQL connection failed: {type(e).__name__}: {e}")
@@ -4744,6 +4724,27 @@ with tab1:
         
         llm = analysis['llm_analysis']
         
+        # Helper function to clean and format text
+        def format_text(value):
+            """Clean text from lists/dicts and format nicely."""
+            if isinstance(value, list):
+                # If it's a list, join with newlines or commas
+                if value and isinstance(value[0], str):
+                    return '<br>• '.join(str(v) for v in value if v)
+                return str(value[0]) if value else 'N/A'
+            elif isinstance(value, dict):
+                # If it's a dict, extract relevant text
+                if 'text' in value:
+                    return str(value['text'])
+                elif 'content' in value:
+                    return str(value['content'])
+                # Otherwise join values
+                return ' '.join(str(v) for v in value.values() if v)
+            elif isinstance(value, str):
+                return value
+            else:
+                return str(value) if value else 'N/A'
+        
         # Top Strengths Section - Ultra Immersive
         strengths = llm.get('top_strengths', [])[:4]
         if strengths:
@@ -4770,6 +4771,8 @@ with tab1:
             """, unsafe_allow_html=True)
             
             for idx, s in enumerate(strengths, 1):
+                # Format the strength text
+                strength_text = format_text(s)
                 st.markdown(f"""
                 <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
                             padding:26px;border-radius:20px;border-left:5px solid #10b981;
@@ -4786,7 +4789,7 @@ with tab1:
                         {idx}
                     </div>
                     <p style="margin:0;color:#f1f5f9;font-size:16px;line-height:1.9;padding-right:50px;font-weight:600;">
-                        ✓ {s}
+                        ✓ {strength_text}
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -4798,7 +4801,7 @@ with tab1:
         col1, col2 = st.columns(2, gap="large")
         
         with col1:
-            cultural_fit = str(llm.get('cultural_fit', 'N/A'))
+            cultural_fit = format_text(llm.get('cultural_fit', 'N/A'))
             st.markdown(f"""
             <div class="metric-card" style="background:linear-gradient(135deg,rgba(99,102,241,.22),rgba(139,92,246,.20));
                         border:3px solid rgba(99,102,241,.6);border-radius:28px;padding:38px;
@@ -4830,7 +4833,7 @@ with tab1:
             """, unsafe_allow_html=True)
         
         with col2:
-            technical_strength = str(llm.get('technical_strength', 'N/A'))
+            technical_strength = format_text(llm.get('technical_strength', 'N/A'))
             st.markdown(f"""
             <div class="metric-card" style="background:linear-gradient(135deg,rgba(236,72,153,.22),rgba(139,92,246,.20));
                         border:3px solid rgba(236,72,153,.6);border-radius:28px;padding:38px;
@@ -4888,6 +4891,7 @@ with tab1:
             """, unsafe_allow_html=True)
             
             for idx, area in enumerate(dev_areas, 1):
+                area_text = format_text(area)
                 st.markdown(f"""
                 <div style="background:linear-gradient(135deg,rgba(21,10,46,.85),rgba(13,2,33,.85));
                             padding:26px;border-radius:20px;border-left:5px solid #f59e0b;
@@ -4905,7 +4909,7 @@ with tab1:
                         {idx}
                     </span>
                     <p style="margin:0;color:#f1f5f9;font-size:16px;line-height:1.9;font-weight:600;position:relative;z-index:1;">
-                        {area}
+                        {area_text}
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -4927,7 +4931,7 @@ with tab1:
                            text-shadow:0 4px 20px rgba(99,102,241,.8);">Final Recommendation</h3>
             </div>
             <p style="margin:0;font-size:16px;line-height:1.9;color:#f1f5f9;font-weight:500;position:relative;z-index:1;">
-        """ + str(llm.get('overall_comment', 'Pending analysis'))[:500] + """
+        """ + format_text(llm.get('overall_comment', 'Pending analysis'))[:500] + """
             </p>
         </div>
         """, unsafe_allow_html=True)
