@@ -1326,20 +1326,99 @@ def _is_valid_atom(atom: str):
     return True  # Default to accepting if passed all filters above
 
 def _canonical_atom(atom: str, nlp=None):
+    """
+    Create canonical form for deduplication, merging abbreviations with full forms.
+    Examples: 'OS' and 'Operating Systems' → same canonical
+    """
     s = normalize_text(atom)
     if not s:
         return ""
+    
+    # Common tech abbreviation mappings (for deduplication)
+    abbreviation_map = {
+        # CS Fundamentals
+        'os': 'operating system',
+        'operating systems': 'operating system',
+        'dbms': 'database management system',
+        'database management systems': 'database management system',
+        'cn': 'computer network',
+        'computer networks': 'computer network',
+        'ds': 'data structure',
+        'data structures': 'data structure',
+        'algo': 'algorithm',
+        'algorithms': 'algorithm',
+        'oop': 'object oriented programming',
+        'oops': 'object oriented programming',
+        'object oriented': 'object oriented programming',
+        
+        # Cloud & DevOps
+        'aws': 'amazon web services',
+        'amazon web services': 'amazon web services',
+        'gcp': 'google cloud platform',
+        'google cloud': 'google cloud platform',
+        'k8s': 'kubernetes',
+        'ci cd': 'continuous integration',
+        'ci/cd': 'continuous integration',
+        
+        # Databases
+        'postgres': 'postgresql',
+        'postgresql': 'postgresql',
+        'mongo': 'mongodb',
+        'mongodb': 'mongodb',
+        
+        # Languages
+        'js': 'javascript',
+        'javascript': 'javascript',
+        'ts': 'typescript',
+        'typescript': 'typescript',
+        'py': 'python',
+        
+        # Frameworks
+        'reactjs': 'react',
+        'react.js': 'react',
+        'nodejs': 'node',
+        'node.js': 'node',
+        'vuejs': 'vue',
+        'vue.js': 'vue',
+        
+        # APIs
+        'rest api': 'rest',
+        'restful': 'rest',
+        'rest apis': 'rest',
+        'graphql api': 'graphql',
+        
+        # ML/AI
+        'ml': 'machine learning',
+        'ai': 'artificial intelligence',
+        'nlp': 'natural language processing',
+        'cv': 'computer vision',
+    }
+    
+    # Check if atom maps to a canonical form
+    if s in abbreviation_map:
+        return abbreviation_map[s]
+    
+    # Use NLP lemmatization for other terms
     if nlp is not None:
         try:
             doc = nlp(s)
             lemmas = [t.lemma_.lower() for t in doc if re.match(r"[a-z0-9][a-z0-9+.#-]*", t.lemma_.lower())]
             canned = " ".join(lemmas)
+            if canned and canned in abbreviation_map:
+                return abbreviation_map[canned]
             if canned:
                 return canned
         except Exception:
             pass
+    
     tokens = _tokenize_atom(s)
-    return " ".join(tokens)
+    canonical = " ".join(tokens)
+    
+    # Final check if tokenized form maps to canonical
+    if canonical in abbreviation_map:
+        return abbreviation_map[canonical]
+    
+    return canonical
 
 def refine_atom_list(atoms, nlp=None, reserved_canonicals=None, limit=50):
     """
@@ -1396,12 +1475,57 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
             chunk_embs = None
 
     def get_best_resume_evidence(requirement, top_k=5):
-        """Find the most relevant resume sections for this requirement."""
+        """
+        Find the most relevant resume sections for this requirement.
+        Uses hybrid approach: semantic search + keyword matching for better accuracy.
+        """
         if not requirement:
             return [], 0.0
         
         evidence = []
         similarities = []
+        keyword_boost_applied = False
+        
+        # Helper: Check if requirement keywords exist in text
+        def has_keyword_match(text, req):
+            """Check for keyword/phrase match with variations."""
+            text_lower = text.lower()
+            req_lower = req.lower()
+            
+            # Direct match
+            if req_lower in text_lower:
+                return True
+            
+            # Check for abbreviation/full form matches
+            abbrev_variants = {
+                'operating system': ['operating system', 'os ', ' os', 'os,', 'os.', 'os)', 'os/'],
+                'database management': ['dbms', 'database management', 'database systems'],
+                'computer network': ['computer network', 'networking', ' cn ', 'cn,', 'cn.'],
+                'data structure': ['data structure', 'ds ', ' ds,', 'ds.'],
+                'object oriented': ['oop', 'object oriented', 'object-oriented'],
+                'aws': ['aws', 'amazon web service'],
+                'kubernetes': ['kubernetes', 'k8s'],
+                'javascript': ['javascript', 'js ', ' js,', 'js.'],
+                'typescript': ['typescript', 'ts '],
+                'postgresql': ['postgresql', 'postgres'],
+                'mongodb': ['mongodb', 'mongo'],
+            }
+            
+            # Check variants
+            for full_form, variants in abbrev_variants.items():
+                if full_form in req_lower:
+                    if any(v in text_lower for v in variants):
+                        return True
+            
+            # Check individual important words (for compound requirements)
+            req_words = [w for w in req_lower.split() if len(w) > 2]
+            if len(req_words) >= 2:
+                # For multi-word requirements, check if most words are present
+                matches = sum(1 for w in req_words if w in text_lower)
+                if matches >= len(req_words) * 0.6:  # 60% of words present
+                    return True
+            
+            return False
         
         # Use FAISS if available (faster)
         if faiss_index is not None and resume_chunks and embedder:
@@ -1409,6 +1533,12 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
                 results = retrieve_relevant_context(requirement, faiss_index, resume_chunks, embedder, top_k=top_k)
                 for text, sim in results:
                     sim = float(np.clip(sim, 0.0, 1.0))
+                    
+                    # Boost similarity if keyword match found
+                    if has_keyword_match(text, requirement):
+                        sim = min(0.95, sim + 0.30)  # +30% boost, cap at 0.95
+                        keyword_boost_applied = True
+                    
                     evidence.append({"text": text[:300], "similarity": round(sim, 3)})
                     similarities.append(sim)
             except Exception:
@@ -1427,11 +1557,31 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
                 for idx in top_indices:
                     if 0 <= idx < len(resume_chunks):
                         sim = float(np.clip(sims[idx], 0.0, 1.0))
+                        
+                        # Boost similarity if keyword match found
+                        if has_keyword_match(resume_chunks[idx], requirement):
+                            sim = min(0.95, sim + 0.30)  # +30% boost
+                            keyword_boost_applied = True
+                        
                         if sim > 0.3:  # Only include relevant matches
                             evidence.append({"text": resume_chunks[idx][:300], "similarity": round(sim, 3)})
                             similarities.append(sim)
             except Exception:
                 pass
+        
+        # Additional keyword search if semantic search fails
+        if not similarities or max(similarities) < 0.50:
+            # Search entire resume text for keyword matches
+            for chunk in (resume_chunks or []):
+                if has_keyword_match(chunk, requirement):
+                    # Found keyword match that semantic search missed
+                    boosted_sim = 0.70  # Assign decent similarity for keyword match
+                    if chunk[:300] not in [e["text"] for e in evidence]:
+                        evidence.append({"text": chunk[:300], "similarity": round(boosted_sim, 3)})
+                        similarities.append(boosted_sim)
+                        keyword_boost_applied = True
+                    if len(evidence) >= top_k:
+                        break
         
         max_sim = max(similarities) if similarities else 0.0
         return evidence[:top_k], round(max_sim, 3)
@@ -1629,44 +1779,118 @@ def llm_verify_requirements_clean(model, requirements_payload, resume_text):
                 "evidence": evidence_snippets
             })
         
-        prompt = f"""Verify if each requirement is met by candidate's resume. Provide UNIQUE, SPECIFIC assessments.
+        prompt = f"""You are an expert technical recruiter analyzing a candidate's resume for specific requirements. Your task is to provide UNIQUE, SPECIFIC assessments for each requirement.
 
-**REQUIREMENTS**:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 REQUIREMENTS TO VERIFY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 {json.dumps(formatted_reqs, indent=2)}
 
-**RESUME**:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📄 CANDIDATE'S RESUME
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 {resume_excerpt}
 
-**ASSESSMENT** (for each requirement):
-1. present (bool): Skill used in projects? (true if used, false if only listed/not mentioned)
-2. confidence (0.0-1.0): 
-   - 0.9-1.0: Multiple projects with details
-   - 0.7-0.8: Used in ≥1 project clearly
-   - 0.5-0.6: Listed with minimal context
-   - 0.3-0.4: Weak/indirect
-   - 0.0-0.2: Not found
-3. rationale (15-25 words): MUST mention PROJECT NAME/CONTEXT where used
-   ✅ "Python in E-commerce API for backend services"
-   ✅ "No PostgreSQL; uses MySQL in Project X"
-   ❌ "Clearly demonstrated" (generic)
-   ❌ "Mentioned in resume" (vague)
-4. evidence (20-40 words): Quote with project context (empty if absent)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 ASSESSMENT CRITERIA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**MATCHING**:
-✅ Accept: Python=Python, K8s=Kubernetes, React 18=React
-❌ Reject: MySQL≠PostgreSQL, "databases"≠MongoDB, list-only (conf<0.6)
+For EACH requirement, provide:
 
-**CRITICAL**: Each rationale MUST be UNIQUE with specific project/context. NO generic phrases.
+1. **present** (boolean): Is the skill/technology actually used?
+   ✅ TRUE if: Mentioned in projects/experience + specific use cases described
+   ❌ FALSE if: Not mentioned OR only in skills list without usage proof
 
-**OUTPUT** (JSON only, no markdown):
+2. **confidence** (0.0 to 1.0): Certainty level
+   - 0.9-1.0: Used in multiple projects with detailed descriptions
+   - 0.7-0.8: Used in at least one project with clear description
+   - 0.5-0.6: Mentioned with minimal context or only in skills list
+   - 0.3-0.4: Weak/indirect mention or possible related skill
+   - 0.0-0.2: Not found or only vague reference
+
+3. **rationale** (15-25 words): SPECIFIC, UNIQUE explanation
+   ⚠️ MUST BE UNIQUE PER REQUIREMENT - Don't use generic phrases!
+   ✅ GOOD: "Used Python in E-commerce Platform project for backend APIs and data processing"
+   ✅ GOOD: "No PostgreSQL mention; uses MySQL in Project X instead"
+   ✅ GOOD: "React expertise shown in Healthcare Dashboard with Redux state management"
+   ❌ BAD: "Clearly demonstrated in projects" (too generic)
+   ❌ BAD: "Mentioned in resume" (too vague)
+   ❌ BAD: "Experience with technology" (not specific)
+   
+   REQUIRED FORMAT:
+   - If present=true: Mention the PROJECT NAME or CONTEXT where used
+   - If present=false: State what's missing or what alternative is used instead
+
+4. **evidence** (20-40 words): Direct quote with PROJECT CONTEXT
+   - Include the PROJECT/COMPANY NAME if possible
+   - Quote the SPECIFIC LINE that proves usage
+   - If not present, leave empty ("")
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ MATCHING RULES (CRITICAL - READ CAREFULLY)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**⚠️ ABBREVIATIONS = FULL FORMS (treat as SAME):**
+- OS = Operating Systems = Operating System
+- DBMS = Database Management Systems = Database Management System
+- CN = Computer Networks = Computer Networking
+- DS = Data Structures = Data Structure
+- OOP = Object Oriented Programming = Object-Oriented
+- AWS = Amazon Web Services
+- K8s = Kubernetes
+- JS = JavaScript
+- TS = TypeScript
+- PostgreSQL = Postgres
+- MongoDB = Mongo
+
+**✅ Accept as matches:**
+- Exact/common names: Python=Python
+- Abbreviations: If resume has "OS", requirement "Operating Systems" is MET
+- Versions: React 18 satisfies "React"
+- Specifics: Django REST satisfies "Django"
+- Skills list + ANY project usage = PRESENT (confidence 0.5-0.6)
+- Skills list + detailed project = PRESENT (confidence 0.7-0.9)
+
+**❌ Reject as non-matches:**
+- Wrong tech: MySQL ≠ PostgreSQL
+- Vague: "databases" ≠ "MongoDB"
+- Insufficient duration: "1 yr Python" ≠ "5+ yrs Python"
+- List-only: Skill listed but zero project usage = LOW confidence (0.4-0.5)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📤 OUTPUT FORMAT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Return ONLY valid JSON (no markdown, no ```json):
+
 {{
-  "req_name": {{
+  "requirement_name": {{
     "present": true/false,
     "confidence": 0.0-1.0,
-    "rationale": "specific explanation with project (15-25 words)",
-    "evidence": "quote with project name or empty"
+    "rationale": "Specific explanation mentioning project/context (15-25 words)",
+    "evidence": "Quoted text with project name (if present, else empty)"
   }}
 }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ CRITICAL ANTI-REPETITION RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Each rationale MUST be UNIQUE - no copy-paste explanations
+2. MUST mention specific PROJECT NAMES or CONTEXTS from resume
+3. NO generic phrases like "demonstrated", "mentioned", "experience with"
+4. If skill is absent, explain WHY or what's used INSTEAD
+5. Be forensic: cite actual project names, company names, or specific contexts
+
+EXAMPLE OF GOOD (UNIQUE, SPECIFIC) RATIONALES:
+- "Python used extensively in E-commerce Platform project for REST API development and data pipelines"
+- "No Docker mentioned; deployment appears to be traditional VM-based per DevOps section"
+- "Strong React skills evidenced in Healthcare Dashboard project using hooks and context API"
+- "AWS mentioned in resume but only S3 storage; no Lambda or serverless experience shown"
+
+BEGIN ANALYSIS:
 """
 
         try:
@@ -2121,45 +2345,149 @@ Return ONLY valid JSON. No markdown, no explanations.
 """
 
 def atomicize_requirements_prompt(jd, resume_preview):
-    return f"""Extract ALL technical requirements from this job description in structured categories.
+    return f"""You are an expert technical recruiter analyzing a job description. Extract ALL requirements in a structured, comprehensive way.
 
-**CATEGORIES** (classify each as must/nice):
-1. hard_skills: Languages, frameworks, databases, cloud, tools (Python, React, AWS, Docker, etc.)
-2. fundamentals: CS concepts (DBMS, OS, algorithms, system design, etc.)
-3. experience: Years required, seniority level, domain experience
-4. qualifications: Degrees, certifications
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 EXTRACTION CATEGORIES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**RULES**:
-✅ Extract EVERY specific tech mentioned (include abbreviations: AWS, K8s, JS)
-✅ Split compounds: "Java/Python" → ["Java", "Python"]
-✅ Add variations: "JavaScript" → ["JavaScript", "JS"]
-✅ Include versions: "Python 3.x", "React 18"
-✅ Classify: "required/essential/mandatory" → must, "preferred/bonus" → nice
-❌ Skip: Soft skills, generic terms ("experience", "good knowledge")
+Extract requirements into 4 distinct categories:
 
-**EXAMPLES**:
-IN: "Required: 5+ yrs Python, Django, PostgreSQL. Preferred: AWS, React"
-OUT:
+1. **hard_skills**: Technical skills, technologies, tools, frameworks
+   - Languages: Python, Java, JavaScript, C++, Go, Rust, etc.
+   - Frameworks: React, Angular, Django, Flask, Spring Boot, etc.
+   - Databases: PostgreSQL, MySQL, MongoDB, Redis, Cassandra, etc.
+   - Cloud: AWS, Azure, GCP, specific services (Lambda, S3, EC2, etc.)
+   - DevOps: Docker, Kubernetes, Jenkins, CI/CD, Terraform, etc.
+   - Tools: Git, Postman, VS Code, JIRA, etc.
+   - Concepts: REST API, GraphQL, Microservices, OOP, etc.
+
+2. **fundamentals**: Core CS/IT concepts and foundations
+   - DBMS, Operating Systems, Computer Networks, Data Structures
+   - Algorithms, System Design, Software Architecture
+   - Security principles, Design patterns, etc.
+
+3. **experience**: Years of experience, seniority, specific domains
+   - "5+ years Python", "3 years backend development"
+   - "Senior level", "Mid-level", "Experience with fintech"
+   - Industry experience requirements
+
+4. **qualifications**: Education, certifications, degrees
+   - "Bachelor's in CS", "Master's preferred"
+   - "AWS Certified", "PMP Certification"
+   - Specific degree requirements
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 EXTRACTION RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ **DO:**
+- Extract EVERY specific technology/tool mentioned
+- Include common abbreviations (AWS, K8s, JS, etc.)
+- Extract version-specific mentions (Python 3.x, React 18, etc.)
+- Include compound skills as separate items (Django/Flask → both)
+- Keep original casing for proper nouns (React, MongoDB, AWS)
+- Extract implicit requirements (mentions "Lambda" → add "AWS")
+
+❌ **DON'T:**
+- Include vague qualifiers ("good knowledge", "strong understanding")
+- Extract generic words ("experience", "skills", "work")
+- Include soft skills here (teamwork, communication) - skip these
+- Add items not in the JD
+- Be repetitive (don't list "Python" 10 times)
+
+⚠️ **AVOID REDUNDANT ABBREVIATION/FULL FORM DUPLICATES:**
+- If JD says "Operating Systems", extract ONLY "Operating Systems" (not both "OS" + "Operating Systems")
+- If JD says "OS", extract ONLY "OS" (not both)
+- If JD says "DBMS", extract ONLY "DBMS" (not "Database Management Systems" too)
+- Exception: If JD explicitly uses BOTH forms, then include both
+- Our system automatically maps abbreviations to full forms, so one is enough
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔍 PRIORITY CLASSIFICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For each category, classify items as MUST-HAVE or NICE-TO-HAVE:
+
+**must**: Required, mandatory, essential
+- Keywords: "required", "must have", "essential", "mandatory"
+- Core tech stack items
+- Minimum experience requirements
+
+**nice**: Preferred, bonus, optional
+- Keywords: "preferred", "nice to have", "bonus", "plus"
+- Secondary technologies
+- "Good to have" items
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 EXAMPLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Example 1:**
+INPUT: "Required: 5+ years Python, strong Django/Flask experience, PostgreSQL, Docker. Core IT fundamentals (DBMS/OS/CN) essential. Bachelor's in CS required. Preferred: AWS, Kubernetes, React."
+
+OUTPUT:
 {{
-  "hard_skills": {{"must": ["Python", "Django", "PostgreSQL"], "nice": ["AWS", "React"]}},
-  "fundamentals": {{"must": [], "nice": []}},
-  "experience": {{"must": ["5+ years Python"], "nice": []}},
-  "qualifications": {{"must": [], "nice": []}}
+  "hard_skills": {{
+    "must": ["Python", "Django", "Flask", "PostgreSQL", "Docker"],
+    "nice": ["AWS", "Kubernetes", "React"]
+  }},
+  "fundamentals": {{
+    "must": ["DBMS", "OS", "CN"],
+    "nice": []
+  }},
+  "experience": {{
+    "must": ["5+ years Python experience"],
+    "nice": []
+  }},
+  "qualifications": {{
+    "must": ["Bachelor's in Computer Science"],
+    "nice": []
+  }}
 }}
 
-IN: "Node.js, MongoDB, REST APIs, Docker. CS fundamentals (DBMS/OS) essential. Nice: TypeScript"
-OUT:
+Note: Only "DBMS", "OS", "CN" extracted (not full forms) because JD uses abbreviations. Our system handles the mapping automatically.
+
+**Example 2:**
+INPUT: "Looking for Full Stack Engineer with React, Node.js, MongoDB. Good understanding of REST APIs, microservices. Experience with AWS Lambda, S3. Agile methodology. Nice to have: TypeScript, GraphQL, Redis."
+
+OUTPUT:
 {{
-  "hard_skills": {{"must": ["Node.js", "Node", "MongoDB", "Mongo", "REST API", "Docker"], "nice": ["TypeScript", "TS"]}},
-  "fundamentals": {{"must": ["DBMS", "OS", "Database Management", "Operating Systems"], "nice": []}},
-  "experience": {{"must": [], "nice": []}},
-  "qualifications": {{"must": [], "nice": []}}
+  "hard_skills": {{
+    "must": ["React", "Node.js", "Node", "MongoDB", "Mongo", "REST API", "REST", "Microservices", "AWS Lambda", "Lambda", "AWS S3", "S3", "AWS", "Agile"],
+    "nice": ["TypeScript", "TS", "GraphQL", "Redis"]
+  }},
+  "fundamentals": {{
+    "must": [],
+    "nice": []
+  }},
+  "experience": {{
+    "must": ["Full Stack development experience"],
+    "nice": []
+  }},
+  "qualifications": {{
+    "must": [],
+    "nice": []
+  }}
 }}
 
-**JOB DESCRIPTION**:
-{jd[:4500]}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📄 JOB DESCRIPTION TO ANALYZE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Return ONLY valid JSON, no markdown:
+{jd[:6000]}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ CRITICAL INSTRUCTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Read the ENTIRE job description above
+2. Extract EVERY specific technical requirement
+3. Be thorough - missing skills hurts accuracy
+4. Return ONLY valid JSON (no markdown, no explanations)
+5. Use the EXACT structure shown in examples
+
+BEGIN EXTRACTION:
 """
 
 def analysis_prompt(jd, plan, profile, coverage_summary, cue_alignment, global_sem, cov_final):
