@@ -2112,7 +2112,143 @@ Return ONLY valid JSON. No markdown, no explanations.
 """
 
 def atomicize_requirements_prompt(jd, resume_preview):
-    return f"""MISSION: Extract EVERY technical skill from this JD with ZERO TOLERANCE for missing skills.
+    return f"""Extract technical skills from this job description. Follow rules EXACTLY to avoid gibberish.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 EXTRACTION RULES (STRICT - NO EXCEPTIONS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+RULE 1: ONLY EXTRACT REAL TECHNICAL TERMS
+✅ Extract: python, java, aws, docker, kubernetes, react, sql, api
+❌ NEVER extract: "good knowledge", "hands on", "strong", "experience with", "skilled in"
+
+RULE 2: EXPAND ABBREVIATIONS IN PARENTHESES
+When you see "(DBMS/OS/CN)":
+✅ Extract: dbms, os, cn, database management systems, operating systems, computer networks
+❌ DO NOT extract: "dbms/os/cn" as one term
+
+RULE 3: SPLIT SLASHES - ALWAYS SEPARATE
+"Java/Python" → Extract BOTH: java, python (as separate atoms)
+"Django/Flask" → Extract BOTH: django, flask
+"AWS (Lambda, S3)" → Extract: aws, lambda, s3
+
+RULE 4: ADD ONLY STANDARD VARIATIONS (limit 2-3 per skill)
+✅ "python" → Add: python 3
+✅ "javascript" → Add: js
+✅ "kubernetes" → Add: k8s
+❌ DO NOT add made-up variations or synonyms
+
+RULE 5: KEEP ATOMS SHORT (1-4 words MAX)
+✅ Good: "aws lambda", "rest api", "machine learning"
+❌ Bad: "experience with aws lambda", "good understanding of rest api"
+
+RULE 6: NO GIBBERISH - ONLY REAL TECHNOLOGIES
+✅ Real: python, java, docker, kubernetes, postgresql, react, tensorflow
+❌ Gibberish: "pythonic", "javanese", "dockerized apps", "kubernetesian"
+
+RULE 7: AVOID EXCESSIVE REPETITION
+✅ Good: "api", "rest api", "api development" (3 related terms)
+❌ Bad: "api", "rest api", "api development", "api integration", "api handling", "api testing" (too many)
+
+RULE 8: LOWERCASE EVERYTHING
+✅ "python", "aws", "docker"
+❌ "Python", "AWS", "Docker"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 CORRECT EXAMPLE (STUDY THIS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+INPUT JD:
+"Good Knowledge with AWS services, Core IT fundamentals (DBMS/OS/CN), API handling, Strong foundation in Java/Python"
+
+CORRECT EXTRACTION:
+{{
+  "must_atoms": [
+    "aws",
+    "aws services",
+    "it fundamentals",
+    "dbms",
+    "database management systems",
+    "os",
+    "operating systems",
+    "cn",
+    "computer networks",
+    "networking",
+    "api",
+    "rest api",
+    "java",
+    "python"
+  ],
+  "nice_atoms": []
+}}
+
+WHY THIS IS CORRECT:
+✅ Removed qualifiers: "good knowledge", "core", "strong foundation"
+✅ Expanded "(DBMS/OS/CN)": Each abbreviation + full name
+✅ Split "Java/Python": Two separate atoms
+✅ Limited variations: Only "aws" + "aws services", "api" + "rest api"
+✅ All lowercase, short, real technical terms
+✅ NO gibberish, NO excessive repetition
+✅ Total: 14 atoms (clean and focused)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+❌ WRONG EXAMPLE (DO NOT DO THIS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WRONG OUTPUT (Too repetitive, gibberish, qualifiers):
+{{
+  "must_atoms": [
+    "good knowledge",  ❌ Qualifier - not a skill
+    "aws", "amazon web services", "aws services", "aws cloud", "aws platform",  ❌ Too many AWS variations
+    "api", "rest api", "api handling", "api development", "api integration", "api testing", "api design",  ❌ Too repetitive
+    "java/python",  ❌ Should be split
+    "pythonic programming",  ❌ Gibberish
+    "strong foundation in java"  ❌ Contains qualifier
+  ]
+}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 WHAT TO EXTRACT (CATEGORIES)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Extract ONLY if explicitly mentioned in JD:
+
+1. Programming Languages: python, java, javascript, typescript, c++, go, ruby, php
+2. Frameworks: react, angular, vue, django, flask, spring, express
+3. Databases: postgresql, mysql, mongodb, redis, sql, nosql
+4. Cloud: aws, azure, gcp (+ services: lambda, s3, ec2)
+5. DevOps: docker, kubernetes, terraform, ci/cd, jenkins
+6. CS Fundamentals: dbms, os, cn, algorithms, data structures, oop
+7. APIs: api, rest api, graphql, soap
+8. Testing: pytest, junit, unit testing, integration testing
+9. Tools: git, github, postman, jira
+10. ML/AI: tensorflow, pytorch, machine learning, nlp
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 NOW EXTRACT FROM THIS JOB DESCRIPTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+JOB DESCRIPTION:
+{jd[:5000]}
+
+EXTRACTION CHECKLIST:
+1. ✅ Read entire JD above
+2. ✅ Find technical terms (use 10 categories)
+3. ✅ Remove ALL qualifiers ("good", "hands on", "strong", etc.)
+4. ✅ Expand abbreviations like "(DBMS/OS/CN)"
+5. ✅ Split slashes: "X/Y" → extract X and Y separately
+6. ✅ Add max 1-2 variations per skill (only standard ones)
+7. ✅ Keep atoms 1-4 words, all lowercase
+8. ✅ Classify: "Required"/"Must" → must_atoms, "Preferred" → nice_atoms
+9. ✅ Target: 10-30 atoms (quality over quantity)
+10. ✅ NO gibberish, NO excessive repetition, NO qualifiers
+
+REQUIRED OUTPUT FORMAT (JSON only, no explanations):
+{{
+  "must_atoms": ["atom1", "atom2", ...],
+  "nice_atoms": ["atom1", ...]
+}}
+"""
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔴 CRITICAL: ABBREVIATIONS IN PARENTHESES LIKE "(DBMS/OS/CN)" MUST BE FULLY EXPANDED
