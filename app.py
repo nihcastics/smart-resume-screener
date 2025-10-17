@@ -809,26 +809,26 @@ def init_postgresql():
         </style>
         <div style="
             position: fixed;
-            top: 80px;
+            top: 20px;
             right: 30px;
-            z-index: 9999;
+            z-index: 10000;
             background: linear-gradient(135deg, rgba(16,185,129,0.95), rgba(5,150,105,0.95));
             color: white;
-            padding: 18px 28px;
-            border-radius: 16px;
-            box-shadow: 0 12px 40px rgba(16,185,129,0.5), 0 0 60px rgba(16,185,129,0.3);
+            padding: 15px 24px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(16,185,129,0.4), 0 0 50px rgba(16,185,129,0.25);
             font-family: 'Inter', sans-serif;
             font-weight: 600;
-            font-size: 15px;
+            font-size: 14px;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             border: 2px solid rgba(255,255,255,0.3);
             backdrop-filter: blur(10px);
             animation: databaseFadeOut 4s ease-in-out forwards;
         ">
-            <span style="font-size: 24px;">💾</span>
-            <span>Database Connected Successfully!</span>
+            <span style="font-size: 20px;">💾</span>
+            <span>Database Connected!</span>
         </div>
         """, unsafe_allow_html=True)
         
@@ -2108,6 +2108,21 @@ def atomicize_requirements_prompt(jd, resume_preview):
 
 ⚠️ CRITICAL INSTRUCTION: Read the ENTIRE job description word-by-word. Extract ALL technical terms, technologies, tools, frameworks, skills, and qualifications mentioned ANYWHERE in the text. DO NOT skip sections. DO NOT summarize. EXTRACT EVERYTHING.
 
+🎯 SKILL EXTRACTION FROM DESCRIPTIVE PHRASES:
+When you encounter descriptive phrases, extract the ACTUAL SKILL/TECHNOLOGY, not the description:
+  ❌ WRONG: "Highly skilled in" → Do NOT extract this phrase
+  ✅ CORRECT: "Highly skilled in AWS Services" → Extract: "aws services", "aws"
+  ✅ CORRECT: "Must know good security practice" → Extract: "security", "security best practices", "security practices"
+  ✅ CORRECT: "Should have good knowledge in core computer fundamentals" → Extract: "computer fundamentals", "computer science fundamentals", "cs fundamentals"
+  ✅ CORRECT: "Experience with Java" → Extract: "java" (not "experience with")
+  ✅ CORRECT: "Strong understanding of Docker" → Extract: "docker" (not "strong understanding")
+  ✅ CORRECT: "Proficient in Python" → Extract: "python" (not "proficient in")
+
+PHRASE CLEANING RULES:
+  → Remove qualifiers: "highly skilled", "must know", "should have", "good knowledge", "strong", "excellent", "proficient"
+  → Remove verbs: "skilled in", "experience with", "knowledge of", "understanding of", "working with"
+  → Keep only the CORE TECHNICAL TERM or CONCEPT
+
 Return ONLY valid JSON with these exact keys:
 - must_atoms: Array of CRITICAL/REQUIRED technical requirements (20-50 items, 2-8 words each)
 - nice_atoms: Array of OPTIONAL/BONUS technical requirements (10-35 items, 2-8 words each)
@@ -2232,6 +2247,42 @@ OUTPUT:
 ✅ Extracted all data science libraries mentioned
 ✅ Added synonyms for better matching: "llms" + "large language models"
 
+Example 4 - Descriptive Phrases (CRITICAL - Study This):
+INPUT: "Highly skilled in AWS Services, Must know good security practice, should have good knowledge in core computer fundamentals, Strong understanding of CI/CD pipelines"
+
+OUTPUT:
+{{
+  "must_atoms": ["aws services", "aws", "security", "security best practices", "security practices", "computer fundamentals", "computer science fundamentals", "cs fundamentals", "ci/cd", "ci/cd pipelines", "continuous integration", "continuous deployment"],
+  "nice_atoms": []
+}}
+✅ Removed: "highly skilled", "must know", "good knowledge", "strong understanding"
+✅ Extracted: Only the technical concepts and their variations
+✅ Expanded: "AWS Services" → ["aws services", "aws"]
+✅ Expanded: "security practice" → ["security", "security best practices", "security practices"]
+✅ Expanded: "computer fundamentals" → ["computer fundamentals", "computer science fundamentals", "cs fundamentals"]
+✅ Expanded: "CI/CD pipelines" → ["ci/cd", "ci/cd pipelines", "continuous integration", "continuous deployment"]
+
+Example 5 - Mixed Descriptive and Technical:
+INPUT: "Proficient in Java and Spring Boot, experience with Kubernetes orchestration, good understanding of database design, familiar with Agile methodologies"
+
+OUTPUT:
+{{
+  "must_atoms": ["java", "spring boot", "spring", "kubernetes", "kubernetes orchestration", "container orchestration", "database design", "database", "sql", "agile", "agile methodologies", "scrum"],
+  "nice_atoms": []
+}}
+✅ Cleaned verbs: "proficient in", "experience with", "understanding of", "familiar with"
+✅ Extracted core skills with variations for better matching
+✅ Added related terms: "container orchestration" (relates to Kubernetes), "sql" (relates to database)
+
+OUTPUT:
+{{
+  "must_atoms": ["python", "tensorflow", "pytorch", "scikit-learn", "deep learning", "nlp", "docker", "kubernetes", "aws", "gcp", "sql", "pandas", "numpy", "5+ years ml", "machine learning"],
+  "nice_atoms": ["ms computer science", "master computer science", "mlflow", "airflow", "spark", "llms", "large language models"]
+}}
+✅ Split "TensorFlow or PyTorch" into both options
+✅ Extracted all data science libraries mentioned
+✅ Added synonyms for better matching: "llms" + "large language models"
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📝 YOUR EXTRACTION TASK - EXECUTE WITH PRECISION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2246,39 +2297,53 @@ RESUME PREVIEW (For context ONLY - DO NOT extract from this, only from JD above)
 ⚠️ MANDATORY EXTRACTION RULES - NO EXCEPTIONS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. COMPLETENESS: Extract EVERY technical term, technology, tool, framework, skill mentioned in JD
+1. CLEAN DESCRIPTIVE PHRASES: Remove qualifier words, keep only technical terms
+   → "Highly skilled in AWS Services" → Extract: ["aws services", "aws"] (NOT "highly skilled")
+   → "Must know security practice" → Extract: ["security", "security practices", "security best practices"]
+   → "Good knowledge in Java" → Extract: ["java"] (NOT "good knowledge")
+   → "Strong understanding of Docker" → Extract: ["docker"] (NOT "strong understanding")
+   🚫 NEVER extract: "highly skilled", "must know", "good knowledge", "strong understanding", "proficient in", "experience with"
+   ✅ ALWAYS extract: The actual technology/skill name and common variations
+
+2. EXPAND TECHNICAL TERMS: Create variations for better matching
+   → "AWS Services" → ["aws services", "aws", "amazon web services"]
+   → "security practice" → ["security", "security practices", "security best practices"]
+   → "computer fundamentals" → ["computer fundamentals", "computer science fundamentals", "cs fundamentals"]
+   → "CI/CD" → ["ci/cd", "ci/cd pipelines", "continuous integration", "continuous deployment"]
+
+3. COMPLETENESS: Extract EVERY technical term, technology, tool, framework, skill mentioned in JD
    → Scan Requirements, Responsibilities, Qualifications, About sections - miss NOTHING
    
-2. GRANULARITY: Extract both general AND specific terms
+4. GRANULARITY: Extract both general AND specific terms
    → "AWS" (general) + "Lambda" + "S3" + "EC2" (specific services)
    → "databases" + "PostgreSQL" + "MongoDB" (both)
    
-3. VARIATIONS: Include version numbers and variations
+5. VARIATIONS: Include version numbers and variations
    → "Python", "Python 3.9+", "Python 3.x" if mentioned
    → "react", "react 18", "reactjs" (create variations for matching)
    
-4. EXPERIENCE YEARS: Capture ALL experience requirements
+6. EXPERIENCE YEARS: Capture ALL experience requirements
    → "5+ years Python", "3+ years experience", "senior level", "mid-level"
    
-5. EDUCATION & CERTS: Extract ALL mentioned
+7. EDUCATION & CERTS: Extract ALL mentioned
    → "bachelor degree", "bachelor computer science", "BS CS"
    → "AWS certified", "aws solutions architect"
    
-6. SPLIT ALTERNATIVES: When JD says "A or B", extract BOTH
+8. SPLIT ALTERNATIVES: When JD says "A or B", extract BOTH
    → "Django or Flask" → ["django", "flask"]
    → "AWS/GCP/Azure" → ["aws", "gcp", "azure"]
    
-7. PROPER LENGTH: Keep atoms 2-8 words (was 2-6, now expanded for complex terms)
+9. PROPER LENGTH: Keep atoms 2-8 words (was 2-6, now expanded for complex terms)
    → "AWS Lambda", "machine learning", "bachelor computer science"
    
-8. CLASSIFICATION: Follow sections in JD carefully
-   → "Required"/"Must" → must_atoms
-   → "Nice to have"/"Preferred" → nice_atoms
-   → If ambiguous → must_atoms (err on side of completeness)
+10. CLASSIFICATION: Follow sections in JD carefully
+    → "Required"/"Must" → must_atoms
+    → "Nice to have"/"Preferred" → nice_atoms
+    → If ambiguous → must_atoms (err on side of completeness)
    
-9. OUTPUT FORMAT: ONLY valid JSON, no markdown, no explanations, no preamble
+11. OUTPUT FORMAT: ONLY valid JSON, no markdown, no explanations, no preamble
    
-10. TARGET COUNTS: 
+12. TARGET COUNTS: 
     → must_atoms: 20-50 items (more items = better coverage)
     → nice_atoms: 10-35 items
 
@@ -5058,11 +5123,11 @@ with tab1:
 with tab2:
     st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
     
-    # Combine all recent activities from database AND session
-    recent_db = get_recent(db_conn, db_ok, limit=15)
+    # Get recent analyses from database only
+    recent_db = get_recent(db_conn, db_ok, limit=20)
     all_activities = []
     
-    # Add database records (persistent across sessions)
+    # Add database records (persistent analyses only)
     for db_record in recent_db:
         all_activities.append({
             "type": "analysis",
@@ -5077,43 +5142,6 @@ with tab2:
             "emoji": "✨",
             "source": "database"
         })
-    
-    # Add uploads from current session (if not already in DB)
-    for u in st.session_state.uploads_history[:12]:
-        all_activities.append({
-            "type": "upload",
-            "name": u.get("name", "Unknown"),
-            "file": u.get("file_name", "Unknown"),
-            "email": u.get("email", "N/A"),
-            "phone": u.get("phone", "N/A"),
-            "timestamp": u.get("timestamp", 0),
-            "emoji": "📄",
-            "source": "session"
-        })
-    
-    # Add analyses from current session (deduplicate with database)
-    db_timestamps = {a.get("timestamp") for a in all_activities if a.get("source") == "database"}
-    for i, entry in enumerate(st.session_state.analysis_history[:10] if st.session_state.analysis_history else []):
-        entry_timestamp = entry.get("timestamp", 0)
-        # Only add if not already in database (within 5 second window)
-        if not any(abs(entry_timestamp - db_ts) < 5 for db_ts in db_timestamps):
-            all_activities.append({
-                "type": "analysis",
-                "name": entry.get("resume_meta", {}).get("name", "Unknown"),
-                "score": entry.get("score", 0),
-                "semantic": entry.get("semantic_score", 0),
-                "coverage": entry.get("coverage_score", 0),
-                "fit": entry.get("llm_fit_score", 0),
-                "email": entry.get("resume_meta", {}).get("email", ""),
-                "file": entry.get("resume_meta", {}).get("file_name", ""),
-                "timestamp": entry.get("timestamp", 0),
-                "emoji": "✨",
-                "source": "session"
-            })
-    
-    # Sort by timestamp descending and limit
-    all_activities.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
-    all_activities = all_activities[:20]  # Show top 20 most recent
     
     if not all_activities:
         st.markdown("""
@@ -5157,116 +5185,76 @@ with tab2:
         
         for idx, activity in enumerate(all_activities):
             t = datetime.fromtimestamp(activity["timestamp"]).strftime('%b %d, %Y • %I:%M %p')
+            score = activity.get("score", 0)
+            color_class = "score-excellent" if score >= 8 else "score-good" if score >= 6 else "score-fair" if score >= 4 else "score-poor"
+            source_badge = "💾"
+            source_tooltip = "Saved to database"
             
-            if activity["type"] == "analysis":
-                score = activity.get("score", 0)
-                color_class = "score-excellent" if score >= 8 else "score-good" if score >= 6 else "score-fair" if score >= 4 else "score-poor"
-                source_badge = "💾" if activity.get("source") == "database" else "⚡"
-                source_tooltip = "Saved to database" if activity.get("source") == "database" else "Current session"
-                
-                st.markdown(f"""
-                <div style="
-                    background:linear-gradient(135deg,rgba(236,72,153,.08),rgba(139,92,246,.06));
-                    border-left:4px solid rgba(236,72,153,.5);
-                    border-radius:14px;
-                    padding:20px 24px;
-                    margin-bottom:16px;
-                    box-shadow:0 4px 16px rgba(0,0,0,.15),0 0 30px rgba(236,72,153,.1);
-                    backdrop-filter:blur(20px);
-                    animation:fadeInRotate 0.5s ease-out;
-                    animation-delay:{idx * 0.05}s;
-                ">
-                    <div style="display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;">
-                        <div>
-                            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-                                <span style="font-size:24px;">{activity['emoji']}</span>
-                                <span style="
-                                    font-size:17px;
-                                    font-weight:800;
-                                    color:#f1f5f9;
-                                    font-family:'Space Grotesk',sans-serif;
-                                ">{activity['name']}</span>
-                                <span title="{source_tooltip}" style="
-                                    font-size:14px;
-                                    opacity:0.7;
-                                ">{source_badge}</span>
-                            </div>
-                            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;">
-                                <span style="color:#cbd5e1;font-size:13px;"><strong>Email:</strong> {activity['email']}</span>
-                                <span style="color:#cbd5e1;font-size:13px;"><strong>File:</strong> {activity['file']}</span>
-                            </div>
-                            <div style="color:#94a3b8;font-size:12px;margin-top:8px;font-weight:500;">{t}</div>
-                        </div>
-                        <div style="text-align:center;">
-                            <div style="
-                                font-size:32px;
-                                font-weight:900;
-                                background:linear-gradient(135deg,#6ee7b7 0%,#10b981 100%);
-                                -webkit-background-clip:text;
-                                -webkit-text-fill-color:transparent;
-                                background-clip:text;
-                                line-height:1;
-                                margin-bottom:8px;
-                            ">{score:.1f}</div>
-                            <div style="
-                                font-size:11px;
-                                color:#cbd5e1;
-                                font-weight:600;
-                                font-family:'Inter',sans-serif;
-                            ">Overall Score</div>
-                            <div style="
-                                display:grid;
-                                grid-template-columns:1fr 1fr 1fr;
-                                gap:8px;
-                                margin-top:10px;
-                                font-size:11px;
-                            ">
-                                <div style="color:#94a3b8;"><strong>📊</strong> {activity['coverage']:.1f}</div>
-                                <div style="color:#94a3b8;"><strong>🧠</strong> {activity['semantic']:.1f}</div>
-                                <div style="color:#94a3b8;"><strong>⚡</strong> {activity['fit']:.1f}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            else:  # upload
-                st.markdown(f"""
-                <div style="
-                    background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(139,92,246,.06));
-                    border-left:4px solid rgba(99,102,241,.5);
-                    border-radius:14px;
-                    padding:18px 24px;
-                    margin-bottom:16px;
-                    box-shadow:0 4px 16px rgba(0,0,0,.15),0 0 30px rgba(99,102,241,.1);
-                    backdrop-filter:blur(20px);
-                    animation:fadeInRotate 0.5s ease-out;
-                    animation-delay:{idx * 0.05}s;
-                ">
-                    <div style="display:flex;align-items:center;gap:14px;">
-                        <span style="font-size:24px;">{activity['emoji']}</span>
-                        <div style="flex:1;">
-                            <div style="
-                                font-size:15px;
-                                font-weight:700;
+            st.markdown(f"""
+            <div style="
+                background:linear-gradient(135deg,rgba(236,72,153,.08),rgba(139,92,246,.06));
+                border-left:4px solid rgba(236,72,153,.5);
+                border-radius:14px;
+                padding:20px 24px;
+                margin-bottom:16px;
+                box-shadow:0 4px 16px rgba(0,0,0,.15),0 0 30px rgba(236,72,153,.1);
+                backdrop-filter:blur(20px);
+                animation:fadeInRotate 0.5s ease-out;
+                animation-delay:{idx * 0.05}s;
+            ">
+                <div style="display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+                            <span style="font-size:24px;">{activity['emoji']}</span>
+                            <span style="
+                                font-size:17px;
+                                font-weight:800;
                                 color:#f1f5f9;
-                                font-family:'Inter',sans-serif;
-                                margin-bottom:6px;
-                            ">{activity['name']} <span style="color:#94a3b8;font-weight:500;">• {activity['file']}</span></div>
-                            <div style="
-                                display:flex;
-                                gap:20px;
-                                font-size:12px;
-                                color:#cbd5e1;
-                                flex-wrap:wrap;
-                            ">
-                                <span><strong>Email:</strong> {activity['email']}</span>
-                                <span><strong>Phone:</strong> {activity['phone']}</span>
-                                <span style="color:#94a3b8;font-weight:500;margin-left:auto;">{t}</span>
-                            </div>
+                                font-family:'Space Grotesk',sans-serif;
+                            ">{activity['name']}</span>
+                            <span title="{source_tooltip}" style="
+                                font-size:14px;
+                                opacity:0.7;
+                            ">{source_badge}</span>
+                        </div>
+                        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;">
+                            <span style="color:#cbd5e1;font-size:13px;"><strong>Email:</strong> {activity['email']}</span>
+                            <span style="color:#cbd5e1;font-size:13px;"><strong>File:</strong> {activity['file']}</span>
+                        </div>
+                        <div style="color:#94a3b8;font-size:12px;margin-top:8px;font-weight:500;">{t}</div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="
+                            font-size:32px;
+                            font-weight:900;
+                            background:linear-gradient(135deg,#6ee7b7 0%,#10b981 100%);
+                            -webkit-background-clip:text;
+                            -webkit-text-fill-color:transparent;
+                            background-clip:text;
+                            line-height:1;
+                            margin-bottom:8px;
+                        ">{score:.1f}</div>
+                        <div style="
+                            font-size:11px;
+                            color:#cbd5e1;
+                            font-weight:600;
+                            font-family:'Inter',sans-serif;
+                        ">Overall Score</div>
+                        <div style="
+                            display:grid;
+                            grid-template-columns:1fr 1fr 1fr;
+                            gap:8px;
+                            margin-top:10px;
+                            font-size:11px;
+                        ">
+                            <div style="color:#94a3b8;"><strong>📊</strong> {activity['coverage']:.1f}</div>
+                            <div style="color:#94a3b8;"><strong>🧠</strong> {activity['semantic']:.1f}</div>
+                            <div style="color:#94a3b8;"><strong>⚡</strong> {activity['fit']:.1f}</div>
                         </div>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+            </div>
+            """, unsafe_allow_html=True)
 
 # ===== IMMERSIVE FOOTER =====
 st.markdown("<div style='height:80px;'></div>", unsafe_allow_html=True)
