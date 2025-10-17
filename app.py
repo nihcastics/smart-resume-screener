@@ -2946,15 +2946,15 @@ def save_to_db(resume_doc, jd, analysis, db_conn, db_ok):
                 resume_id,
                 jd[:5000],  # Limit JD text size
                 Json(_sanitize_for_postgres(analysis.get("plan", {}))),
-                Json(_sanitize_for_postgres(analysis.get("profile", {}))),
-                Json(_sanitize_for_postgres(analysis.get("coverage", {}))),
+                Json(_sanitize_for_postgres(analysis.get("resume_profile", {}))),
+                Json(_sanitize_for_postgres(analysis.get("coverage_summary", {}))),
                 Json(_sanitize_for_postgres(analysis.get("cue_alignment", {}))),
-                Json(_sanitize_for_postgres(analysis.get("final_analysis", {}))),
-                float(analysis.get("semantic", 0.0)),
-                float(analysis.get("coverage_score", 0.0)),
-                float(analysis.get("llm_fit", 0.0)),
-                float(analysis.get("score", 0.0)),
-                int(analysis.get("final_analysis", {}).get("fit_score", 0))
+                Json(_sanitize_for_postgres(analysis.get("llm_analysis", {}))),
+                float(analysis.get("semantic_score", 0.0)) / 10.0,  # Scale 0-10 to 0-1 for DB
+                float(analysis.get("coverage_score", 0.0)) / 10.0,  # Scale 0-10 to 0-1 for DB
+                float(analysis.get("llm_fit_score", 0.0)) / 10.0,   # Scale 0-10 to 0-1 for DB
+                float(analysis.get("score", 0.0)) / 10.0,           # Scale 0-10 to 0-1 for DB
+                int(analysis.get("llm_fit_score", 0))               # Store as 0-10 integer
             ))
             analysis_id = cur.fetchone()[0]
             print(f"   ✅ Analysis saved with ID: {analysis_id}")
