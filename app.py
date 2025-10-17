@@ -5043,7 +5043,7 @@ with tab2:
             "score": float(db_record.get("final_score", 0)) * 10,  # Scale 0-1 to 0-10
             "semantic": float(db_record.get("semantic_score", 0)) * 10,  # Scale 0-1 to 0-10
             "coverage": float(db_record.get("coverage_score", 0)) * 10,  # Scale 0-1 to 0-10
-            "fit": float(db_record.get("fit_score", 0)),  # Already 0-100, keep as is
+            "fit": float(db_record.get("fit_score", 0)) / 10,  # Scale 0-100 to 0-10 for display
             "email": db_record.get("email", "N/A"),
             "file": "Resume",
             "timestamp": db_record.get("timestamp", 0),
