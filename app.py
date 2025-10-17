@@ -763,24 +763,35 @@ def init_postgresql():
     """Initialize PostgreSQL connection and create tables if they don't exist."""
     # Try Streamlit secrets first (for cloud deployment), then fall back to environment variables
     try:
-        db_url = st.secrets["DATABASE_URL"]
-    except (KeyError, AttributeError):
+        db_url = st.secrets.get("DATABASE_URL", "")
+        if db_url:
+            print("🔑 Using DATABASE_URL from Streamlit secrets")
+    except (KeyError, AttributeError, Exception):
         db_url = os.getenv("DATABASE_URL", "")
+        if db_url:
+            print("🔑 Using DATABASE_URL from environment variable")
     
     db_url = db_url.strip() if db_url else ""
     if not db_url: 
         print("⚠️ DATABASE_URL not found - skipping database connection")
         print("💡 To enable database: Set DATABASE_URL in .env or Streamlit secrets")
         print("   Free options: Supabase, Neon, Railway, ElephantSQL")
+        st.warning("⚠️ Database not connected. Add DATABASE_URL to Streamlit secrets to enable data persistence.")
         return None, False
     
     try:
+        print(f"🔌 Attempting PostgreSQL connection to: {db_url.split('@')[1] if '@' in db_url else 'hidden'}")
+        
         # Connect to PostgreSQL
         conn = psycopg2.connect(db_url)
         conn.autocommit = False  # Use transactions
         
+        print("✅ PostgreSQL connection established!")
+        
         # Create tables if they don't exist
         with conn.cursor() as cur:
+            print("📋 Creating tables if not exist...")
+            
             # Resumes table
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS resumes (
@@ -826,11 +837,15 @@ def init_postgresql():
             
         conn.commit()
         print("✅ PostgreSQL connected successfully!")
-        print(f"📊 Database ready with tables: resumes, analyses")
+        print("📊 Database ready with tables: resumes, analyses")
+        st.success("💾 Database connected successfully!")
         return conn, True
     except Exception as e:
-        print(f"❌ PostgreSQL connection failed: {e}")
-        print(f"💡 Check your DATABASE_URL format: postgresql://user:password@host:port/dbname")
+        print(f"❌ PostgreSQL connection failed: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        st.error(f"❌ Database connection failed: {str(e)[:200]}")
+        st.info("💡 Check your DATABASE_URL in Streamlit secrets. Format: `postgresql://user:password@host:port/dbname`")
         return None, False
 
 # --- NLP / utils ---
@@ -2935,12 +2950,18 @@ def save_to_db(resume_doc, jd, analysis, db_conn, db_ok):
     """Save resume and analysis to PostgreSQL database."""
     if not db_ok or not db_conn:
         print("⚠️ PostgreSQL not connected - skipping database save")
-        return
+        st.warning("⚠️ Database not available - analysis not saved to database")
+        return None, None
+    
+    print(f"💾 Attempting to save to database...")
+    print(f"   Resume: {resume_doc.get('name', 'Unknown')} ({resume_doc.get('email', 'N/A')})")
     
     resume_id = None
+    analysis_id = None
     try:
         with db_conn.cursor() as cur:
             # Save resume document
+            print("   → Inserting resume...")
             cur.execute("""
                 INSERT INTO resumes (name, email, phone, text, chunks, entities, technical_skills)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -2955,9 +2976,10 @@ def save_to_db(resume_doc, jd, analysis, db_conn, db_ok):
                 Json(_sanitize_for_postgres(resume_doc.get("technical_skills", [])))
             ))
             resume_id = cur.fetchone()[0]
-            print(f"✅ Resume saved to DB with ID: {resume_id}")
+            print(f"   ✅ Resume saved with ID: {resume_id}")
             
             # Save analysis document
+            print("   → Inserting analysis...")
             cur.execute("""
                 INSERT INTO analyses (
                     resume_id, jd_text, plan, profile, coverage, cue_alignment,
@@ -2981,17 +3003,18 @@ def save_to_db(resume_doc, jd, analysis, db_conn, db_ok):
                 int(analysis.get("final_analysis", {}).get("fit_score", 0))
             ))
             analysis_id = cur.fetchone()[0]
+            print(f"   ✅ Analysis saved with ID: {analysis_id}")
             
         db_conn.commit()
-        print(f"✅ Analysis saved to DB with ID: {analysis_id}")
-        st.success(f"💾 Analysis saved to database successfully!")
+        print(f"✅ Transaction committed successfully!")
+        st.success(f"💾 Saved to database! (Resume ID: {resume_id}, Analysis ID: {analysis_id})")
         return resume_id, analysis_id
     except Exception as exc:
         db_conn.rollback()
-        print(f"❌ PostgreSQL save error: {exc}")
+        print(f"❌ PostgreSQL save error: {type(exc).__name__}: {exc}")
         import traceback
         traceback.print_exc()
-        st.warning(f"⚠️ Could not save to database: {str(exc)[:100]}")
+        st.error(f"❌ Database save failed: {str(exc)[:200]}")
         return None, None
 
 def get_recent(db_conn, db_ok, limit=20):
