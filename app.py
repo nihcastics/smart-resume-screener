@@ -1629,102 +1629,44 @@ def llm_verify_requirements_clean(model, requirements_payload, resume_text):
                 "evidence": evidence_snippets
             })
         
-        prompt = f"""You are an expert technical recruiter analyzing a candidate's resume for specific requirements. Your task is to provide UNIQUE, SPECIFIC assessments for each requirement.
+        prompt = f"""Verify if each requirement is met by candidate's resume. Provide UNIQUE, SPECIFIC assessments.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 REQUIREMENTS TO VERIFY
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+**REQUIREMENTS**:
 {json.dumps(formatted_reqs, indent=2)}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📄 CANDIDATE'S RESUME
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+**RESUME**:
 {resume_excerpt}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 ASSESSMENT CRITERIA
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**ASSESSMENT** (for each requirement):
+1. present (bool): Skill used in projects? (true if used, false if only listed/not mentioned)
+2. confidence (0.0-1.0): 
+   - 0.9-1.0: Multiple projects with details
+   - 0.7-0.8: Used in ≥1 project clearly
+   - 0.5-0.6: Listed with minimal context
+   - 0.3-0.4: Weak/indirect
+   - 0.0-0.2: Not found
+3. rationale (15-25 words): MUST mention PROJECT NAME/CONTEXT where used
+   ✅ "Python in E-commerce API for backend services"
+   ✅ "No PostgreSQL; uses MySQL in Project X"
+   ❌ "Clearly demonstrated" (generic)
+   ❌ "Mentioned in resume" (vague)
+4. evidence (20-40 words): Quote with project context (empty if absent)
 
-For EACH requirement, provide:
+**MATCHING**:
+✅ Accept: Python=Python, K8s=Kubernetes, React 18=React
+❌ Reject: MySQL≠PostgreSQL, "databases"≠MongoDB, list-only (conf<0.6)
 
-1. **present** (boolean): Is the skill/technology actually used?
-   ✅ TRUE if: Mentioned in projects/experience + specific use cases described
-   ❌ FALSE if: Not mentioned OR only in skills list without usage proof
+**CRITICAL**: Each rationale MUST be UNIQUE with specific project/context. NO generic phrases.
 
-2. **confidence** (0.0 to 1.0): Certainty level
-   - 0.9-1.0: Used in multiple projects with detailed descriptions
-   - 0.7-0.8: Used in at least one project with clear description
-   - 0.5-0.6: Mentioned with minimal context or only in skills list
-   - 0.3-0.4: Weak/indirect mention or possible related skill
-   - 0.0-0.2: Not found or only vague reference
-
-3. **rationale** (15-25 words): SPECIFIC, UNIQUE explanation
-   ⚠️ MUST BE UNIQUE PER REQUIREMENT - Don't use generic phrases!
-   ✅ GOOD: "Used Python in E-commerce Platform project for backend APIs and data processing"
-   ✅ GOOD: "No PostgreSQL mention; uses MySQL in Project X instead"
-   ✅ GOOD: "React expertise shown in Healthcare Dashboard with Redux state management"
-   ❌ BAD: "Clearly demonstrated in projects" (too generic)
-   ❌ BAD: "Mentioned in resume" (too vague)
-   ❌ BAD: "Experience with technology" (not specific)
-   
-   REQUIRED FORMAT:
-   - If present=true: Mention the PROJECT NAME or CONTEXT where used
-   - If present=false: State what's missing or what alternative is used instead
-
-4. **evidence** (20-40 words): Direct quote with PROJECT CONTEXT
-   - Include the PROJECT/COMPANY NAME if possible
-   - Quote the SPECIFIC LINE that proves usage
-   - If not present, leave empty ("")
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ MATCHING RULES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**Accept as matches:**
-- Exact/common names: Python=Python, K8s=Kubernetes, JS=JavaScript
-- Versions: React 18 satisfies "React"
-- Specifics: Django REST satisfies "Django"
-
-**Reject as non-matches:**
-- Wrong tech: MySQL ≠ PostgreSQL
-- Vague: "databases" ≠ "MongoDB"
-- Insufficient duration: "1 yr Python" ≠ "5+ yrs Python"
-- List-only: Skill listed but zero project usage = LOW confidence (0.4-0.5)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📤 OUTPUT FORMAT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Return ONLY valid JSON (no markdown, no ```json):
-
+**OUTPUT** (JSON only, no markdown):
 {{
-  "requirement_name": {{
+  "req_name": {{
     "present": true/false,
     "confidence": 0.0-1.0,
-    "rationale": "Specific explanation mentioning project/context (15-25 words)",
-    "evidence": "Quoted text with project name (if present, else empty)"
+    "rationale": "specific explanation with project (15-25 words)",
+    "evidence": "quote with project name or empty"
   }}
 }}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ CRITICAL ANTI-REPETITION RULES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-1. Each rationale MUST be UNIQUE - no copy-paste explanations
-2. MUST mention specific PROJECT NAMES or CONTEXTS from resume
-3. NO generic phrases like "demonstrated", "mentioned", "experience with"
-4. If skill is absent, explain WHY or what's used INSTEAD
-5. Be forensic: cite actual project names, company names, or specific contexts
-
-EXAMPLE OF GOOD (UNIQUE, SPECIFIC) RATIONALES:
-- "Python used extensively in E-commerce Platform project for REST API development and data pipelines"
-- "No Docker mentioned; deployment appears to be traditional VM-based per DevOps section"
-- "Strong React skills evidenced in Healthcare Dashboard project using hooks and context API"
-- "AWS mentioned in resume but only S3 storage; no Lambda or serverless experience shown"
-
-BEGIN ANALYSIS:
 """
 
         try:
@@ -2179,141 +2121,45 @@ Return ONLY valid JSON. No markdown, no explanations.
 """
 
 def atomicize_requirements_prompt(jd, resume_preview):
-    return f"""You are an expert technical recruiter analyzing a job description. Extract ALL requirements in a structured, comprehensive way.
+    return f"""Extract ALL technical requirements from this job description in structured categories.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 EXTRACTION CATEGORIES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**CATEGORIES** (classify each as must/nice):
+1. hard_skills: Languages, frameworks, databases, cloud, tools (Python, React, AWS, Docker, etc.)
+2. fundamentals: CS concepts (DBMS, OS, algorithms, system design, etc.)
+3. experience: Years required, seniority level, domain experience
+4. qualifications: Degrees, certifications
 
-Extract requirements into 4 distinct categories:
+**RULES**:
+✅ Extract EVERY specific tech mentioned (include abbreviations: AWS, K8s, JS)
+✅ Split compounds: "Java/Python" → ["Java", "Python"]
+✅ Add variations: "JavaScript" → ["JavaScript", "JS"]
+✅ Include versions: "Python 3.x", "React 18"
+✅ Classify: "required/essential/mandatory" → must, "preferred/bonus" → nice
+❌ Skip: Soft skills, generic terms ("experience", "good knowledge")
 
-1. **hard_skills**: Technical skills, technologies, tools, frameworks
-   - Languages: Python, Java, JavaScript, C++, Go, Rust, etc.
-   - Frameworks: React, Angular, Django, Flask, Spring Boot, etc.
-   - Databases: PostgreSQL, MySQL, MongoDB, Redis, Cassandra, etc.
-   - Cloud: AWS, Azure, GCP, specific services (Lambda, S3, EC2, etc.)
-   - DevOps: Docker, Kubernetes, Jenkins, CI/CD, Terraform, etc.
-   - Tools: Git, Postman, VS Code, JIRA, etc.
-   - Concepts: REST API, GraphQL, Microservices, OOP, etc.
-
-2. **fundamentals**: Core CS/IT concepts and foundations
-   - DBMS, Operating Systems, Computer Networks, Data Structures
-   - Algorithms, System Design, Software Architecture
-   - Security principles, Design patterns, etc.
-
-3. **experience**: Years of experience, seniority, specific domains
-   - "5+ years Python", "3 years backend development"
-   - "Senior level", "Mid-level", "Experience with fintech"
-   - Industry experience requirements
-
-4. **qualifications**: Education, certifications, degrees
-   - "Bachelor's in CS", "Master's preferred"
-   - "AWS Certified", "PMP Certification"
-   - Specific degree requirements
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 EXTRACTION RULES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-✅ **DO:**
-- Extract EVERY specific technology/tool mentioned
-- Include common abbreviations (AWS, K8s, JS, etc.)
-- Extract version-specific mentions (Python 3.x, React 18, etc.)
-- Include compound skills as separate items (Django/Flask → both)
-- Keep original casing for proper nouns (React, MongoDB, AWS)
-- Extract implicit requirements (mentions "Lambda" → add "AWS")
-- Add common variations (JavaScript → also add JS)
-
-❌ **DON'T:**
-- Include vague qualifiers ("good knowledge", "strong understanding")
-- Extract generic words ("experience", "skills", "work")
-- Include soft skills here (teamwork, communication) - skip these
-- Add items not in the JD
-- Be repetitive (don't list "Python" 10 times)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔍 PRIORITY CLASSIFICATION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-For each category, classify items as MUST-HAVE or NICE-TO-HAVE:
-
-**must**: Required, mandatory, essential
-- Keywords: "required", "must have", "essential", "mandatory"
-- Core tech stack items
-- Minimum experience requirements
-
-**nice**: Preferred, bonus, optional
-- Keywords: "preferred", "nice to have", "bonus", "plus"
-- Secondary technologies
-- "Good to have" items
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📝 EXAMPLES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**Example 1:**
-INPUT: "Required: 5+ years Python, strong Django/Flask experience, PostgreSQL, Docker. Core IT fundamentals (DBMS/OS/CN) essential. Bachelor's in CS required. Preferred: AWS, Kubernetes, React."
-
-OUTPUT:
+**EXAMPLES**:
+IN: "Required: 5+ yrs Python, Django, PostgreSQL. Preferred: AWS, React"
+OUT:
 {{
-  "hard_skills": {{
-    "must": ["Python", "Django", "Flask", "PostgreSQL", "Docker"],
-    "nice": ["AWS", "Kubernetes", "K8s", "React"]
-  }},
-  "fundamentals": {{
-    "must": ["DBMS", "Database Management", "Operating Systems", "OS", "Computer Networks", "Networking", "CN"],
-    "nice": []
-  }},
-  "experience": {{
-    "must": ["5+ years Python", "5 years Python experience"],
-    "nice": []
-  }},
-  "qualifications": {{
-    "must": ["Bachelor's in Computer Science", "CS degree", "Bachelor's degree"],
-    "nice": []
-  }}
+  "hard_skills": {{"must": ["Python", "Django", "PostgreSQL"], "nice": ["AWS", "React"]}},
+  "fundamentals": {{"must": [], "nice": []}},
+  "experience": {{"must": ["5+ years Python"], "nice": []}},
+  "qualifications": {{"must": [], "nice": []}}
 }}
 
-**Example 2:**
-INPUT: "Looking for Full Stack Engineer with React, Node.js, MongoDB. Good understanding of REST APIs, microservices. Experience with AWS Lambda, S3. Agile methodology. Nice to have: TypeScript, GraphQL, Redis."
-
-OUTPUT:
+IN: "Node.js, MongoDB, REST APIs, Docker. CS fundamentals (DBMS/OS) essential. Nice: TypeScript"
+OUT:
 {{
-  "hard_skills": {{
-    "must": ["React", "Node.js", "Node", "MongoDB", "Mongo", "REST API", "REST", "Microservices", "AWS Lambda", "Lambda", "AWS S3", "S3", "AWS", "Agile"],
-    "nice": ["TypeScript", "TS", "GraphQL", "Redis"]
-  }},
-  "fundamentals": {{
-    "must": [],
-    "nice": []
-  }},
-  "experience": {{
-    "must": ["Full Stack development experience"],
-    "nice": []
-  }},
-  "qualifications": {{
-    "must": [],
-    "nice": []
-  }}
+  "hard_skills": {{"must": ["Node.js", "Node", "MongoDB", "Mongo", "REST API", "Docker"], "nice": ["TypeScript", "TS"]}},
+  "fundamentals": {{"must": ["DBMS", "OS", "Database Management", "Operating Systems"], "nice": []}},
+  "experience": {{"must": [], "nice": []}},
+  "qualifications": {{"must": [], "nice": []}}
 }}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📄 JOB DESCRIPTION TO ANALYZE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**JOB DESCRIPTION**:
+{jd[:4500]}
 
-{jd[:6000]}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ CRITICAL INSTRUCTIONS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-1. Read the ENTIRE job description above
-2. Extract EVERY specific technical requirement
-3. Be thorough - missing skills hurts accuracy
-4. Return ONLY valid JSON (no markdown, no explanations)
-5. Use the EXACT structure shown in examples
-
-BEGIN EXTRACTION:
+Return ONLY valid JSON, no markdown:
 """
 
 def analysis_prompt(jd, plan, profile, coverage_summary, cue_alignment, global_sem, cov_final):
