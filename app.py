@@ -621,8 +621,11 @@ def section(title, emoji=""):
         unsafe_allow_html=True
     )
 
-# --- Config (balanced weights for accurate scoring) ---
-DEFAULT_WEIGHTS = {"semantic":0.35, "coverage":0.50, "llm_fit":0.15}
+# --- Config (stricter scoring with balanced weights) ---
+# Semantic: 40% (increased - contextual fit is important)
+# Coverage: 35% (decreased - less priority to avoid over-reliance on keyword matching)
+# LLM Fit: 25% (increased - holistic AI assessment is valuable)
+DEFAULT_WEIGHTS = {"semantic":0.40, "coverage":0.35, "llm_fit":0.25}
 
 # --- Models / DB ---
 @st.cache_resource(show_spinner=False)
@@ -1365,13 +1368,18 @@ def refine_atom_list(atoms, nlp=None, reserved_canonicals=None, limit=50):
     return refined, reserved
 
 def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_chunks, embedder, model=None,
-                                   faiss_index=None, strict_threshold=0.75, partial_threshold=0.60,
+                                   faiss_index=None, strict_threshold=0.80, partial_threshold=0.65,
                                    nlp=None, jd_text=""):
     """
-    Clean, accurate requirement coverage analysis:
+    Clean, accurate requirement coverage analysis with STRICTER thresholds:
     1. Use semantic search to find relevant resume sections for each requirement
     2. LLM verifies if requirement is actually met based on evidence
     3. Score based on: presence (yes/no) + confidence (0-1) + evidence quality
+    
+    Thresholds (stricter than before):
+    - Strict match: ≥0.80 (was 0.75) - High bar for full credit
+    - Partial match: ≥0.65 (was 0.60) - Moderate bar for partial credit
+    - Weak match: ≥0.50 (was 0.45) - Minimum for any credit
     
     No random adjustments, no fingerprints, just accurate matching.
     """
@@ -1428,13 +1436,13 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
         return evidence[:top_k], round(max_sim, 3)
 
     def calculate_initial_score(requirement, max_similarity):
-        """Calculate preliminary score based on semantic similarity."""
-        if max_similarity >= strict_threshold:
-            return 0.85  # Strong match
-        elif max_similarity >= partial_threshold:
-            return 0.60  # Partial match
-        elif max_similarity >= 0.45:
-            return 0.35  # Weak match
+        """Calculate preliminary score based on semantic similarity with STRICTER thresholds."""
+        if max_similarity >= strict_threshold:  # ≥0.80
+            return 0.80  # Strong match (reduced from 0.85 - more conservative)
+        elif max_similarity >= partial_threshold:  # ≥0.65
+            return 0.55  # Partial match (reduced from 0.60 - stricter)
+        elif max_similarity >= 0.50:  # ≥0.50 (was 0.45)
+            return 0.30  # Weak match (reduced from 0.35 - stricter)
         else:
             return 0.0  # No match
 
@@ -2108,20 +2116,34 @@ def atomicize_requirements_prompt(jd, resume_preview):
 
 ⚠️ CRITICAL INSTRUCTION: Read the ENTIRE job description word-by-word. Extract ALL technical terms, technologies, tools, frameworks, skills, and qualifications mentioned ANYWHERE in the text. DO NOT skip sections. DO NOT summarize. EXTRACT EVERYTHING.
 
-🎯 SKILL EXTRACTION FROM DESCRIPTIVE PHRASES:
+🎯 SKILL EXTRACTION FROM DESCRIPTIVE PHRASES (CRITICAL - READ CAREFULLY):
 When you encounter descriptive phrases, extract the ACTUAL SKILL/TECHNOLOGY, not the description:
   ❌ WRONG: "Highly skilled in" → Do NOT extract this phrase
   ✅ CORRECT: "Highly skilled in AWS Services" → Extract: "aws services", "aws"
+  ✅ CORRECT: "Good knowledge with AWS services" → Extract: "aws services", "aws"
+  ✅ CORRECT: "Hands on experience with AWS" → Extract: "aws" (not "hands on experience")
   ✅ CORRECT: "Must know good security practice" → Extract: "security", "security best practices", "security practices"
   ✅ CORRECT: "Should have good knowledge in core computer fundamentals" → Extract: "computer fundamentals", "computer science fundamentals", "cs fundamentals"
+  ✅ CORRECT: "Core IT fundamentals (DBMS/OS/CN)" → Extract: "it fundamentals", "dbms", "database management systems", "operating systems", "os", "computer networks", "cn", "networking"
+  ✅ CORRECT: "API handling" → Extract: "api", "api handling", "rest api", "api development"
+  ✅ CORRECT: "Strong foundation in Java/Python" → Extract: "java", "python", "strong foundation" removed
   ✅ CORRECT: "Experience with Java" → Extract: "java" (not "experience with")
   ✅ CORRECT: "Strong understanding of Docker" → Extract: "docker" (not "strong understanding")
   ✅ CORRECT: "Proficient in Python" → Extract: "python" (not "proficient in")
 
+🔍 ABBREVIATION & PARENTHESIS HANDLING (CRITICAL):
+When you see abbreviations in parentheses like "(DBMS/OS/CN)", ALWAYS extract BOTH full forms AND abbreviations:
+  ✅ "DBMS" → Extract: "dbms", "database management systems", "databases"
+  ✅ "OS" → Extract: "os", "operating systems"
+  ✅ "CN" → Extract: "cn", "computer networks", "networking"
+  ✅ "IT fundamentals" → Extract: "it fundamentals", "computer science fundamentals", "cs fundamentals"
+  ✅ "API" → Extract: "api", "rest api", "api development"
+
 PHRASE CLEANING RULES:
-  → Remove qualifiers: "highly skilled", "must know", "should have", "good knowledge", "strong", "excellent", "proficient"
-  → Remove verbs: "skilled in", "experience with", "knowledge of", "understanding of", "working with"
+  → Remove qualifiers: "highly skilled", "must know", "should have", "good knowledge", "strong", "excellent", "proficient", "hands on"
+  → Remove verbs: "skilled in", "experience with", "knowledge of", "understanding of", "working with", "good knowledge with"
   → Keep only the CORE TECHNICAL TERM or CONCEPT
+  → For acronyms in parentheses like "(X/Y/Z)", extract EACH component with full names
 
 Return ONLY valid JSON with these exact keys:
 - must_atoms: Array of CRITICAL/REQUIRED technical requirements (20-50 items, 2-8 words each)
@@ -2159,23 +2181,37 @@ Return ONLY valid JSON with these exact keys:
   
   9. Methodologies & Practices: "Agile", "Scrum", "Kanban", "TDD", "BDD", "CI/CD", "DevOps"
   
-  10. ML/AI/Data Science: "TensorFlow", "PyTorch", "scikit-learn", "Pandas", "NumPy", "Transformers", "LLMs", "NLP"
+  10. Computer Science Fundamentals & Theory:
+     → General: "IT fundamentals", "Computer Science fundamentals", "CS fundamentals", "Core IT"
+     → DBMS: "DBMS", "Database Management Systems", "database concepts", "SQL", "ACID", "normalization"
+     → Operating Systems: "OS", "Operating Systems", "process management", "memory management", "threading"
+     → Computer Networks: "CN", "Computer Networks", "networking", "TCP/IP", "HTTP", "DNS", "routing"
+     → Data Structures: "DSA", "Data Structures", "Algorithms", "arrays", "trees", "graphs", "sorting"
+     → OOP: "Object Oriented Programming", "OOP", "OOPS", "inheritance", "polymorphism"
+     → Extract BOTH abbreviations AND full names: "DBMS" + "Database Management Systems"
   
-  11. Architecture & Design: "Microservices", "REST API", "GraphQL", "Event-driven", "Serverless", "Distributed systems"
+  11. ML/AI/Data Science: "TensorFlow", "PyTorch", "scikit-learn", "Pandas", "NumPy", "Transformers", "LLMs", "NLP"
   
-  12. Development Tools: "Git", "GitHub", "VS Code", "IntelliJ", "Postman", "Jira", "Confluence"
+  12. Architecture & Design: "Microservices", "REST API", "GraphQL", "Event-driven", "Serverless", "Distributed systems"
   
-  13. Testing & Quality: "Jest", "pytest", "JUnit", "Selenium", "Cypress", "unit testing", "integration testing"
+  13. Development Tools: "Git", "GitHub", "VS Code", "IntelliJ", "Postman", "Jira", "Confluence"
   
-  14. Security: "OAuth", "JWT", "SSL/TLS", "OWASP", "Security best practices", "penetration testing"
+  14. Testing & Quality: "Jest", "pytest", "JUnit", "Selenium", "Cypress", "unit testing", "integration testing"
   
-  15. Frontend Technologies: "HTML", "CSS", "JavaScript", "Webpack", "Babel", "SASS", "Tailwind CSS"
+  15. Security: "OAuth", "JWT", "SSL/TLS", "OWASP", "Security best practices", "penetration testing"
   
-  16. Backend Technologies: "Node.js", "Express", "Nest.js", "Django", "Flask", "Spring", "ASP.NET"
+  16. Frontend Technologies: "HTML", "CSS", "JavaScript", "Webpack", "Babel", "SASS", "Tailwind CSS"
   
-  17. Message Queues & Streaming: "Kafka", "RabbitMQ", "AWS SQS", "Redis Pub/Sub", "Apache Spark"
+  17. Backend Technologies: "Node.js", "Express", "Nest.js", "Django", "Flask", "Spring", "ASP.NET"
   
-  18. Monitoring & Logging: "Prometheus", "Grafana", "ELK Stack", "Datadog", "New Relic", "CloudWatch"
+  18. Message Queues & Streaming: "Kafka", "RabbitMQ", "AWS SQS", "Redis Pub/Sub", "Apache Spark"
+  
+  19. Monitoring & Logging: "Prometheus", "Grafana", "ELK Stack", "Datadog", "New Relic", "CloudWatch"
+  
+  20. API Development & Integration:
+     → "API", "REST API", "RESTful API", "API development", "API handling", "API integration"
+     → "GraphQL", "gRPC", "SOAP", "WebSockets"
+     → "API design", "API testing", "Postman", "Swagger"
 
 ❌ NEVER EXTRACT (Pure soft skills/fluff ONLY - extract everything technical):
   → Pure soft skills WITHOUT technical context: "communication", "teamwork", "leadership" (ONLY if standalone)
@@ -2274,6 +2310,33 @@ OUTPUT:
 ✅ Extracted core skills with variations for better matching
 ✅ Added related terms: "container orchestration" (relates to Kubernetes), "sql" (relates to database)
 
+Example 6 - IT Fundamentals with Abbreviations (YOUR EXACT SCENARIO - STUDY CAREFULLY):
+INPUT: "Good Knowledge with AWS services and hands on experience with it, Core IT fundamentals (DBMS/OS/CN), API handling, Strong foundation in Java/Python"
+
+OUTPUT:
+{{
+  "must_atoms": [
+    "aws services", "aws", "amazon web services",
+    "it fundamentals", "computer science fundamentals", "cs fundamentals",
+    "dbms", "database management systems", "databases", "sql",
+    "os", "operating systems",
+    "cn", "computer networks", "networking", "tcp/ip",
+    "api handling", "api", "rest api", "api development",
+    "java", "python"
+  ],
+  "nice_atoms": []
+}}
+✅ Removed ALL qualifiers: "good knowledge with", "hands on experience", "strong foundation in"
+✅ Extracted "AWS services" → ["aws services", "aws", "amazon web services"]
+✅ Extracted "IT fundamentals" → ["it fundamentals", "computer science fundamentals", "cs fundamentals"]
+✅ CRITICAL: Parsed "(DBMS/OS/CN)" → Each abbreviation WITH full names:
+   - "DBMS" → ["dbms", "database management systems", "databases", "sql"]
+   - "OS" → ["os", "operating systems"]
+   - "CN" → ["cn", "computer networks", "networking", "tcp/ip"]
+✅ Extracted "API handling" → ["api handling", "api", "rest api", "api development"]
+✅ Split "Java/Python" → ["java", "python"] (both languages separately)
+✅ NO GIBBERISH: Every extracted term is a real, verifiable technical skill
+
 OUTPUT:
 {{
   "must_atoms": ["python", "tensorflow", "pytorch", "scikit-learn", "deep learning", "nlp", "docker", "kubernetes", "aws", "gcp", "sql", "pandas", "numpy", "5+ years ml", "machine learning"],
@@ -2299,45 +2362,68 @@ RESUME PREVIEW (For context ONLY - DO NOT extract from this, only from JD above)
 
 1. CLEAN DESCRIPTIVE PHRASES: Remove qualifier words, keep only technical terms
    → "Highly skilled in AWS Services" → Extract: ["aws services", "aws"] (NOT "highly skilled")
+   → "Good knowledge with AWS" → Extract: ["aws"] (NOT "good knowledge with")
+   → "Hands on experience with Java" → Extract: ["java"] (NOT "hands on experience")
    → "Must know security practice" → Extract: ["security", "security practices", "security best practices"]
-   → "Good knowledge in Java" → Extract: ["java"] (NOT "good knowledge")
-   → "Strong understanding of Docker" → Extract: ["docker"] (NOT "strong understanding")
-   🚫 NEVER extract: "highly skilled", "must know", "good knowledge", "strong understanding", "proficient in", "experience with"
+   → "Strong foundation in Python" → Extract: ["python"] (NOT "strong foundation")
+   🚫 NEVER extract: "highly skilled", "must know", "good knowledge", "strong understanding", "proficient in", "experience with", "hands on", "strong foundation"
    ✅ ALWAYS extract: The actual technology/skill name and common variations
 
-2. EXPAND TECHNICAL TERMS: Create variations for better matching
+2. HANDLE ABBREVIATIONS IN PARENTHESES (CRITICAL):
+   → "(DBMS/OS/CN)" → Extract EACH with full names:
+     • "dbms" + "database management systems" + "databases"
+     • "os" + "operating systems"
+     • "cn" + "computer networks" + "networking"
+   → "(API/REST)" → Extract: "api", "rest api", "restful api"
+   → Always extract BOTH abbreviation AND expanded full name for better matching
+
+3. EXPAND TECHNICAL TERMS: Create variations for better matching
    → "AWS Services" → ["aws services", "aws", "amazon web services"]
    → "security practice" → ["security", "security practices", "security best practices"]
-   → "computer fundamentals" → ["computer fundamentals", "computer science fundamentals", "cs fundamentals"]
+   → "computer fundamentals" → ["computer fundamentals", "computer science fundamentals", "cs fundamentals", "it fundamentals"]
+   → "API handling" → ["api handling", "api", "rest api", "api development"]
    → "CI/CD" → ["ci/cd", "ci/cd pipelines", "continuous integration", "continuous deployment"]
 
-3. COMPLETENESS: Extract EVERY technical term, technology, tool, framework, skill mentioned in JD
+4. SPLIT SLASHED TERMS: Extract each component separately
+   → "Java/Python" → ["java", "python"]
+   → "AWS/Azure/GCP" → ["aws", "azure", "gcp"]
+   → "React/Vue" → ["react", "vue"]
+
+5. COMPLETENESS: Extract EVERY technical term, technology, tool, framework, skill mentioned in JD
    → Scan Requirements, Responsibilities, Qualifications, About sections - miss NOTHING
    
-4. GRANULARITY: Extract both general AND specific terms
+6. GRANULARITY: Extract both general AND specific terms
    → "AWS" (general) + "Lambda" + "S3" + "EC2" (specific services)
    → "databases" + "PostgreSQL" + "MongoDB" (both)
    
-5. VARIATIONS: Include version numbers and variations
+7. VARIATIONS: Include version numbers and variations
    → "Python", "Python 3.9+", "Python 3.x" if mentioned
    → "react", "react 18", "reactjs" (create variations for matching)
    
-6. EXPERIENCE YEARS: Capture ALL experience requirements
+8. EXPERIENCE YEARS: Capture ALL experience requirements
    → "5+ years Python", "3+ years experience", "senior level", "mid-level"
    
-7. EDUCATION & CERTS: Extract ALL mentioned
+9. EDUCATION & CERTS: Extract ALL mentioned
    → "bachelor degree", "bachelor computer science", "BS CS"
    → "AWS certified", "aws solutions architect"
    
-8. SPLIT ALTERNATIVES: When JD says "A or B", extract BOTH
-   → "Django or Flask" → ["django", "flask"]
-   → "AWS/GCP/Azure" → ["aws", "gcp", "azure"]
+10. PROPER LENGTH: Keep atoms 2-8 words (was 2-6, now expanded for complex terms)
+    → "AWS Lambda", "machine learning", "bachelor computer science"
    
-9. PROPER LENGTH: Keep atoms 2-8 words (was 2-6, now expanded for complex terms)
-   → "AWS Lambda", "machine learning", "bachelor computer science"
-   
-10. CLASSIFICATION: Follow sections in JD carefully
+11. CLASSIFICATION: Follow sections in JD carefully
     → "Required"/"Must" → must_atoms
+    → "Nice to have"/"Preferred" → nice_atoms
+    → If ambiguous → must_atoms (err on side of completeness)
+   
+12. NO GIBBERISH: Only extract real, verifiable technical skills/concepts
+    → ✅ GOOD: "aws", "java", "dbms", "api", "docker", "kubernetes"
+    → ❌ BAD: "good knowledge", "highly skilled", "strong foundation" (descriptors, not skills)
+   
+13. OUTPUT FORMAT: ONLY valid JSON, no markdown, no explanations, no preamble
+   
+14. TARGET COUNTS: 
+    → must_atoms: 20-60 items (more items = better coverage, especially with variations)
+    → nice_atoms: 10-35 items
     → "Nice to have"/"Preferred" → nice_atoms
     → If ambiguous → must_atoms (err on side of completeness)
    
@@ -5132,10 +5218,10 @@ with tab2:
         all_activities.append({
             "type": "analysis",
             "name": db_record.get("candidate", "Unknown"),
-            "score": float(db_record.get("final_score", 0)),
-            "semantic": float(db_record.get("semantic_score", 0)),
-            "coverage": float(db_record.get("coverage_score", 0)),
-            "fit": float(db_record.get("fit_score", 0)),
+            "score": float(db_record.get("final_score", 0)) * 10,  # Scale 0-1 to 0-10
+            "semantic": float(db_record.get("semantic_score", 0)) * 10,  # Scale 0-1 to 0-10
+            "coverage": float(db_record.get("coverage_score", 0)) * 10,  # Scale 0-1 to 0-10
+            "fit": float(db_record.get("fit_score", 0)),  # Already 0-100, keep as is
             "email": db_record.get("email", "N/A"),
             "file": "Resume",
             "timestamp": db_record.get("timestamp", 0),
