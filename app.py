@@ -1,9 +1,3 @@
-# ============================
-# Resume Screener Pro — Final
-# Focus: Accurate parsing & analysis (no evidence UI, no lexicons)
-# ============================
-
-# --- Silence noisy libs before imports ---
 import os, sys
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
@@ -20,7 +14,6 @@ logging.getLogger().setLevel(logging.ERROR)
 logging.getLogger('sentence_transformers').setLevel(logging.ERROR)
 logging.getLogger('transformers').setLevel(logging.ERROR)
 
-# --- Core deps ---
 import streamlit as st
 import fitz  # PyMuPDF
 import spacy
@@ -624,8 +617,11 @@ def section(title, emoji=""):
 # --- Config (stricter scoring with balanced weights) ---
 # Semantic: 40% (increased - contextual fit is important)
 # Coverage: 35% (decreased - less priority to avoid over-reliance on keyword matching)
-# LLM Fit: 25% (increased - holistic AI assessment is valuable)
-DEFAULT_WEIGHTS = {"semantic":0.40, "coverage":0.35, "llm_fit":0.25}
+# STRICT WEIGHTS: Coverage matters most (concrete skill matching)
+# Coverage: 45% (raised - most important: does resume have required skills?)
+# Semantic: 35% (lowered - general alignment)
+# LLM Fit: 20% (lowered - holistic assessment but can be subjective)
+DEFAULT_WEIGHTS = {"semantic":0.35, "coverage":0.45, "llm_fit":0.20}
 
 # --- Models / DB ---
 @st.cache_resource(show_spinner=False)
@@ -1448,18 +1444,18 @@ def refine_atom_list(atoms, nlp=None, reserved_canonicals=None, limit=50):
     return refined, reserved
 
 def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_chunks, embedder, model=None,
-                                   faiss_index=None, strict_threshold=0.80, partial_threshold=0.65,
+                                   faiss_index=None, strict_threshold=0.85, partial_threshold=0.70,
                                    nlp=None, jd_text=""):
     """
-    Clean, accurate requirement coverage analysis with STRICTER thresholds:
+    Clean, accurate requirement coverage analysis with VERY STRICT thresholds:
     1. Use semantic search to find relevant resume sections for each requirement
     2. LLM verifies if requirement is actually met based on evidence
     3. Score based on: presence (yes/no) + confidence (0-1) + evidence quality
     
-    Thresholds (stricter than before):
-    - Strict match: ≥0.80 (was 0.75) - High bar for full credit
-    - Partial match: ≥0.65 (was 0.60) - Moderate bar for partial credit
-    - Weak match: ≥0.50 (was 0.45) - Minimum for any credit
+    Thresholds (very strict for accurate differentiation):
+    - Strict match: ≥0.85 (was 0.80) - Very high bar for full credit
+    - Partial match: ≥0.70 (was 0.65) - High bar for partial credit
+    - Weak match: ≥0.55 (was 0.50) - Minimum for any credit
     
     No random adjustments, no fingerprints, just accurate matching.
     """
@@ -1587,13 +1583,13 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
         return evidence[:top_k], round(max_sim, 3)
 
     def calculate_initial_score(requirement, max_similarity):
-        """Calculate preliminary score based on semantic similarity with STRICTER thresholds."""
-        if max_similarity >= strict_threshold:  # ≥0.80
-            return 0.80  # Strong match (reduced from 0.85 - more conservative)
-        elif max_similarity >= partial_threshold:  # ≥0.65
-            return 0.55  # Partial match (reduced from 0.60 - stricter)
-        elif max_similarity >= 0.50:  # ≥0.50 (was 0.45)
-            return 0.30  # Weak match (reduced from 0.35 - stricter)
+        """Calculate preliminary score based on semantic similarity with VERY STRICT thresholds."""
+        if max_similarity >= strict_threshold:  # ≥0.85
+            return 0.85  # Strong match - very high bar
+        elif max_similarity >= partial_threshold:  # ≥0.70
+            return 0.60  # Partial match - high bar
+        elif max_similarity >= 0.55:  # ≥0.55 (was 0.50)
+            return 0.35  # Weak match - minimum threshold raised
         else:
             return 0.0  # No match
 
@@ -1656,35 +1652,37 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
             detail["llm_rationale"] = verdict.get("rationale", "")
             detail["llm_evidence"] = verdict.get("evidence", "")
             
-            # Calculate final score using enhanced algorithm
+            # Calculate final score using STRICT algorithm
             if present:
                 # Skill is present - score based on confidence and evidence quality
-                # Range: 0.60 to 1.0
-                base_score = 0.60
-                confidence_bonus = 0.40 * confidence
+                # Range: 0.55 to 1.0 (stricter base)
+                base_score = 0.55  # Lowered from 0.60
+                confidence_bonus = 0.45 * confidence  # Increased range (was 0.40)
                 detail["score"] = base_score + confidence_bonus
                 
-                # Boost for strong evidence (high semantic similarity)
-                if detail["max_similarity"] >= 0.85:
-                    detail["score"] = min(1.0, detail["score"] * 1.10)  # 10% boost
+                # Boost for strong evidence (high semantic similarity) - stricter thresholds
+                if detail["max_similarity"] >= 0.90:
+                    detail["score"] = min(1.0, detail["score"] * 1.12)  # 12% boost for very strong
+                elif detail["max_similarity"] >= 0.85:
+                    detail["score"] = min(1.0, detail["score"] * 1.08)  # 8% boost (was 10%)
                 elif detail["max_similarity"] >= 0.75:
-                    detail["score"] = min(1.0, detail["score"] * 1.05)  # 5% boost
+                    detail["score"] = min(1.0, detail["score"] * 1.04)  # 4% boost (was 5%)
                     
             else:
-                # Skill is absent - penalize based on confidence
-                if confidence >= 0.8:
+                # Skill is absent - stricter penalties
+                if confidence >= 0.85:  # Raised from 0.8
                     # Highly confident it's missing - zero points
                     detail["score"] = 0.0
-                elif confidence >= 0.6:
-                    # Likely missing - small residual score
-                    detail["score"] = 0.10
-                elif confidence >= 0.4:
-                    # Uncertain - give some benefit of doubt
-                    detail["score"] = 0.25
+                elif confidence >= 0.70:  # Raised from 0.6
+                    # Likely missing - very small residual score
+                    detail["score"] = 0.05  # Reduced from 0.10
+                elif confidence >= 0.50:  # Raised from 0.4
+                    # Uncertain - minimal benefit of doubt
+                    detail["score"] = 0.20  # Reduced from 0.25
                 else:
                     # Low confidence in absence - maybe present but unclear
-                    # Use semantic similarity as tiebreaker
-                    detail["score"] = min(0.40, detail["pre_llm_score"] * 0.8)
+                    # Use semantic similarity as tiebreaker (more conservative)
+                    detail["score"] = min(0.35, detail["pre_llm_score"] * 0.7)  # Reduced from 0.40 and 0.8
 
     # Step 4: Calculate overall coverage with sophisticated weighting
     must_scores = [d["score"] for d in must_details.values()]
@@ -1701,17 +1699,19 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
     must_total = len(must_details) if must_details else 1
     must_fulfillment_rate = must_present_count / must_total
     
-    # Penalty factor: reduces overall score if many must-haves missing
-    if must_fulfillment_rate < 0.5:  # Less than 50% must-haves present
-        penalty_factor = 0.70  # 30% penalty
-    elif must_fulfillment_rate < 0.7:  # 50-70% present
-        penalty_factor = 0.85  # 15% penalty
+    # Penalty factor: STRICT penalties for missing must-haves
+    if must_fulfillment_rate < 0.4:  # Less than 40% must-haves present (was 50%)
+        penalty_factor = 0.60  # 40% penalty (was 30%)
+    elif must_fulfillment_rate < 0.6:  # 40-60% present (was 50-70%)
+        penalty_factor = 0.75  # 25% penalty (was 15%)
+    elif must_fulfillment_rate < 0.8:  # 60-80% present (new tier)
+        penalty_factor = 0.90  # 10% penalty
     else:
-        penalty_factor = 1.0  # No penalty
+        penalty_factor = 1.0  # No penalty only if 80%+ met
     
-    # Calculate overall: 75% must-have, 25% nice-to-have (must-haves matter more)
+    # Calculate overall: 80% must-have, 20% nice-to-have (must-haves matter MUCH more)
     if must_scores:
-        raw_overall = (0.75 * must_coverage + 0.25 * nice_coverage)
+        raw_overall = (0.80 * must_coverage + 0.20 * nice_coverage)  # Changed from 75/25
         overall_coverage = raw_overall * penalty_factor
     else:
         overall_coverage = nice_coverage
@@ -1803,12 +1803,12 @@ For EACH requirement, provide:
    ✅ TRUE if: Mentioned in projects/experience + specific use cases described
    ❌ FALSE if: Not mentioned OR only in skills list without usage proof
 
-2. **confidence** (0.0 to 1.0): Certainty level
-   - 0.9-1.0: Used in multiple projects with detailed descriptions
-   - 0.7-0.8: Used in at least one project with clear description
-   - 0.5-0.6: Mentioned with minimal context or only in skills list
-   - 0.3-0.4: Weak/indirect mention or possible related skill
-   - 0.0-0.2: Not found or only vague reference
+2. **confidence** (0.0 to 1.0): Certainty level - BE STRICT!
+   - 0.9-1.0: Used extensively in multiple projects with detailed, concrete descriptions
+   - 0.7-0.8: Used in at least one substantial project with clear, specific description
+   - 0.5-0.6: Mentioned with some context OR in skills list with light project usage
+   - 0.3-0.4: Only in skills list without evidence OR weak/indirect mention
+   - 0.0-0.2: Not found, vague reference, or only aspirational mention
 
 3. **rationale** (15-25 words): SPECIFIC, UNIQUE explanation
    ⚠️ MUST BE UNIQUE PER REQUIREMENT - Don't use generic phrases!
