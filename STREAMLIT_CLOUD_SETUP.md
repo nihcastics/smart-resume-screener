@@ -20,10 +20,13 @@ Your app needs **Streamlit Secrets** configured to connect to the Supabase datab
 # Google Gemini API Key (get from https://makersuite.google.com/app/apikey)
 GEMINI_API_KEY = "your_gemini_api_key_here"
 
-# PostgreSQL Database URL (from Supabase Dashboard → Settings → Database)
-# Format: postgresql://postgres:YOUR_PASSWORD@db.xxxxx.supabase.co:5432/postgres
+# PostgreSQL Database URL
+# RECOMMENDED: Use Supabase Connection Pooler for better reliability
+# Go to: Supabase Dashboard → Settings → Database → Connection Pooling
+# Copy the "Transaction" mode connection string (port 6543)
+# Format: postgresql://postgres.xxxxx:[PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres
 # IMPORTANT: URL-encode special characters in password (@ becomes %40, # becomes %23, etc.)
-DATABASE_URL = "postgresql://postgres:your_password@db.xxxxx.supabase.co:5432/postgres"
+DATABASE_URL = "postgresql://postgres.xxxxx:your_password@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
 
 # Hugging Face Hub Token (get from https://huggingface.co/settings/tokens)
 HF_TOKEN = "your_hf_token_here"
@@ -31,7 +34,8 @@ HF_TOKEN = "your_hf_token_here"
 
 **Where to find your values:**
 - `GEMINI_API_KEY`: Your Google AI API key from the `.env` file
-- `DATABASE_URL`: Your Supabase connection string (remember to URL-encode the password)
+- `DATABASE_URL`: **Use Connection Pooler URL from Supabase** (more reliable than direct connection)
+  - Supabase Dashboard → Settings → Database → **Connection Pooling** → **Transaction mode**
 - `HF_TOKEN`: Your Hugging Face token from the `.env` file
 
 #### 3. Save & Reboot
@@ -53,12 +57,22 @@ After rebooting, you should see:
 
 ### Issue: "Database not connected" warning
 
-**Solution 1: Check Secrets Format**
+**Solution 1: Use Connection Pooler (Fixes IPv6 issues)**
+1. Go to Supabase Dashboard → Settings → Database
+2. Scroll to **Connection Pooling** section
+3. Copy the **"Transaction"** mode connection string
+   - Uses port **6543** (not 5432)
+   - Format: `postgresql://postgres.xxxxx:[PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres`
+4. Replace `[PASSWORD]` with your password (URL-encode special chars)
+5. Update DATABASE_URL in Streamlit secrets
+6. Reboot app
+
+**Solution 2: Check Secrets Format**
 - Ensure no extra spaces before/after `=`
 - Use quotes around values: `DATABASE_URL = "postgresql://..."`
 - Make sure password `@` is encoded as `%40`
 
-**Solution 2: Verify Supabase Connection**
+**Solution 3: Verify Supabase Connection**
 1. Go to https://supabase.com/dashboard
 2. Select your project
 3. Go to **Settings** → **Database**

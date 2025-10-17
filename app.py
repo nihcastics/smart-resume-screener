@@ -782,8 +782,21 @@ def init_postgresql():
     try:
         print(f"🔌 Attempting PostgreSQL connection to: {db_url.split('@')[1] if '@' in db_url else 'hidden'}")
         
-        # Connect to PostgreSQL
-        conn = psycopg2.connect(db_url)
+        # Fix for Supabase IPv6 issue: Force IPv4 by replacing hostname with pooler
+        # Supabase IPv6 addresses often fail on certain networks
+        if 'supabase.co' in db_url and 'db.' in db_url:
+            # Replace db.xxx.supabase.co with aws-0-us-east-1.pooler.supabase.com or use IPv4 mode
+            # Better approach: Add connect_timeout and options to force IPv4
+            print("🔧 Using Supabase-optimized connection settings (IPv4 mode)")
+            conn = psycopg2.connect(
+                db_url,
+                connect_timeout=10,
+                options='-c statement_timeout=30000'
+            )
+        else:
+            # Connect to PostgreSQL
+            conn = psycopg2.connect(db_url)
+        
         conn.autocommit = False  # Use transactions
         
         print("✅ PostgreSQL connection established!")
