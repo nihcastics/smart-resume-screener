@@ -1357,20 +1357,18 @@ def refine_atom_list(atoms, nlp=None, reserved_canonicals=None, limit=50):
     return refined, reserved
 
 def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_chunks, embedder, model=None,
-                                   faiss_index=None, strict_threshold=0.60, partial_threshold=0.48,
+                                   faiss_index=None, strict_threshold=0.75, partial_threshold=0.60,
                                    nlp=None, jd_text=""):
     """
-    Requirement coverage that relies on RAG evidence + LLM confirmation instead of lexicon heuristics.
-    - Retrieves the most relevant resume snippets for every requirement
-    - Aligns each requirement with its originating JD context
-    - Uses the LLM to render a present/missing verdict with confidence
-    - Applies competency awareness as a gentle post-adjustment
-    - Ensures unique scoring per resume by incorporating resume-specific context
-    """
-
-    # Resume-specific fingerprint to ensure variability across candidates
-    resume_fingerprint = hash(resume_text[:500]) % 1000 / 10000.0  # Small variability factor (0-0.1)
+    Clean, accurate requirement coverage analysis:
+    1. Use semantic search to find relevant resume sections for each requirement
+    2. LLM verifies if requirement is actually met based on evidence
+    3. Score based on: presence (yes/no) + confidence (0-1) + evidence quality
     
+    No random adjustments, no fingerprints, just accurate matching.
+    """
+    
+    # Step 1: Encode resume chunks for semantic search
     chunk_embs = None
     if resume_chunks and embedder:
         try:
@@ -1380,239 +1378,146 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
         except Exception:
             chunk_embs = None
 
-    # Pre-compute JD sentence contexts for requirement alignment
-    normalized_jd = jd_text.lower() if jd_text else ""
-    jd_sentences = []
-    if jd_text:
-        raw_sentences = re.split(r'(?<=[.!?])\s+', jd_text)
-        for sent in raw_sentences:
-            s = sent.strip()
-            if 8 <= len(s) <= 240:
-                jd_sentences.append(s)
-        if not jd_sentences:
-            jd_sentences = [jd_text.strip()]
-
-    jd_embs = None
-    if embedder and jd_sentences:
-        try:
-            jd_embs = embedder.encode(jd_sentences, convert_to_numpy=True, normalize_embeddings=True)
-            if jd_embs.ndim == 1:
-                jd_embs = jd_embs.reshape(1, -1)
-        except Exception:
-            jd_embs = None
-
-    # Pre-compute competency signals for semantic context awareness (if nlp available)
-    if nlp is not None:
-        try:
-            comp_scores, comp_evd = compute_competency_scores(
-                resume_text, resume_chunks, embedder, nlp, model=model, faiss_index=faiss_index
-            )
-        except Exception:
-            comp_scores, comp_evd = {}, {}
-    else:
-        comp_scores, comp_evd = {}, {}
-
-    catalog = build_competency_catalog()
-    atom_to_comp_must, atom_kind_must = map_atoms_to_competencies(must_atoms, catalog)
-    atom_to_comp_nice, atom_kind_nice = map_atoms_to_competencies(nice_atoms, catalog)
-
-    def comp_adjustment(atom, base_score, req_type):
-        """Apply gentle competency-aware adjustments to prevent over-penalisation."""
-        a_norm = normalize_text(atom)
-        if req_type == "must-have":
-            comp_id = atom_to_comp_must.get(a_norm)
-            kind = atom_kind_must.get(a_norm)
-        else:
-            comp_id = atom_to_comp_nice.get(a_norm)
-            kind = atom_kind_nice.get(a_norm)
-        if not comp_id:
-            return base_score
-
-        cscore = float(comp_scores.get(comp_id, 0.0))
-        if (kind or "framework") == "core":
-            if base_score >= 1.0 and cscore < 0.50:
-                return 0.75
-            if base_score >= 0.85 and cscore < 0.40:
-                return 0.60
-        else:
-            if base_score >= 1.0 and cscore < 0.25:
-                return 0.90
-        return base_score
-
-    def summarize_snippet(text, limit=240):
-        text = (text or "").strip()
-        text = re.sub(r'\s+', ' ', text)
-        if len(text) > limit:
-            text = text[:limit-3].rstrip() + "..."
-        return text
-
-    def gather_resume_contexts(atom, top_k=3):
-        contexts, sims = [], []
-        if not atom:
-            return contexts, 0.0
-
+    def get_best_resume_evidence(requirement, top_k=5):
+        """Find the most relevant resume sections for this requirement."""
+        if not requirement:
+            return [], 0.0
+        
+        evidence = []
+        similarities = []
+        
+        # Use FAISS if available (faster)
         if faiss_index is not None and resume_chunks and embedder:
-            fetched = retrieve_relevant_context(atom, faiss_index, resume_chunks, embedder, top_k=top_k)
-            for snippet, sim in fetched:
-                clip_sim = float(np.clip(sim, -1.0, 1.0))
-                contexts.append({
-                    "text": summarize_snippet(snippet),
-                    "similarity": clip_sim
-                })
-                sims.append(max(0.0, clip_sim))
+            try:
+                results = retrieve_relevant_context(requirement, faiss_index, resume_chunks, embedder, top_k=top_k)
+                for text, sim in results:
+                    sim = float(np.clip(sim, 0.0, 1.0))
+                    evidence.append({"text": text[:300], "similarity": round(sim, 3)})
+                    similarities.append(sim)
+            except Exception:
+                pass
+        
+        # Fallback to direct embedding comparison
         elif chunk_embs is not None and embedder and resume_chunks:
             try:
-                atom_emb = embedder.encode(atom, convert_to_numpy=True, normalize_embeddings=True)
-                if atom_emb.ndim > 1:
-                    atom_emb = atom_emb[0]
-                scores = np.dot(chunk_embs, atom_emb)
-                if scores.size > 0:
-                    top_idx = np.argsort(scores)[-top_k:][::-1]
-                    for idx in top_idx:
-                        if idx < 0 or idx >= len(resume_chunks):
-                            continue
-                        sim_val = float(np.clip(scores[idx], -1.0, 1.0))
-                        if sim_val <= 0 and len(contexts) >= top_k:
-                            continue
-                        contexts.append({
-                            "text": summarize_snippet(resume_chunks[idx]),
-                            "similarity": sim_val
-                        })
-                        sims.append(max(0.0, sim_val))
+                req_emb = embedder.encode(requirement, convert_to_numpy=True, normalize_embeddings=True)
+                if req_emb.ndim > 1:
+                    req_emb = req_emb[0]
+                
+                sims = np.dot(chunk_embs, req_emb)
+                top_indices = np.argsort(sims)[-top_k:][::-1]
+                
+                for idx in top_indices:
+                    if 0 <= idx < len(resume_chunks):
+                        sim = float(np.clip(sims[idx], 0.0, 1.0))
+                        if sim > 0.3:  # Only include relevant matches
+                            evidence.append({"text": resume_chunks[idx][:300], "similarity": round(sim, 3)})
+                            similarities.append(sim)
             except Exception:
                 pass
+        
+        max_sim = max(similarities) if similarities else 0.0
+        return evidence[:top_k], round(max_sim, 3)
 
-        top_similarity = max(sims) if sims else 0.0
-        return contexts[:top_k], float(top_similarity)
+    def calculate_initial_score(requirement, max_similarity):
+        """Calculate preliminary score based on semantic similarity."""
+        if max_similarity >= strict_threshold:
+            return 0.85  # Strong match
+        elif max_similarity >= partial_threshold:
+            return 0.60  # Partial match
+        elif max_similarity >= 0.45:
+            return 0.35  # Weak match
+        else:
+            return 0.0  # No match
 
-    def gather_jd_context(atom):
-        if not jd_text:
-            return {"text": "", "similarity": 0.0}
-
-        lowered_atom = atom.lower() if atom else ""
-        if lowered_atom and lowered_atom in normalized_jd:
-            idx = normalized_jd.find(lowered_atom)
-            if idx != -1:
-                start = max(0, idx - 120)
-                end = min(len(jd_text), idx + len(atom) + 120)
-                snippet = jd_text[start:end]
-                return {"text": summarize_snippet(snippet), "similarity": 1.0}
-
-        if jd_embs is not None and embedder and atom:
-            try:
-                atom_emb = embedder.encode(atom, convert_to_numpy=True, normalize_embeddings=True)
-                if atom_emb.ndim > 1:
-                    atom_emb = atom_emb[0]
-                sims = np.dot(jd_embs, atom_emb)
-                if sims.size > 0:
-                    idx = int(np.argmax(sims))
-                    sim_val = float(np.clip(sims[idx], -1.0, 1.0))
-                    return {"text": summarize_snippet(jd_sentences[idx]), "similarity": sim_val}
-            except Exception:
-                pass
-
-        return {"text": "", "similarity": 0.0}
-
-    def assess(atoms, req_type):
+    # Step 2: Analyze each requirement
+    def analyze_requirements(atoms, req_type):
+        """Analyze a list of requirements (must-have or nice-to-have)."""
         details = {}
-        queue = []
+        llm_queue = []
+        
         for atom in atoms:
-            resume_ctx, top_similarity = gather_resume_contexts(atom)
-            jd_ctx = gather_jd_context(atom)
-
-            if top_similarity >= strict_threshold:
-                base_score = 0.80
-            elif top_similarity >= partial_threshold:
-                base_score = 0.55
-            else:
-                base_score = 0.0
-
+            evidence, max_sim = get_best_resume_evidence(atom)
+            initial_score = calculate_initial_score(atom, max_sim)
+            
             detail = {
                 "req_type": req_type,
-                "similarity": float(top_similarity),
-                "max_similarity": float(top_similarity),
-                "resume_contexts": resume_ctx,
-                "jd_context": jd_ctx,
-                "pre_llm_score": float(base_score),
-                "score": float(base_score),
+                "similarity": max_sim,
+                "max_similarity": max_sim,
+                "resume_contexts": evidence,
+                "jd_context": {"text": "", "similarity": 0.0},  # Simplified - focus on resume evidence
+                "pre_llm_score": initial_score,
+                "score": initial_score,
                 "llm_present": False,
                 "llm_confidence": 0.0,
-                "llm_rationale": ""
+                "llm_rationale": "",
+                "llm_evidence": ""
             }
             details[atom] = detail
-
-            if model:
-                queue.append({
+            
+            # Queue for LLM verification if model available and evidence found
+            if model and evidence:
+                llm_queue.append({
                     "requirement": atom,
                     "req_type": req_type,
-                    "resume_contexts": resume_ctx,
-                    "jd_context": jd_ctx,
-                    "max_similarity": float(top_similarity)
+                    "resume_evidence": evidence,
+                    "max_similarity": max_sim
                 })
+        
+        return details, llm_queue
 
-        return details, queue
+    must_details, must_queue = analyze_requirements(must_atoms, "must-have")
+    nice_details, nice_queue = analyze_requirements(nice_atoms, "nice-to-have") if nice_atoms else ({}, [])
 
-    must_details, must_queue = assess(must_atoms, "must-have")
-    nice_details, nice_queue = assess(nice_atoms, "nice-to-have") if nice_atoms else ({}, [])
-
+    # Step 3: LLM verification for accurate presence detection
     if model and (must_queue or nice_queue):
-        payload = must_queue + nice_queue
-        llm_results = llm_verify_requirements(model, payload, resume_text, jd_text)
-
+        all_queue = must_queue + nice_queue
+        llm_results = llm_verify_requirements_clean(model, all_queue, resume_text)
+        
+        # Update details with LLM verdicts
         for atom, detail in {**must_details, **nice_details}.items():
             verdict = llm_results.get(atom)
             if not verdict:
                 continue
-
-            present = bool(verdict.get("present"))
-            confidence = verdict.get("confidence", 0.0)
-            try:
-                confidence = float(confidence)
-            except Exception:
-                confidence = 0.0
+            
+            present = verdict.get("present", False)
+            confidence = float(verdict.get("confidence", 0.0))
             confidence = max(0.0, min(1.0, confidence))
-
-            rationale = str(verdict.get("rationale", "") or "").strip()
-            evidence = str(verdict.get("evidence", "") or "").strip()
-
+            
             detail["llm_present"] = present
             detail["llm_confidence"] = confidence
-            if evidence and not rationale:
-                rationale = evidence
-            detail["llm_rationale"] = rationale
-            if evidence:
-                detail["llm_evidence"] = evidence
-
+            detail["llm_rationale"] = verdict.get("rationale", "")
+            detail["llm_evidence"] = verdict.get("evidence", "")
+            
+            # Calculate final score based on LLM verdict
             if present:
-                boosted = 0.90 + 0.10 * confidence
-                # Add small resume-specific variation to prevent identical scores
-                detail["score"] = float(np.clip(boosted + resume_fingerprint * 0.05, 0.0, 1.0))
+                # Present: score based on confidence (0.7 to 1.0 range)
+                detail["score"] = 0.70 + (0.30 * confidence)
             else:
-                dampened = detail["pre_llm_score"] * (0.35 if confidence >= 0.6 else 0.5)
-                detail["score"] = float(np.clip(dampened, 0.0, 1.0))
+                # Not present: reduce score based on confidence in absence
+                if confidence >= 0.7:
+                    detail["score"] = 0.0  # Confidently absent
+                elif confidence >= 0.5:
+                    detail["score"] = 0.15  # Likely absent
+                else:
+                    detail["score"] = detail["pre_llm_score"] * 0.5  # Uncertain, keep some score
 
-    for atom, detail in must_details.items():
-        adjusted = comp_adjustment(atom, detail["score"], detail["req_type"])
-        detail["score"] = float(np.clip(adjusted, 0.0, 1.0))
-
-    for atom, detail in nice_details.items():
-        adjusted = comp_adjustment(atom, detail["score"], detail["req_type"])
-        detail["score"] = float(np.clip(adjusted, 0.0, 1.0))
-
+    # Step 4: Calculate overall coverage scores
     must_scores = [d["score"] for d in must_details.values()]
     nice_scores = [d["score"] for d in nice_details.values()]
 
-    must_cov = float(np.mean(must_scores)) if must_scores else 0.0
-    nice_cov = float(np.mean(nice_scores)) if nice_scores else 1.0
-
-    overall = 0.70 * must_cov + 0.30 * nice_cov if must_scores else nice_cov
+    must_coverage = float(np.mean(must_scores)) if must_scores else 0.0
+    nice_coverage = float(np.mean(nice_scores)) if nice_scores else 1.0
+    
+    # Overall: 70% must-have, 30% nice-to-have
+    overall_coverage = (0.70 * must_coverage + 0.30 * nice_coverage) if must_scores else nice_coverage
 
     return {
-        "overall": overall,
-        "must": must_cov,
-        "nice": nice_cov,
+        "overall": round(overall_coverage, 3),
+        "must": round(must_coverage, 3),
+        "nice": round(nice_coverage, 3),
         "details": {"must": must_details, "nice": nice_details},
-        "competencies": {"scores": comp_scores, "evidence": comp_evd}
+        "competencies": {"scores": {}, "evidence": {}}  # Removed complex competency logic
     }
 
 # ---- LLM wrappers / prompts ----
@@ -1636,7 +1541,184 @@ def llm_json(model, prompt):
         try: return json.loads(s)
         except: return {}
 
+def llm_verify_requirements_clean(model, requirements_payload, resume_text):
+    """
+    Clean LLM verification: Is each requirement present in the resume? Yes/No + Confidence + Evidence.
+    No complexity, no gibberish, just accurate matching.
+    """
+    if not requirements_payload or not model:
+        return {}
+
+    results = {}
+    batch_size = 10  # Process 10 requirements at a time
+    
+    # Prepare resume excerpt (limit to avoid token overflow)
+    resume_excerpt = resume_text[:4000] if len(resume_text) > 4000 else resume_text
+    
+    for i in range(0, len(requirements_payload), batch_size):
+        batch = requirements_payload[i:i + batch_size]
+        
+        # Format batch for LLM
+        formatted_reqs = []
+        for item in batch:
+            req_name = item.get("requirement", "")
+            evidence_snippets = []
+            for ev in (item.get("resume_evidence") or [])[:3]:
+                evidence_snippets.append({
+                    "text": ev.get("text", "")[:250],
+                    "similarity": ev.get("similarity", 0.0)
+                })
+            
+            formatted_reqs.append({
+                "requirement": req_name,
+                "type": item.get("req_type", ""),
+                "evidence": evidence_snippets
+            })
+        
+        prompt = f"""You are an expert technical recruiter. Verify if each requirement is met by the candidate's resume.
+
+**REQUIREMENTS TO VERIFY:**
+{json.dumps(formatted_reqs, indent=2)}
+
+**CANDIDATE'S FULL RESUME:**
+{resume_excerpt}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+INSTRUCTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For each requirement, determine:
+
+1. **present** (true/false): Is this skill/technology clearly mentioned and used in the resume?
+   - true: Explicitly mentioned with project usage or experience
+   - false: Not mentioned OR just listed without evidence of use
+
+2. **confidence** (0.0 to 1.0): How certain are you?
+   - 1.0: Direct mention with concrete examples
+   - 0.8: Clearly stated with some details
+   - 0.6: Mentioned but limited evidence
+   - 0.4: Weak/indirect evidence
+   - 0.2: Barely mentioned or unclear
+   - 0.0: Not found
+
+3. **rationale** (max 20 words): Brief factual explanation
+
+4. **evidence** (max 30 words): Quote the specific line from resume that proves it (if present=true)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MATCHING RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ **Accept as matches:**
+- Exact names: "Python" = "Python"
+- Common abbreviations: "K8s" = "Kubernetes", "JS" = "JavaScript"
+- Version variants: "React 18" satisfies "React"
+- Framework specifics: "Django REST" satisfies "Django"
+
+❌ **Reject as non-matches:**
+- Different tech: "MySQL" ≠ "PostgreSQL"
+- Vague categories: "databases" ≠ "MongoDB"
+- Insufficient years: "2 years Python" ≠ "5+ years Python"
+- Listed only: Skill in tech list but no project usage = weak match (confidence < 0.6)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+OUTPUT FORMAT (JSON only, no explanations)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{{
+  "requirement_name": {{
+    "present": true or false,
+    "confidence": number (0.0 to 1.0),
+    "rationale": "brief explanation (max 20 words)",
+    "evidence": "direct quote from resume (empty if present=false)"
+  }}
+}}
+
+CRITICAL:
+- Base answers ONLY on resume content
+- Do NOT invent or assume skills
+- Keep rationale under 20 words
+- Keep evidence under 30 words
+- Return ONLY valid JSON (no markdown, no extra text)
+
+BEGIN:
+"""
+
+        try:
+            raw = llm_json(model, prompt)
+            if not isinstance(raw, dict):
+                continue
+            
+            # Extract results for each requirement in batch
+            for item in batch:
+                req_name = item.get("requirement", "")
+                if not req_name:
+                    continue
+                
+                # Try exact match first
+                verdict = raw.get(req_name)
+                
+                # Try normalized match if exact fails
+                if verdict is None:
+                    req_norm = normalize_text(req_name)
+                    for key, value in raw.items():
+                        if normalize_text(key) == req_norm:
+                            verdict = value
+                            break
+                
+                if isinstance(verdict, dict):
+                    # Extract and validate fields
+                    present = bool(verdict.get("present", False))
+                    
+                    confidence = verdict.get("confidence", 0.0)
+                    try:
+                        confidence = float(confidence)
+                    except:
+                        confidence = 0.0
+                    confidence = max(0.0, min(1.0, confidence))
+                    
+                    rationale = str(verdict.get("rationale", "")).strip()
+                    evidence = str(verdict.get("evidence", "")).strip()
+                    
+                    # Clean text: remove repetition, limit length
+                    def clean_llm_text(text, max_words=25):
+                        if not text:
+                            return ""
+                        # Remove markdown and code artifacts
+                        text = re.sub(r'```\w*', '', text)
+                        # Remove repeated words (e.g., "Python Python Python")
+                        text = re.sub(r'\b(\w+)(\s+\1\b){2,}', r'\1', text, flags=re.IGNORECASE)
+                        # Remove repeated punctuation
+                        text = re.sub(r'([.,!?])\1+', r'\1', text)
+                        # Normalize whitespace
+                        text = re.sub(r'\s+', ' ', text).strip()
+                        # Truncate to word limit
+                        words = text.split()
+                        if len(words) > max_words:
+                            text = ' '.join(words[:max_words])
+                        return text
+                    
+                    rationale = clean_llm_text(rationale, max_words=20)
+                    evidence = clean_llm_text(evidence, max_words=30)
+                    
+                    results[req_name] = {
+                        "present": present,
+                        "confidence": confidence,
+                        "rationale": rationale,
+                        "evidence": evidence
+                    }
+                    
+        except Exception as e:
+            # Skip this batch on error, continue with next
+            continue
+    
+    return results
+
 def llm_verify_requirements(model, requirements_payload, resume_text, jd_text=""):
+    """Legacy function - redirects to new clean implementation."""
+    return llm_verify_requirements_clean(model, requirements_payload, resume_text)
+
+def llm_verify_requirements_old(model, requirements_payload, resume_text, jd_text=""):
     """
     Cross-verify requirement coverage using curated RAG evidence + JD context.
     Returns a mapping of requirement -> {present, confidence, rationale, evidence}.
