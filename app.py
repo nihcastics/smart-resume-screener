@@ -1,382 +1,1046 @@
-import os, sys
-os.environ['TOKENIZERS_PARALLELISM'] = 'false'
-os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
-os.environ['TORCH_CPP_LOG_LEVEL'] = 'ERROR'
-os.environ['PYTORCH_JIT'] = '0'
+""""""import os, sys
 
-import warnings, logging, io
-stderr_backup = sys.stderr
-sys.stderr = io.StringIO()
-warnings.filterwarnings('ignore')
-logging.getLogger().setLevel(logging.ERROR)
-logging.getLogger('sentence_transformers').setLevel(logging.ERROR)
-logging.getLogger('transformers').setLevel(logging.ERROR)
+Smart Resume Screener - Modular Version
 
-import streamlit as st
-import fitz  # PyMuPDF
-import spacy
-from sentence_transformers import SentenceTransformer
-import faiss
-import numpy as np
-import google.generativeai as genai
-from dotenv import load_dotenv
-import json, time, re, tempfile, html
-from datetime import datetime
-from collections import Counter
-import psycopg2
-from psycopg2.extras import Json, RealDictCursor
-import plotly.graph_objects as go
-import plotly.express as px
+"""Smart Resume Screener - Modular Versionos.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
-sys.stderr = stderr_backup
+from modules.config import CSS
+
+from dotenv import load_dotenvMain application file with imports from organized modulesos.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+
 load_dotenv()
 
-# --- Streamlit page ---
-st.set_page_config(layout="wide", page_title="Smart Resume Screener", page_icon="🎯", initial_sidebar_state="collapsed")
+"""os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-CSS = """
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+import streamlit as st
 
-/* ===== GLOBAL RESET & BASE ===== */
-*{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif}
-html,body,[class*="css"],.main,.stApp{background:#060812!important;overflow-x:hidden}
+import tempfileos.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
-/* ===== IMMERSIVE ANIMATED GRADIENT BACKGROUND ===== */
-.stApp{
-    background:linear-gradient(-45deg,#0d0221,#0f0624,#1a0933,#150a2e,#0d0221)!important;
-    background-size:600% 600%!important;
-    animation:cosmicShift 20s ease-in-out infinite!important;
-    position:relative;
-    min-height:100vh;
-}
-@keyframes cosmicShift{
-    0%{background-position:0% 50%}
-    25%{background-position:50% 75%}
-    50%{background-position:100% 50%}
-    75%{background-position:50% 25%}
-    100%{background-position:0% 50%}
-}
+import json
 
-/* ===== FLOATING GLOW PARTICLES ===== */
-.stApp::before{
-    content:'';
-    position:fixed;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
-    background-image:radial-gradient(circle at 20% 30%,rgba(139,92,246,.12) 0%,transparent 40%),
-                     radial-gradient(circle at 80% 70%,rgba(236,72,153,.10) 0%,transparent 45%),
-                     radial-gradient(circle at 50% 50%,rgba(99,102,241,.08) 0%,transparent 50%),
-                     radial-gradient(circle at 10% 80%,rgba(16,185,129,.06) 0%,transparent 40%);
-    pointer-events:none;
-    z-index:0;
-    animation:glowPulse 25s ease-in-out infinite;
-}
-@keyframes glowPulse{
-    0%,100%{opacity:1;transform:translate(0,0) scale(1)}
-    25%{opacity:.85;transform:translate(40px,-40px) scale(1.15)}
-    50%{opacity:.95;transform:translate(-30px,30px) scale(1.05)}
-    75%{opacity:.9;transform:translate(30px,20px) scale(1.1)}
-}
+from datetime import datetime# Environment setup and configurationos.environ['TORCH_CPP_LOG_LEVEL'] = 'ERROR'
 
-/* ===== MODERN TYPOGRAPHY WITH BETTER HIERARCHY ===== */
-h1{font-family:'Space Grotesk',sans-serif!important;color:#f8fafc!important;font-weight:800!important;font-size:3.5rem!important;letter-spacing:-.04em!important;text-shadow:0 4px 20px rgba(139,92,246,.6),0 0 60px rgba(236,72,153,.3)}
-h2{font-family:'Space Grotesk',sans-serif!important;color:#f1f5f9!important;font-weight:700!important;font-size:2.25rem!important;letter-spacing:-.03em!important;text-shadow:0 3px 15px rgba(99,102,241,.5)}
-h3{font-family:'Space Grotesk',sans-serif!important;color:#e2e8f0!important;font-weight:700!important;font-size:1.75rem!important;letter-spacing:-.02em!important;text-shadow:0 2px 12px rgba(139,92,246,.4)}
-h4,h5,h6{font-family:'Space Grotesk',sans-serif!important;color:#cbd5e1!important;font-weight:600!important;text-shadow:0 2px 8px rgba(99,102,241,.3)}
-p,span,div{color:#94a3b8!important;line-height:1.8!important;font-size:1.05rem!important}
 
-/* ===== ULTRA-MODERN FLUID TABS ===== */
-.stTabs [data-baseweb="tab-list"]{
-    gap:24px;
-    background:linear-gradient(135deg,rgba(21,10,46,.75),rgba(13,2,33,.75));
-    border-bottom:none;
-    padding:16px 28px;
-    border-radius:24px 24px 0 0;
-    backdrop-filter:blur(30px) saturate(180%);
-    box-shadow:0 -15px 50px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.05);
-    border:1px solid rgba(139,92,246,.15);
-}
-.stTabs [data-baseweb="tab"]{
-    height:64px;
-    padding:0 42px;
-    background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(99,102,241,.08));
-    border:2px solid rgba(139,92,246,.2);
-    border-radius:18px;
-    color:#a78bfa;
-    font-family:'Space Grotesk',sans-serif;
-    font-weight:700;
-    font-size:16px;
-    letter-spacing:.5px;
-    transition:all .5s cubic-bezier(.34,1.56,.64,1);
-    backdrop-filter:blur(15px);
-    position:relative;
-    overflow:hidden;
-    box-shadow:0 4px 15px rgba(139,92,246,.15);
-}
-.stTabs [data-baseweb="tab"]::before{
-    content:'';
-    position:absolute;
-    top:0;
-    left:-100%;
-    width:100%;
-    height:100%;
-    background:linear-gradient(90deg,transparent,rgba(139,92,246,.3),rgba(236,72,153,.3),transparent);
-    transition:left .8s cubic-bezier(.4,0,.2,1);
-}
-.stTabs [data-baseweb="tab"]::after{
-    content:'';
-    position:absolute;
-    inset:0;
-    border-radius:18px;
-    padding:2px;
-    background:linear-gradient(135deg,rgba(139,92,246,.4),rgba(236,72,153,.4));
-    -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
-    -webkit-mask-composite:exclude;
-    mask-composite:exclude;
-    opacity:0;
-    transition:opacity .5s ease;
-}
-.stTabs [data-baseweb="tab"]:hover::before{left:100%}
-.stTabs [data-baseweb="tab"]:hover::after{opacity:1}
-.stTabs [data-baseweb="tab"]:hover{
-    background:linear-gradient(135deg,rgba(139,92,246,.18),rgba(236,72,153,.15));
-    border-color:rgba(139,92,246,.5);
-    transform:translateY(-6px) scale(1.03);
-    box-shadow:0 15px 45px rgba(139,92,246,.35),0 0 50px rgba(236,72,153,.25);
-    color:#e9d5ff;
-}
-.stTabs [aria-selected="true"]{
-    background:linear-gradient(135deg,#8b5cf6 0%,#ec4899 100%)!important;
-    color:#fff!important;
-    border-color:rgba(139,92,246,.8)!important;
-    box-shadow:0 20px 60px rgba(139,92,246,.6),0 0 80px rgba(236,72,153,.5),inset 0 2px 0 rgba(255,255,255,.3),inset 0 -2px 0 rgba(0,0,0,.2)!important;
-    transform:translateY(-4px) scale(1.02);
-}
 
-/* ===== MAGNETIC GLOWING BUTTONS ===== */
-.stButton>button{
-    background:linear-gradient(135deg,#8b5cf6 0%,#6366f1 50%,#ec4899 100%);
-    background-size:200% 200%;
-    color:#fff;
-    border:none;
-    border-radius:20px;
-    padding:22px 60px;
-    font-family:'Space Grotesk',sans-serif;
-    font-weight:800;
-    font-size:17px;
-    letter-spacing:1.5px;
-    text-transform:uppercase;
-    transition:all .5s cubic-bezier(.34,1.56,.64,1);
-    box-shadow:0 15px 50px rgba(139,92,246,.5),0 0 60px rgba(236,72,153,.3),inset 0 2px 0 rgba(255,255,255,.3),inset 0 -2px 0 rgba(0,0,0,.2);
-    position:relative;
-    overflow:hidden;
-    animation:gradientSlide 4s ease infinite;
-}
-@keyframes gradientSlide{
-    0%,100%{background-position:0% 50%}
-    50%{background-position:100% 50%}
-}
-.stButton>button::before{
-    content:'';
-    position:absolute;
-    top:50%;
-    left:50%;
-    width:0;
-    height:0;
-    border-radius:50%;
-    background:radial-gradient(circle,rgba(255,255,255,.4),transparent 70%);
-    transform:translate(-50%,-50%);
-    transition:width .7s cubic-bezier(.4,0,.2,1),height .7s cubic-bezier(.4,0,.2,1);
-}
-.stButton>button::after{
-    content:'';
-    position:absolute;
-    inset:-2px;
-    border-radius:22px;
-    background:linear-gradient(45deg,#8b5cf6,#ec4899,#6366f1,#8b5cf6);
-    background-size:400% 400%;
-    opacity:0;
-    filter:blur(20px);
-    transition:opacity .5s ease;
-    animation:rotateGradient 6s linear infinite;
-    z-index:-1;
-}
-@keyframes rotateGradient{
-    0%{background-position:0% 50%}
-    50%{background-position:100% 50%}
-    100%{background-position:0% 50%}
-}
-.stButton>button:hover::before{width:400px;height:400px}
-.stButton>button:hover::after{opacity:.8}
-.stButton>button:hover{
-    transform:translateY(-6px) scale(1.05);
-    box-shadow:0 25px 80px rgba(139,92,246,.7),0 0 90px rgba(236,72,153,.6),0 0 120px rgba(99,102,241,.4),inset 0 2px 0 rgba(255,255,255,.4);
-}
-.stButton>button:active{transform:translateY(-3px) scale(.98)}
+from modules.models import load_modelsfrom modules.config import CSSos.environ['PYTORCH_JIT'] = '0'
 
-/* ===== IMMERSIVE FILE UPLOADER ===== */
-.stFileUploader{
-    background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(236,72,153,.08));
-    border:3px dashed rgba(139,92,246,.5);
+from modules.database import init_postgresql, save_to_db, get_recent
+
+from modules.text_processing import (from dotenv import load_dotenv
+
+    normalize_text, chunk_text, parse_contacts, build_index,
+
+    extract_sections, token_set, contains_atom, extract_atoms_from_text,load_dotenv()import warnings, logging, io
+
+    refine_atom_list, extract_structured_entities, extract_technical_skills
+
+)stderr_backup = sys.stderr
+
+from modules.llm_operations import (
+
+    llm_json, jd_plan_prompt, resume_profile_prompt,# Core importssys.stderr = io.StringIO()
+
+    atomicize_requirements_prompt, analysis_prompt, llm_verify_requirements_clean
+
+)import streamlit as stwarnings.filterwarnings('ignore')
+
+from modules.scoring import (
+
+    compute_global_semantic, evaluate_requirement_coverage,import tempfilelogging.getLogger().setLevel(logging.ERROR)
+
+    compute_cue_alignment, build_competency_catalog,
+
+    compute_competency_scores, map_atoms_to_competenciesimport jsonlogging.getLogger('sentence_transformers').setLevel(logging.ERROR)
+
+)
+
+from modules.resume_parser import parse_resume_pdffrom datetime import datetimelogging.getLogger('transformers').setLevel(logging.ERROR)
+
+from modules.ui_components import section
+
+
+
+st.set_page_config(
+
+    layout="wide",# Module importsimport streamlit as st
+
+    page_title="Smart Resume Screener",
+
+    page_icon="🎯",from modules.models import load_modelsimport fitz  # PyMuPDF
+
+    initial_sidebar_state="collapsed"
+
+)from modules.database import init_postgresql, save_to_db, get_recentimport spacy
+
+
+
+st.markdown(CSS, unsafe_allow_html=True)from modules.text_processing import (from sentence_transformers import SentenceTransformer
+
+
+
+if "models_loaded" not in st.session_state:    normalize_text, chunk_text, parse_contacts, build_index,import faiss
+
+    with st.spinner("🔄 Loading AI models..."):
+
+        model, nlp, embedder, models_ok = load_models()    extract_sections, token_set, contains_atom, extract_atoms_from_text,import numpy as np
+
+        st.session_state["model"] = model
+
+        st.session_state["nlp"] = nlp    refine_atom_list, extract_structured_entities, extract_technical_skillsimport google.generativeai as genai
+
+        st.session_state["embedder"] = embedder
+
+        st.session_state["models_loaded"] = models_ok)from dotenv import load_dotenv
+
+else:
+
+    model = st.session_state.get("model")from modules.llm_operations import (import json, time, re, tempfile, html
+
+    nlp = st.session_state.get("nlp")
+
+    embedder = st.session_state.get("embedder")    llm_json, jd_plan_prompt, resume_profile_prompt,from datetime import datetime
+
+    models_ok = st.session_state.get("models_loaded", False)
+
+    atomicize_requirements_prompt, analysis_prompt, llm_verify_requirements_cleanfrom collections import Counter
+
+if "db_initialized" not in st.session_state:
+
+    db_conn, db_ok = init_postgresql())import psycopg2
+
+    st.session_state["db_conn"] = db_conn
+
+    st.session_state["db_ok"] = db_okfrom modules.scoring import (from psycopg2.extras import Json, RealDictCursor
+
+    st.session_state["db_initialized"] = True
+
+else:    compute_global_semantic, evaluate_requirement_coverage,import plotly.graph_objects as go
+
+    db_conn = st.session_state.get("db_conn")
+
+    db_ok = st.session_state.get("db_ok", False)    compute_cue_alignment, build_competency_catalog,import plotly.express as px
+
+
+
+st.markdown("""    compute_competency_scores, map_atoms_to_competencies
+
+<div style="text-align:center;padding:40px 0 60px 0;">
+
+    <h1 style="font-size:4.5rem;font-weight:900;background:linear-gradient(135deg,#8b5cf6 0%,#ec4899 50%,#6366f1 100%);)sys.stderr = stderr_backup
+
+        -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:20px;
+
+        letter-spacing:-0.04em;text-shadow:0 8px 32px rgba(139,92,246,0.4);">🎯 Smart Resume Screener</h1>from modules.resume_parser import parse_resume_pdfload_dotenv()
+
+    <p style="font-size:1.35rem;color:#a78bfa;font-weight:600;letter-spacing:1px;text-shadow:0 2px 8px rgba(139,92,246,0.3);">
+
+        AI-Powered Candidate Evaluation System</p>from modules.ui_components import section
+
+</div>
+
+""", unsafe_allow_html=True)import plotly.graph_objects as go# --- Streamlit page ---
+
+
+
+if models_ok:import plotly.express as pxst.set_page_config(layout="wide", page_title="Smart Resume Screener", page_icon="🎯", initial_sidebar_state="collapsed")
+
+    model_name = st.session_state.get("gemini_model_name", "Unknown")
+
+    st.success(f"✅ **AI Models Loaded Successfully!** Using Google Gemini: `{model_name}`")
+
+else:
+
+    st.error("❌ **AI Models Not Available** - Please check your GEMINI_API_KEY in `.env` file")# Streamlit page configCSS = """
+
+    st.info("💡 Get a FREE API key at: https://makersuite.google.com/app/apikey")
+
+    st.stop()st.set_page_config(<style>
+
+
+
+if 'analysis_history' not in st.session_state:    layout="wide",@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    st.session_state.analysis_history = []
+
+    page_title="Smart Resume Screener",
+
+tab1, tab2 = st.tabs(["📄 Analyze", "🕒 Recent"])
+
+    page_icon="🎯",/* ===== GLOBAL RESET & BASE ===== */
+
+with tab1:
+
+    st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)    initial_sidebar_state="collapsed"*{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif}
+
+    
+
+    uploaded_file = st.session_state.get('uploaded_file', None))html,body,[class*="css"],.main,.stApp{background:#060812!important;overflow-x:hidden}
+
+    job_description = st.session_state.get('job_description', '')
+
+    
+
+    step_placeholder = st.empty()
+
+    if not uploaded_file:# Apply CSS/* ===== IMMERSIVE ANIMATED GRADIENT BACKGROUND ===== */
+
+        step_placeholder.markdown("""
+
+        <div style="background:linear-gradient(135deg,rgba(99,102,241,.18),rgba(139,92,246,.15));st.markdown(CSS, unsafe_allow_html=True).stApp{
+
+            border:2px solid rgba(99,102,241,.4);border-radius:20px;padding:20px 32px;text-align:center;margin-bottom:24px;">
+
+            <span style="font-size:32px;">👆</span>    background:linear-gradient(-45deg,#0d0221,#0f0624,#1a0933,#150a2e,#0d0221)!important;
+
+            <span style="font-size:17px;font-weight:700;color:#c7d2fe;">Step 1: Upload a resume PDF file</span>
+
+        </div># Initialize models and database    background-size:600% 600%!important;
+
+        """, unsafe_allow_html=True)
+
+    elif not job_description or len(job_description) < 50:if "models_loaded" not in st.session_state:    animation:cosmicShift 20s ease-in-out infinite!important;
+
+        step_placeholder.markdown("""
+
+        <div style="background:linear-gradient(135deg,rgba(236,72,153,.18),rgba(139,92,246,.15));    with st.spinner("🔄 Loading AI models..."):    position:relative;
+
+            border:2px solid rgba(236,72,153,.4);border-radius:20px;padding:20px 32px;text-align:center;margin-bottom:24px;">
+
+            <span style="font-size:32px;">👉</span>        model, nlp, embedder, models_ok = load_models()    min-height:100vh;
+
+            <span style="font-size:17px;font-weight:700;color:#fbbf24;">Step 2: Add job description (minimum 50 characters)</span>
+
+        </div>        st.session_state["model"] = model}
+
+        """, unsafe_allow_html=True)
+
+    else:        st.session_state["nlp"] = nlp@keyframes cosmicShift{
+
+        step_placeholder.markdown("""
+
+        <div style="background:linear-gradient(135deg,rgba(16,185,129,.18),rgba(5,150,105,.15));        st.session_state["embedder"] = embedder    0%{background-position:0% 50%}
+
+            border:2px solid rgba(16,185,129,.5);border-radius:20px;padding:20px 32px;text-align:center;margin-bottom:24px;">
+
+            <span style="font-size:32px;">✅</span>        st.session_state["models_loaded"] = models_ok    25%{background-position:50% 75%}
+
+            <span style="font-size:17px;font-weight:700;color:#6ee7b7;">Ready! Click button below to start analysis</span>
+
+            <span style="font-size:32px;">🚀</span>else:    50%{background-position:100% 50%}
+
+        </div>
+
+        """, unsafe_allow_html=True)    model = st.session_state.get("model")    75%{background-position:50% 25%}
+
+    
+
+    c1, c2 = st.columns([1,1], gap="large")    nlp = st.session_state.get("nlp")    100%{background-position:0% 50%}
+
+    
+
+    with c1:    embedder = st.session_state.get("embedder")}
+
+        st.markdown("### 📄 Resume Upload")
+
+        uploaded_file = st.file_uploader("Choose PDF file", type=['pdf'], key='uploaded_file',    models_ok = st.session_state.get("models_loaded", False)
+
+            help="Upload candidate's resume in PDF format (max 10MB)")
+
+    /* ===== FLOATING GLOW PARTICLES ===== */
+
+    with c2:
+
+        st.markdown("### 💼 Job Description")if "db_initialized" not in st.session_state:.stApp::before{
+
+        job_description = st.text_area("Paste job requirements", height=200,
+
+            placeholder="Enter job description, required skills, qualifications...",    db_conn, db_ok = init_postgresql()    content:'';
+
+            key='job_description', help="Provide detailed job description for better matching")
+
+        st.session_state["db_conn"] = db_conn    position:fixed;
+
+    st.markdown("<div style='height:30px;'></div>", unsafe_allow_html=True)
+
+        st.session_state["db_ok"] = db_ok    top:0;
+
+    col1, col2, col3 = st.columns([1,2,1])
+
+    with col2:    st.session_state["db_initialized"] = True    left:0;
+
+        analyze_btn = st.button("🚀 Analyze Resume", use_container_width=True,
+
+            disabled=not (uploaded_file and job_description and len(job_description) >= 50))else:    width:100%;
+
+    
+
+    if analyze_btn:    db_conn = st.session_state.get("db_conn")    height:100%;
+
+        with st.spinner("🔍 Analyzing resume..."):
+
+            try:    db_ok = st.session_state.get("db_ok", False)    background-image:radial-gradient(circle at 20% 30%,rgba(139,92,246,.12) 0%,transparent 40%),
+
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+
+                    tmp.write(uploaded_file.read())                     radial-gradient(circle at 80% 70%,rgba(236,72,153,.10) 0%,transparent 45%),
+
+                    tmp_path = tmp.name
+
+                # Header                     radial-gradient(circle at 50% 50%,rgba(99,102,241,.08) 0%,transparent 50%),
+
+                progress = st.progress(0.1)
+
+                st.info("📄 Parsing PDF resume...")st.markdown("""                     radial-gradient(circle at 10% 80%,rgba(16,185,129,.06) 0%,transparent 40%);
+
+                resume_doc = parse_resume_pdf(tmp_path, nlp, embedder)
+
+                <div style="text-align:center;padding:40px 0 60px 0;">    pointer-events:none;
+
+                progress.progress(0.3)
+
+                st.info("🔍 Extracting requirements...")    <h1 style="    z-index:0;
+
+                atoms = extract_atoms_from_text(job_description, nlp)
+
+                atoms_clean = refine_atom_list(atoms, nlp, limit=50)        font-size:4.5rem;    animation:glowPulse 25s ease-in-out infinite;
+
+                
+
+                must_atoms = [a for a in atoms_clean if len(a.split()) <= 3]        font-weight:900;}
+
+                nice_atoms = [a for a in atoms_clean if len(a.split()) > 3]
+
+                        background:linear-gradient(135deg,#8b5cf6 0%,#ec4899 50%,#6366f1 100%);@keyframes glowPulse{
+
+                progress.progress(0.5)
+
+                st.info("🧠 Computing semantic similarities...")        -webkit-background-clip:text;    0%,100%{opacity:1;transform:translate(0,0) scale(1)}
+
+                chunks = resume_doc.get('chunks', [])
+
+                if chunks:        -webkit-text-fill-color:transparent;    25%{opacity:.85;transform:translate(40px,-40px) scale(1.15)}
+
+                    faiss_index, resume_embs = build_index(embedder, chunks)
+
+                else:        background-clip:text;    50%{opacity:.95;transform:translate(-30px,30px) scale(1.05)}
+
+                    faiss_index, resume_embs = None, None
+
+                        margin-bottom:20px;    75%{opacity:.9;transform:translate(30px,20px) scale(1.1)}
+
+                semantic_score = compute_global_semantic(embedder, resume_embs, job_description)
+
+                        letter-spacing:-0.04em;}
+
+                progress.progress(0.7)
+
+                st.info("📊 Evaluating requirement coverage...")        text-shadow:0 8px 32px rgba(139,92,246,0.4);
+
+                coverage_result = evaluate_requirement_coverage(
+
+                    must_atoms, nice_atoms, resume_doc.get('text', ''),    ">🎯 Smart Resume Screener</h1>/* ===== MODERN TYPOGRAPHY WITH BETTER HIERARCHY ===== */
+
+                    chunks, embedder, model, faiss_index)
+
+                    <p style="h1{font-family:'Space Grotesk',sans-serif!important;color:#f8fafc!important;font-weight:800!important;font-size:3.5rem!important;letter-spacing:-.04em!important;text-shadow:0 4px 20px rgba(139,92,246,.6),0 0 60px rgba(236,72,153,.3)}
+
+                progress.progress(0.9)
+
+                st.info("🤖 Generating final assessment...")        font-size:1.35rem;h2{font-family:'Space Grotesk',sans-serif!important;color:#f1f5f9!important;font-weight:700!important;font-size:2.25rem!important;letter-spacing:-.03em!important;text-shadow:0 3px 15px rgba(99,102,241,.5)}
+
+                
+
+                analysis_prompt_text = analysis_prompt(        color:#a78bfa;h3{font-family:'Space Grotesk',sans-serif!important;color:#e2e8f0!important;font-weight:700!important;font-size:1.75rem!important;letter-spacing:-.02em!important;text-shadow:0 2px 12px rgba(139,92,246,.4)}
+
+                    job_description, {"requirements": must_atoms + nice_atoms},
+
+                    {"summary": resume_doc.get('text', '')[:2000]},        font-weight:600;h4,h5,h6{font-family:'Space Grotesk',sans-serif!important;color:#cbd5e1!important;font-weight:600!important;text-shadow:0 2px 8px rgba(99,102,241,.3)}
+
+                    coverage_result, {}, semantic_score, coverage_result.get('overall', 0.5))
+
+                        letter-spacing:1px;p,span,div{color:#94a3b8!important;line-height:1.8!important;font-size:1.05rem!important}
+
+                llm_result = llm_json(model, analysis_prompt_text)
+
+                        text-shadow:0 2px 8px rgba(139,92,246,0.3);
+
+                coverage_score = coverage_result.get('overall', 0.5)
+
+                llm_fit = llm_result.get('technical_strength', 50) / 100.0    ">AI-Powered Candidate Evaluation System</p>/* ===== ULTRA-MODERN FLUID TABS ===== */
+
+                
+
+                final_score = (semantic_score * 0.35 + coverage_score * 0.50 + llm_fit * 0.15) * 100</div>.stTabs [data-baseweb="tab-list"]{
+
+                
+
+                progress.progress(1.0)""", unsafe_allow_html=True)    gap:24px;
+
+                st.success("✅ Analysis complete!")
+
+                    background:linear-gradient(135deg,rgba(21,10,46,.75),rgba(13,2,33,.75));
+
+                analysis = {
+
+                    'candidate_name': resume_doc.get('name', 'Unknown'),# Show model status    border-bottom:none;
+
+                    'email': resume_doc.get('email', 'Not found'),
+
+                    'timestamp': datetime.now().timestamp(),if models_ok:    padding:16px 28px;
+
+                    'score': final_score,
+
+                    'semantic_score': semantic_score * 100,    model_name = st.session_state.get("gemini_model_name", "Unknown")    border-radius:24px 24px 0 0;
+
+                    'coverage_score': coverage_score * 100,
+
+                    'llm_fit_score': llm_fit * 100,    st.success(f"✅ **AI Models Loaded Successfully!** Using Google Gemini: `{model_name}`")    backdrop-filter:blur(30px) saturate(180%);
+
+                    'requirements': {'must': must_atoms, 'nice': nice_atoms},
+
+                    'coverage_details': coverage_result,else:    box-shadow:0 -15px 50px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.05);
+
+                    'llm_analysis': llm_result,
+
+                    'jd_text': job_description    st.error("❌ **AI Models Not Available** - Please check your GEMINI_API_KEY in `.env` file")    border:1px solid rgba(139,92,246,.15);
+
+                }
+
+                    st.info("💡 Get a FREE API key at: https://makersuite.google.com/app/apikey")}
+
+                st.session_state.analysis_history.insert(0, analysis)
+
+                st.session_state['current_analysis'] = analysis    st.stop().stTabs [data-baseweb="tab"]{
+
+                
+
+                if db_ok and db_conn:    height:64px;
+
+                    save_to_db(resume_doc, job_description, analysis, db_conn, db_ok)
+
+                # Initialize session state    padding:0 42px;
+
+                st.markdown("<div style='height:40px;'></div>", unsafe_allow_html=True)
+
+                st.markdown("## 📊 Analysis Results")if 'analysis_history' not in st.session_state:    background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(99,102,241,.08));
+
+                
+
+                score_class = (    st.session_state.analysis_history = []    border:2px solid rgba(139,92,246,.2);
+
+                    "score-excellent" if final_score >= 75 else
+
+                    "score-good" if final_score >= 60 else    border-radius:18px;
+
+                    "score-fair" if final_score >= 45 else "score-poor")
+
+                # Main tabs    color:#a78bfa;
+
+                st.markdown(f"""
+
+                <div style="text-align:center;margin:40px 0;">tab1, tab2 = st.tabs(["📄 Analyze", "🕒 Recent"])    font-family:'Space Grotesk',sans-serif;
+
+                    <div class="score-badge {score_class}">{final_score:.1f}</div>
+
+                    <p style="margin-top:20px;font-size:1.2rem;color:#94a3b8;">Overall Match Score</p>    font-weight:700;
+
+                </div>
+
+                """, unsafe_allow_html=True)# TAB 1: Analyze    font-size:16px;
+
+                
+
+                col1, col2, col3 = st.columns(3)with tab1:    letter-spacing:.5px;
+
+                with col1:
+
+                    st.metric("📊 Coverage", f"{coverage_score*100:.1f}%")    st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)    transition:all .5s cubic-bezier(.34,1.56,.64,1);
+
+                with col2:
+
+                    st.metric("🧠 Semantic", f"{semantic_score*100:.1f}%")        backdrop-filter:blur(15px);
+
+                with col3:
+
+                    st.metric("⚡ LLM Fit", f"{llm_fit*100:.1f}%")    # Get current state    position:relative;
+
+                
+
+                with st.expander("📋 Detailed Analysis", expanded=True):    uploaded_file = st.session_state.get('uploaded_file', None)    overflow:hidden;
+
+                    st.markdown("**Top Strengths:**")
+
+                    for strength in llm_result.get('top_strengths', [])[:4]:    job_description = st.session_state.get('job_description', '')    box-shadow:0 4px 15px rgba(139,92,246,.15);
+
+                        st.markdown(f"- {strength}")
+
+                    st.markdown("\\n**Cultural Fit:**")    }
+
+                    st.write(llm_result.get('cultural_fit', 'N/A'))
+
+                    st.markdown("\\n**Overall Comment:**")    # Step indicator.stTabs [data-baseweb="tab"]::before{
+
+                    st.write(llm_result.get('overall_comment', 'N/A'))
+
+                    step_placeholder = st.empty()    content:'';
+
+            except Exception as e:
+
+                st.error(f"❌ Error during analysis: {str(e)}")    if not uploaded_file:    position:absolute;
+
+                import traceback
+
+                st.code(traceback.format_exc())        step_placeholder.markdown("""    top:0;
+
+
+
+with tab2:        <div style="background:linear-gradient(135deg,rgba(99,102,241,.18),rgba(139,92,246,.15));    left:-100%;
+
+    st.markdown("## 🕒 Recent Analyses")
+
+                border:2px solid rgba(99,102,241,.4);border-radius:20px;padding:20px 32px;    width:100%;
+
+    if db_ok and db_conn:
+
+        recent_items = get_recent(db_conn, db_ok, limit=20)            text-align:center;margin-bottom:24px;">    height:100%;
+
+        if recent_items:
+
+            for item in recent_items:            <span style="font-size:32px;">👆</span>    background:linear-gradient(90deg,transparent,rgba(139,92,246,.3),rgba(236,72,153,.3),transparent);
+
+                score = item.get('final_score', 0) * 10
+
+                st.markdown(f"""            <span style="font-size:17px;font-weight:700;color:#c7d2fe;">    transition:left .8s cubic-bezier(.4,0,.2,1);
+
+                <div class="analysis-card">
+
+                    <h4>💾 {item.get('candidate', 'Unknown')}</h4>                Step 1: Upload a resume PDF file}
+
+                    <p><strong>Score:</strong> {score:.1f}/10</p>
+
+                    <p><strong>Date:</strong> {item.get('created_at', 'Unknown')}</p>            </span>.stTabs [data-baseweb="tab"]::after{
+
+                    <p><strong>Email:</strong> {item.get('email', 'Not found')}</p>
+
+                </div>        </div>    content:'';
+
+                """, unsafe_allow_html=True)
+
+        else:        """, unsafe_allow_html=True)    position:absolute;
+
+            st.info("No recent analyses in database")
+
+        elif not job_description or len(job_description) < 50:    inset:0;
+
+    if st.session_state.analysis_history:
+
+        st.markdown("### ⚡ Session History")        step_placeholder.markdown("""    border-radius:18px;
+
+        for idx, activity in enumerate(st.session_state.analysis_history[:10]):
+
+            score = activity.get('score', 0)        <div style="background:linear-gradient(135deg,rgba(236,72,153,.18),rgba(139,92,246,.15));    padding:2px;
+
+            name = activity.get('candidate_name', 'Unknown')
+
+            st.markdown(f"""            border:2px solid rgba(236,72,153,.4);border-radius:20px;padding:20px 32px;    background:linear-gradient(135deg,rgba(139,92,246,.4),rgba(236,72,153,.4));
+
+            <div class="analysis-card">
+
+                <h4>⚡ {name}</h4>            text-align:center;margin-bottom:24px;">    -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+
+                <p><strong>Score:</strong> {score:.1f}/100</p>
+
+            </div>            <span style="font-size:32px;">👉</span>    -webkit-mask-composite:exclude;
+
+            """, unsafe_allow_html=True)
+
+            <span style="font-size:17px;font-weight:700;color:#fbbf24;">    mask-composite:exclude;
+
+st.markdown("""
+
+<div style="text-align:center;padding:60px 0 40px 0;margin-top:80px;border-top:2px solid rgba(139,92,246,0.2);">                Step 2: Add job description (minimum 50 characters)    opacity:0;
+
+    <p style="font-size:14px;color:#64748b;margin:0;">Built with ❤️ using Streamlit, Google Gemini, FAISS & spaCy</p>
+
+    <p style="font-size:12px;color:#475569;margin-top:8px;">© 2025 Smart Resume Screener | Powered by AI</p>            </span>    transition:opacity .5s ease;
+
+</div>
+
+""", unsafe_allow_html=True)        </div>}
+
+
+        """, unsafe_allow_html=True).stTabs [data-baseweb="tab"]:hover::before{left:100%}
+
+    else:.stTabs [data-baseweb="tab"]:hover::after{opacity:1}
+
+        step_placeholder.markdown(""".stTabs [data-baseweb="tab"]:hover{
+
+        <div style="background:linear-gradient(135deg,rgba(16,185,129,.18),rgba(5,150,105,.15));    background:linear-gradient(135deg,rgba(139,92,246,.18),rgba(236,72,153,.15));
+
+            border:2px solid rgba(16,185,129,.5);border-radius:20px;padding:20px 32px;    border-color:rgba(139,92,246,.5);
+
+            text-align:center;margin-bottom:24px;">    transform:translateY(-6px) scale(1.03);
+
+            <span style="font-size:32px;">✅</span>    box-shadow:0 15px 45px rgba(139,92,246,.35),0 0 50px rgba(236,72,153,.25);
+
+            <span style="font-size:17px;font-weight:700;color:#6ee7b7;">    color:#e9d5ff;
+
+                Ready! Click button below to start analysis}
+
+            </span>.stTabs [aria-selected="true"]{
+
+            <span style="font-size:32px;">🚀</span>    background:linear-gradient(135deg,#8b5cf6 0%,#ec4899 100%)!important;
+
+        </div>    color:#fff!important;
+
+        """, unsafe_allow_html=True)    border-color:rgba(139,92,246,.8)!important;
+
+        box-shadow:0 20px 60px rgba(139,92,246,.6),0 0 80px rgba(236,72,153,.5),inset 0 2px 0 rgba(255,255,255,.3),inset 0 -2px 0 rgba(0,0,0,.2)!important;
+
+    # Two column layout    transform:translateY(-4px) scale(1.02);
+
+    c1, c2 = st.columns([1,1], gap="large")}
+
+    
+
+    with c1:/* ===== MAGNETIC GLOWING BUTTONS ===== */
+
+        st.markdown("### 📄 Resume Upload").stButton>button{
+
+        uploaded_file = st.file_uploader(    background:linear-gradient(135deg,#8b5cf6 0%,#6366f1 50%,#ec4899 100%);
+
+            "Choose PDF file",    background-size:200% 200%;
+
+            type=['pdf'],    color:#fff;
+
+            key='uploaded_file',    border:none;
+
+            help="Upload candidate's resume in PDF format (max 10MB)"    border-radius:20px;
+
+        )    padding:22px 60px;
+
+        font-family:'Space Grotesk',sans-serif;
+
+    with c2:    font-weight:800;
+
+        st.markdown("### 💼 Job Description")    font-size:17px;
+
+        job_description = st.text_area(    letter-spacing:1.5px;
+
+            "Paste job requirements",    text-transform:uppercase;
+
+            height=200,    transition:all .5s cubic-bezier(.34,1.56,.64,1);
+
+            placeholder="Enter job description, required skills, qualifications...",    box-shadow:0 15px 50px rgba(139,92,246,.5),0 0 60px rgba(236,72,153,.3),inset 0 2px 0 rgba(255,255,255,.3),inset 0 -2px 0 rgba(0,0,0,.2);
+
+            key='job_description',    position:relative;
+
+            help="Provide detailed job description for better matching"    overflow:hidden;
+
+        )    animation:gradientSlide 4s ease infinite;
+
+    }
+
+    st.markdown("<div style='height:30px;'></div>", unsafe_allow_html=True)@keyframes gradientSlide{
+
+        0%,100%{background-position:0% 50%}
+
+    # Analyze button    50%{background-position:100% 50%}
+
+    col1, col2, col3 = st.columns([1,2,1])}
+
+    with col2:.stButton>button::before{
+
+        analyze_btn = st.button(    content:'';
+
+            "🚀 Analyze Resume",    position:absolute;
+
+            use_container_width=True,    top:50%;
+
+            disabled=not (uploaded_file and job_description and len(job_description) >= 50)    left:50%;
+
+        )    width:0;
+
+        height:0;
+
+    # Analysis logic    border-radius:50%;
+
+    if analyze_btn:    background:radial-gradient(circle,rgba(255,255,255,.4),transparent 70%);
+
+        with st.spinner("🔍 Analyzing resume..."):    transform:translate(-50%,-50%);
+
+            try:    transition:width .7s cubic-bezier(.4,0,.2,1),height .7s cubic-bezier(.4,0,.2,1);
+
+                # Save PDF temporarily}
+
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:.stButton>button::after{
+
+                    tmp.write(uploaded_file.read())    content:'';
+
+                    tmp_path = tmp.name    position:absolute;
+
+                    inset:-2px;
+
+                # Parse resume    border-radius:22px;
+
+                progress = st.progress(0.1)    background:linear-gradient(45deg,#8b5cf6,#ec4899,#6366f1,#8b5cf6);
+
+                st.info("📄 Parsing PDF resume...")    background-size:400% 400%;
+
+                resume_doc = parse_resume_pdf(tmp_path, nlp, embedder)    opacity:0;
+
+                    filter:blur(20px);
+
+                # Extract atoms from JD    transition:opacity .5s ease;
+
+                progress.progress(0.3)    animation:rotateGradient 6s linear infinite;
+
+                st.info("🔍 Extracting requirements...")    z-index:-1;
+
+                atoms = extract_atoms_from_text(job_description, nlp)}
+
+                atoms_clean = refine_atom_list(atoms, nlp, limit=50)@keyframes rotateGradient{
+
+                    0%{background-position:0% 50%}
+
+                # Separate must-have and nice-to-have    50%{background-position:100% 50%}
+
+                must_atoms = [a for a in atoms_clean if len(a.split()) <= 3]    100%{background-position:0% 50%}
+
+                nice_atoms = [a for a in atoms_clean if len(a.split()) > 3]}
+
+                .stButton>button:hover::before{width:400px;height:400px}
+
+                # Build FAISS index.stButton>button:hover::after{opacity:.8}
+
+                progress.progress(0.5).stButton>button:hover{
+
+                st.info("🧠 Computing semantic similarities...")    transform:translateY(-6px) scale(1.05);
+
+                chunks = resume_doc.get('chunks', [])    box-shadow:0 25px 80px rgba(139,92,246,.7),0 0 90px rgba(236,72,153,.6),0 0 120px rgba(99,102,241,.4),inset 0 2px 0 rgba(255,255,255,.4);
+
+                if chunks:}
+
+                    faiss_index, resume_embs = build_index(embedder, chunks).stButton>button:active{transform:translateY(-3px) scale(.98)}
+
+                else:
+
+                    faiss_index, resume_embs = None, None/* ===== IMMERSIVE FILE UPLOADER ===== */
+
+                .stFileUploader{
+
+                # Compute semantic score    background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(236,72,153,.08));
+
+                semantic_score = compute_global_semantic(embedder, resume_embs, job_description)    border:3px dashed rgba(139,92,246,.5);
+
+                    border-radius:24px;
+
+                # Evaluate coverage    padding:40px;
+
+                progress.progress(0.7)    transition:all .5s cubic-bezier(.34,1.56,.64,1);
+
+                st.info("📊 Evaluating requirement coverage...")    backdrop-filter:blur(25px) saturate(180%);
+
+                coverage_result = evaluate_requirement_coverage(    position:relative;
+
+                    must_atoms, nice_atoms,    overflow:hidden;
+
+                    resume_doc.get('text', ''),}
+
+                    chunks, embedder, model,.stFileUploader::before{
+
+                    faiss_index, resume_embs    content:'';
+
+                )    position:absolute;
+
+                    inset:0;
+
+                # LLM holistic analysis    border-radius:24px;
+
+                progress.progress(0.9)    background:linear-gradient(45deg,rgba(139,92,246,.15),rgba(236,72,153,.15));
+
+                st.info("🤖 Generating final assessment...")    opacity:0;
+
+                    transition:opacity .5s ease;
+
+                analysis_prompt_text = analysis_prompt(    pointer-events:none!important;
+
+                    job_description,    z-index:-1;
+
+                    {"requirements": must_atoms + nice_atoms},}
+
+                    {"summary": resume_doc.get('text', '')[:2000]},.stFileUploader:hover::before{opacity:1}
+
+                    coverage_result,.stFileUploader:hover{
+
+                    {},    background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(236,72,153,.15));
+
+                    semantic_score,    border-color:rgba(139,92,246,.8);
+
+                    coverage_result.get('coverage_score', 0.5)    border-style:solid;
+
+                )    transform:scale(1.02) translateY(-4px);
+
+                    box-shadow:0 20px 60px rgba(139,92,246,.3),0 0 80px rgba(236,72,153,.2);
+
+                llm_result = llm_json(model, analysis_prompt_text)}
+
+                /* Ensure file uploader button is always clickable */
+
+                # Calculate final score.stFileUploader button{
+
+                coverage_score = coverage_result.get('coverage_score', 0.5)    pointer-events:auto!important;
+
+                llm_fit = llm_result.get('technical_strength', 50) / 100.0    cursor:pointer!important;
+
+                    opacity:1!important;
+
+                final_score = (}
+
+                    semantic_score * 0.35 +.stFileUploader section{
+
+                    coverage_score * 0.50 +    pointer-events:auto!important;
+
+                    llm_fit * 0.15}
+
+                ) * 100.stFileUploader label{
+
+                    pointer-events:auto!important;
+
+                progress.progress(1.0)}
+
+                st.success("✅ Analysis complete!").stFileUploader div[data-testid="stFileUploaderDropzone"]{
+
+                    pointer-events:auto!important;
+
+                # Store result}
+
+                analysis = {
+
+                    'candidate_name': resume_doc.get('name', 'Unknown'),/* ===== GLOWING TEXT AREA ===== */
+
+                    'email': resume_doc.get('email', 'Not found'),.stTextArea textarea{
+
+                    'timestamp': datetime.now().timestamp(),    background:linear-gradient(135deg,rgba(21,10,46,.9),rgba(13,2,33,.9))!important;
+
+                    'score': final_score,    border:2px solid rgba(139,92,246,.3)!important;
+
+                    'semantic_score': semantic_score * 100,    border-radius:20px!important;
+
+                    'coverage_score': coverage_score * 100,    color:#f1f5f9!important;
+
+                    'llm_fit_score': llm_fit * 10,    font-family:'JetBrains Mono',monospace!important;
+
+                    'requirements': {'must': must_atoms, 'nice': nice_atoms},    font-size:16px!important;
+
+                    'coverage_details': coverage_result,    padding:24px!important;
+
+                    'llm_analysis': llm_result,    transition:all .4s cubic-bezier(.4,0,.2,1)!important;
+
+                    'jd_text': job_description    line-height:1.9!important;
+
+                }    backdrop-filter:blur(20px)!important;
+
+                    box-shadow:inset 0 2px 8px rgba(0,0,0,.3)!important;
+
+                st.session_state.analysis_history.insert(0, analysis)}
+
+                st.session_state['current_analysis'] = analysis.stTextArea textarea:focus{
+
+                    border-color:rgba(139,92,246,.9)!important;
+
+                # Save to database    box-shadow:0 0 0 5px rgba(139,92,246,.2),0 15px 50px rgba(139,92,246,.3),0 0 70px rgba(236,72,153,.2),inset 0 2px 8px rgba(0,0,0,.3)!important;
+
+                if db_ok and db_conn:    background:linear-gradient(135deg,rgba(21,10,46,.98),rgba(13,2,33,.98))!important;
+
+                    save_to_db(resume_doc, job_description, analysis, db_conn, db_ok)    transform:scale(1.01)!important;
+
+                }
+
+                # Display results
+
+                st.markdown("<div style='height:40px;'></div>", unsafe_allow_html=True)/* ===== PREMIUM METRIC CARDS WITH GLOW ===== */
+
+                st.markdown("## 📊 Analysis Results").metric-card{
+
+                    background:linear-gradient(135deg,rgba(21,10,46,.90),rgba(13,2,33,.88));
+
+                # Score badge    border:2px solid rgba(139,92,246,.25);
+
+                score_class = (    border-radius:28px;
+
+                    "score-excellent" if final_score >= 75 else    padding:36px;
+
+                    "score-good" if final_score >= 60 else    transition:all .6s cubic-bezier(.34,1.56,.64,1);
+
+                    "score-fair" if final_score >= 45 else    backdrop-filter:blur(30px) saturate(200%);
+
+                    "score-poor"    box-shadow:0 10px 40px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);
+
+                )    position:relative;
+
+                    overflow:hidden;
+
+                st.markdown(f"""}
+
+                <div style="text-align:center;margin:40px 0;">.metric-card::before{
+
+                    <div class="score-badge {score_class}">{final_score:.1f}</div>    content:'';
+
+                    <p style="margin-top:20px;font-size:1.2rem;color:#94a3b8;">    position:absolute;
+
+                        Overall Match Score    top:0;
+
+                    </p>    left:0;
+
+                </div>    right:0;
+
+                """, unsafe_allow_html=True)    height:4px;
+
+                    background:linear-gradient(90deg,transparent,rgba(139,92,246,.8),rgba(236,72,153,.8),transparent);
+
+                # Metrics    opacity:0;
+
+                col1, col2, col3 = st.columns(3)    transition:opacity .6s ease;
+
+                with col1:    box-shadow:0 0 20px rgba(139,92,246,.6);
+
+                    st.metric("📊 Coverage", f"{coverage_score*100:.1f}%")}
+
+                with col2:.metric-card::after{
+
+                    st.metric("🧠 Semantic", f"{semantic_score*100:.1f}%")    content:'';
+
+                with col3:    position:absolute;
+
+                    st.metric("⚡ LLM Fit", f"{llm_fit*10:.1f}/10")    inset:-100%;
+
+                    background:radial-gradient(circle,rgba(139,92,246,.15),transparent 70%);
+
+                # Detailed analysis    opacity:0;
+
+                with st.expander("📋 Detailed Analysis", expanded=True):    transition:opacity .6s ease,transform .6s ease;
+
+                    st.markdown(f"**Top Strengths:**")    pointer-events:none;
+
+                    for strength in llm_result.get('top_strengths', [])[:4]:}
+
+                        st.markdown(f"- {strength}").metric-card:hover::before{opacity:1}
+
+                    .metric-card:hover::after{opacity:1;transform:scale(1.5)}
+
+                    st.markdown(f"\\n**Cultural Fit:**").metric-card:hover{
+
+                    st.write(llm_result.get('cultural_fit', 'N/A'))    border-color:rgba(139,92,246,.6);
+
+                        transform:translateY(-10px) scale(1.02) rotate(0.5deg);
+
+                    st.markdown(f"\\n**Overall Comment:**")    box-shadow:0 25px 70px rgba(139,92,246,.4),0 0 90px rgba(236,72,153,.3),inset 0 2px 0 rgba(255,255,255,.1);
+
+                    st.write(llm_result.get('overall_comment', 'N/A'))}
+
+                
+
+            except Exception as e:/* ===== IMMERSIVE ANALYSIS CARDS ===== */
+
+                st.error(f"❌ Error during analysis: {str(e)}").analysis-card{
+
+                import traceback    background:linear-gradient(135deg,rgba(21,10,46,.92),rgba(13,2,33,.90));
+
+                st.code(traceback.format_exc())    border:2px solid rgba(139,92,246,.3);
+
     border-radius:24px;
-    padding:40px;
-    transition:all .5s cubic-bezier(.34,1.56,.64,1);
-    backdrop-filter:blur(25px) saturate(180%);
-    position:relative;
-    overflow:hidden;
-}
-.stFileUploader::before{
-    content:'';
-    position:absolute;
-    inset:0;
-    border-radius:24px;
-    background:linear-gradient(45deg,rgba(139,92,246,.15),rgba(236,72,153,.15));
-    opacity:0;
-    transition:opacity .5s ease;
-    pointer-events:none!important;
-    z-index:-1;
-}
-.stFileUploader:hover::before{opacity:1}
-.stFileUploader:hover{
-    background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(236,72,153,.15));
-    border-color:rgba(139,92,246,.8);
-    border-style:solid;
-    transform:scale(1.02) translateY(-4px);
-    box-shadow:0 20px 60px rgba(139,92,246,.3),0 0 80px rgba(236,72,153,.2);
-}
-/* Ensure file uploader button is always clickable */
-.stFileUploader button{
-    pointer-events:auto!important;
-    cursor:pointer!important;
-    opacity:1!important;
-}
-.stFileUploader section{
-    pointer-events:auto!important;
-}
-.stFileUploader label{
-    pointer-events:auto!important;
-}
-.stFileUploader div[data-testid="stFileUploaderDropzone"]{
-    pointer-events:auto!important;
-}
 
-/* ===== GLOWING TEXT AREA ===== */
-.stTextArea textarea{
-    background:linear-gradient(135deg,rgba(21,10,46,.9),rgba(13,2,33,.9))!important;
-    border:2px solid rgba(139,92,246,.3)!important;
-    border-radius:20px!important;
-    color:#f1f5f9!important;
-    font-family:'JetBrains Mono',monospace!important;
-    font-size:16px!important;
-    padding:24px!important;
-    transition:all .4s cubic-bezier(.4,0,.2,1)!important;
-    line-height:1.9!important;
-    backdrop-filter:blur(20px)!important;
-    box-shadow:inset 0 2px 8px rgba(0,0,0,.3)!important;
-}
-.stTextArea textarea:focus{
-    border-color:rgba(139,92,246,.9)!important;
-    box-shadow:0 0 0 5px rgba(139,92,246,.2),0 15px 50px rgba(139,92,246,.3),0 0 70px rgba(236,72,153,.2),inset 0 2px 8px rgba(0,0,0,.3)!important;
-    background:linear-gradient(135deg,rgba(21,10,46,.98),rgba(13,2,33,.98))!important;
-    transform:scale(1.01)!important;
-}
+# TAB 2: Recent    padding:34px;
 
-/* ===== PREMIUM METRIC CARDS WITH GLOW ===== */
-.metric-card{
-    background:linear-gradient(135deg,rgba(21,10,46,.90),rgba(13,2,33,.88));
-    border:2px solid rgba(139,92,246,.25);
-    border-radius:28px;
-    padding:36px;
-    transition:all .6s cubic-bezier(.34,1.56,.64,1);
-    backdrop-filter:blur(30px) saturate(200%);
-    box-shadow:0 10px 40px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);
-    position:relative;
-    overflow:hidden;
-}
-.metric-card::before{
-    content:'';
-    position:absolute;
-    top:0;
-    left:0;
-    right:0;
-    height:4px;
-    background:linear-gradient(90deg,transparent,rgba(139,92,246,.8),rgba(236,72,153,.8),transparent);
-    opacity:0;
-    transition:opacity .6s ease;
-    box-shadow:0 0 20px rgba(139,92,246,.6);
-}
-.metric-card::after{
-    content:'';
-    position:absolute;
-    inset:-100%;
-    background:radial-gradient(circle,rgba(139,92,246,.15),transparent 70%);
-    opacity:0;
-    transition:opacity .6s ease,transform .6s ease;
-    pointer-events:none;
-}
-.metric-card:hover::before{opacity:1}
-.metric-card:hover::after{opacity:1;transform:scale(1.5)}
-.metric-card:hover{
-    border-color:rgba(139,92,246,.6);
-    transform:translateY(-10px) scale(1.02) rotate(0.5deg);
-    box-shadow:0 25px 70px rgba(139,92,246,.4),0 0 90px rgba(236,72,153,.3),inset 0 2px 0 rgba(255,255,255,.1);
-}
+with tab2:    transition:all .5s cubic-bezier(.34,1.56,.64,1);
 
-/* ===== IMMERSIVE ANALYSIS CARDS ===== */
-.analysis-card{
-    background:linear-gradient(135deg,rgba(21,10,46,.92),rgba(13,2,33,.90));
-    border:2px solid rgba(139,92,246,.3);
-    border-radius:24px;
-    padding:34px;
-    transition:all .5s cubic-bezier(.34,1.56,.64,1);
-    backdrop-filter:blur(25px) saturate(180%);
-    box-shadow:0 12px 45px rgba(0,0,0,.4);
-    position:relative;
-    overflow:hidden;
-}
-.analysis-card::before{
-    content:'';
-    position:absolute;
-    inset:0;
-    border-radius:24px;
-    background:linear-gradient(135deg,rgba(139,92,246,.1),rgba(236,72,153,.1));
-    opacity:0;
-    transition:opacity .5s ease;
-}
-.analysis-card:hover::before{opacity:1}
-.analysis-card:hover{
-    border-color:rgba(139,92,246,.6);
-    transform:translateY(-8px) scale(1.01);
-    box-shadow:0 20px 65px rgba(139,92,246,.35),0 0 80px rgba(236,72,153,.25);
-}
+    st.markdown("## 🕒 Recent Analyses")    backdrop-filter:blur(25px) saturate(180%);
 
-/* ===== ULTRA 3D GLOWING SCORE BADGES ===== */
-.score-badge{
-    display:inline-block;
-    padding:28px 52px;
-    border-radius:32px;
-    font-family:'Space Grotesk',sans-serif;
-    font-weight:900;
-    font-size:56px;
-    box-shadow:0 20px 60px rgba(0,0,0,.6),inset 0 3px 0 rgba(255,255,255,.4),inset 0 -3px 0 rgba(0,0,0,.4);
-    transition:all .5s cubic-bezier(.34,1.56,.64,1);
+        box-shadow:0 12px 45px rgba(0,0,0,.4);
+
+    # Try to load from database    position:relative;
+
+    if db_ok and db_conn:    overflow:hidden;
+
+        recent_items = get_recent(db_conn, db_ok, limit=20)}
+
+        if recent_items:.analysis-card::before{
+
+            for item in recent_items:    content:'';
+
+                score = item.get('final_score', 0) * 10  # Scale 0-1 to 0-10    position:absolute;
+
+                st.markdown(f"""    inset:0;
+
+                <div class="analysis-card">    border-radius:24px;
+
+                    <h4>💾 {item.get('candidate', 'Unknown')}</h4>    background:linear-gradient(135deg,rgba(139,92,246,.1),rgba(236,72,153,.1));
+
+                    <p><strong>Score:</strong> {score:.1f}/10</p>    opacity:0;
+
+                    <p><strong>Date:</strong> {item.get('created_at', 'Unknown')}</p>    transition:opacity .5s ease;
+
+                    <p><strong>Email:</strong> {item.get('email', 'Not found')}</p>}
+
+                </div>.analysis-card:hover::before{opacity:1}
+
+                """, unsafe_allow_html=True).analysis-card:hover{
+
+        else:    border-color:rgba(139,92,246,.6);
+
+            st.info("No recent analyses in database")    transform:translateY(-8px) scale(1.01);
+
+        box-shadow:0 20px 65px rgba(139,92,246,.35),0 0 80px rgba(236,72,153,.25);
+
+    # Show session analyses}
+
+    if st.session_state.analysis_history:
+
+        st.markdown("### ⚡ Session History")/* ===== ULTRA 3D GLOWING SCORE BADGES ===== */
+
+        for idx, activity in enumerate(st.session_state.analysis_history[:10]):.score-badge{
+
+            score = activity.get('score', 0)    display:inline-block;
+
+            name = activity.get('candidate_name', 'Unknown')    padding:28px 52px;
+
+            st.markdown(f"""    border-radius:32px;
+
+            <div class="analysis-card">    font-family:'Space Grotesk',sans-serif;
+
+                <h4>⚡ {name}</h4>    font-weight:900;
+
+                <p><strong>Score:</strong> {score:.1f}/100</p>    font-size:56px;
+
+            </div>    box-shadow:0 20px 60px rgba(0,0,0,.6),inset 0 3px 0 rgba(255,255,255,.4),inset 0 -3px 0 rgba(0,0,0,.4);
+
+            """, unsafe_allow_html=True)    transition:all .5s cubic-bezier(.34,1.56,.64,1);
+
     position:relative;
-    letter-spacing:-.02em;
-}
-.score-badge::after{
-    content:'';
-    position:absolute;
-    inset:-4px;
-    border-radius:36px;
-    opacity:0;
-    filter:blur(25px);
-    transition:opacity .5s ease;
-    z-index:-1;
+
+# Footer    letter-spacing:-.02em;
+
+st.markdown("""}
+
+<div style="text-align:center;padding:60px 0 40px 0;margin-top:80px;border-top:2px solid rgba(139,92,246,0.2);">.score-badge::after{
+
+    <p style="font-size:14px;color:#64748b;margin:0;">    content:'';
+
+        Built with ❤️ using Streamlit, Google Gemini, FAISS & spaCy    position:absolute;
+
+    </p>    inset:-4px;
+
+    <p style="font-size:12px;color:#475569;margin-top:8px;">    border-radius:36px;
+
+        © 2025 Smart Resume Screener | Powered by AI    opacity:0;
+
+    </p>    filter:blur(25px);
+
+</div>    transition:opacity .5s ease;
+
+""", unsafe_allow_html=True)    z-index:-1;
+
 }
 .score-badge:hover{transform:scale(1.12) rotate(-3deg) translateY(-8px);box-shadow:0 30px 90px rgba(0,0,0,.7),inset 0 3px 0 rgba(255,255,255,.5)}
 .score-badge:hover::after{opacity:.9}
