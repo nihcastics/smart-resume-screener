@@ -1,9 +1,14 @@
 # Multi-stage build for optimized image size
 FROM python:3.11-slim as builder
 
-# Install system dependencies required for native packages
-# Using retry logic to handle transient apt repository issues
-RUN apt-get update -qq && \
+# Set shell to bash for better error handling
+SHELL ["/bin/bash", "-c"]
+
+# Fix apt sources and install with retry logic
+RUN echo "deb http://deb.debian.org/debian bookworm main contrib non-free" > /etc/apt/sources.list && \
+    echo "deb http://deb.debian.org/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list && \
+    echo "deb http://deb.debian.org/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list && \
+    apt-get update -qq --fix-missing || apt-get update -qq --fix-missing || apt-get update -qq --fix-missing && \
     apt-get install -y --no-install-recommends \
         build-essential \
         libpq-dev \
@@ -31,8 +36,14 @@ RUN pip install --upgrade pip setuptools wheel && \
 # Final stage - minimal runtime image
 FROM python:3.11-slim
 
-# Install only runtime dependencies (not build tools)
-RUN apt-get update -qq && \
+# Set shell to bash for better error handling
+SHELL ["/bin/bash", "-c"]
+
+# Fix apt sources and install runtime dependencies with retry logic
+RUN echo "deb http://deb.debian.org/debian bookworm main contrib non-free" > /etc/apt/sources.list && \
+    echo "deb http://deb.debian.org/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list && \
+    echo "deb http://deb.debian.org/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list && \
+    apt-get update -qq --fix-missing || apt-get update -qq --fix-missing || apt-get update -qq --fix-missing && \
     apt-get install -y --no-install-recommends \
         libpq5 \
         libopenblas0 \
