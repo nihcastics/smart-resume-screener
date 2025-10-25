@@ -2,7 +2,7 @@ services:
   - type: web
     name: smart-resume-screener-backend
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
+    dockerfilePath: ./Dockerfile
     plan: starter
     region: oregon
     envVars:
