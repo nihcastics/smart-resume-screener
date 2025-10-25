@@ -1,23 +1,28 @@
 # Multi-stage build for optimized image size
-FROM python:3.11-slim as builder
+FROM python:3.11-bullseye as builder
 
-# Install system dependencies required for native packages
-# Using retry logic to handle transient apt repository issues
-RUN apt-get update -qq && \
-    apt-get install -y --no-install-recommends \
-        build-essential \
-        libpq-dev \
-        libopenblas-dev \
-        gfortran \
-        liblapack-dev \
-        libatlas-base-dev \
-        libjpeg-dev \
-        zlib1g-dev \
-        poppler-utils \
-        ffmpeg \
-        tesseract-ocr && \
-    rm -rf /var/lib/apt/lists/* && \
-    apt-get clean
+# Update package manager with retries
+RUN apt-get update --allow-releaseinfo-change || true && \
+    apt-get update || apt-get update || apt-get update
+
+# Install build dependencies
+RUN apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    libopenblas-dev \
+    gfortran \
+    liblapack-dev \
+    libatlas-base-dev \
+    libjpeg-dev \
+    zlib1g-dev \
+    wget && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install runtime tools separately
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    poppler-utils \
+    tesseract-ocr && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create virtual environment
 RUN python -m venv /opt/venv
@@ -29,21 +34,22 @@ RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 
 # Final stage - minimal runtime image
-FROM python:3.11-slim
+FROM python:3.11-bullseye
 
-# Install only runtime dependencies (not build tools)
-RUN apt-get update -qq && \
-    apt-get install -y --no-install-recommends \
-        libpq5 \
-        libopenblas0 \
-        liblapack3 \
-        libatlas3-base \
-        libjpeg62-turbo \
-        poppler-utils \
-        ffmpeg \
-        tesseract-ocr && \
-    rm -rf /var/lib/apt/lists/* && \
-    apt-get clean
+# Update package manager with retries
+RUN apt-get update --allow-releaseinfo-change || true && \
+    apt-get update || apt-get update || apt-get update
+
+# Install runtime dependencies
+RUN apt-get install -y --no-install-recommends \
+    libpq5 \
+    libopenblas0 \
+    liblapack3 \
+    libatlas3-base \
+    libjpeg62-turbo \
+    poppler-utils \
+    tesseract-ocr && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
