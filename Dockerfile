@@ -2,20 +2,22 @@
 FROM python:3.11-slim as builder
 
 # Install system dependencies required for native packages
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    libopenblas-dev \
-    gfortran \
-    liblapack-dev \
-    libatlas-base-dev \
-    libjpeg-dev \
-    zlib1g-dev \
-    poppler-utils \
-    libsndfile1 \
-    ffmpeg \
-    tesseract-ocr \
-    && rm -rf /var/lib/apt/lists/*
+# Using retry logic to handle transient apt repository issues
+RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        libpq-dev \
+        libopenblas-dev \
+        gfortran \
+        liblapack-dev \
+        libatlas-base-dev \
+        libjpeg-dev \
+        zlib1g-dev \
+        poppler-utils \
+        ffmpeg \
+        tesseract-ocr && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
 
 # Create virtual environment
 RUN python -m venv /opt/venv
@@ -30,17 +32,18 @@ RUN pip install --upgrade pip setuptools wheel && \
 FROM python:3.11-slim
 
 # Install only runtime dependencies (not build tools)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
-    libopenblas0 \
-    liblapack3 \
-    libatlas3-base \
-    libjpeg62-turbo \
-    poppler-utils \
-    libsndfile1 \
-    ffmpeg \
-    tesseract-ocr \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends \
+        libpq5 \
+        libopenblas0 \
+        liblapack3 \
+        libatlas3-base \
+        libjpeg62-turbo \
+        poppler-utils \
+        ffmpeg \
+        tesseract-ocr && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
 
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
