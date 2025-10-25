@@ -1,0 +1,27 @@
+[MASTER]
+init-hook='import sys; sys.path.append(".")'
+
+[MESSAGES CONTROL]
+disable=
+    import-error,
+    no-member,
+    no-name-in-module,
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring,
+    too-few-public-methods,
+    too-many-arguments,
+    too-many-locals,
+    too-many-branches,
+    too-many-statements,
+    broad-except,
+    bare-except
+
+[BASIC]
+good-names=i,j,k,ex,Run,_,id,db,nlp,jd,qa,qb
+
+[DESIGN]
+max-args=10
+max-locals=20
+max-branches=15
+max-statements=60

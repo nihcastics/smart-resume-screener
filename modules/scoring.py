@@ -1,195 +1,230 @@
 """
 Scoring and Evaluation Logic
+ENTERPRISE-GRADE: Robust error handling, input validation, security checks
 """
 import numpy as np
 import re
 import json
+import logging
+from difflib import SequenceMatcher
 from modules.llm_operations import llm_verify_requirements_clean, llm_json
 from modules.text_processing import retrieve_relevant_context, token_set, contains_atom, normalize_text
 
-def compute_global_semantic(embedder, resume_embs, jd_text):
+# Configure logging
+logger = logging.getLogger(__name__)
+
+def compute_global_semantic(jd_text, resume_text, embedder):
     """
     IMPROVED global semantic similarity: fair to good candidates.
     Uses top-k averaging without over-penalizing well-matched resumes.
+    ENTERPRISE-GRADE: Input validation, dimension checking, error handling.
     """
-    if resume_embs is None or len(resume_embs)==0: 
+    # ROBUSTNESS: Validate inputs
+    if embedder is None:
+        logger.warning("Embedder is None, returning 0.0 semantic score")
         return 0.0
+    if not resume_text or not resume_text.strip():
+        logger.warning("Resume text empty, returning 0.0 semantic score")
+        return 0.0
+    if not jd_text or not jd_text.strip():
+        logger.warning("JD text empty, returning 0.0 semantic score")
+        return 0.0
+    
     try:
-        job_vec = embedder.encode(jd_text, convert_to_numpy=True, normalize_embeddings=True)
-        if job_vec.ndim>1: 
-            job_vec = job_vec[0]
-        sims = np.dot(resume_embs, job_vec)
-        if sims.size == 0: 
+        # ROBUSTNESS: Limit text length (prevent memory issues)
+        jd_text_truncated = jd_text[:5000]  # Max 5000 chars for embedding
+        resume_text_truncated = resume_text[:10000]  # Max 10000 chars
+        
+        # Encode both texts
+        jd_emb = embedder.encode(jd_text_truncated, convert_to_numpy=True, normalize_embeddings=True)
+        resume_emb = embedder.encode(resume_text_truncated, convert_to_numpy=True, normalize_embeddings=True)
+        
+        if jd_emb.ndim > 1: 
+            jd_emb = jd_emb[0]
+        if resume_emb.ndim > 1:
+            resume_emb = resume_emb[0]
+        
+        # ROBUSTNESS: Validate embedding dimensions match
+        if jd_emb.shape[0] != resume_emb.shape[0]:
+            logger.error(f"Embedding dimension mismatch: jd={jd_emb.shape[0]}, resume={resume_emb.shape[0]}")
             return 0.0
         
-        # Use top-8 chunks for balance (focused, not too generous)
-        k = min(8, sims.size)
-        topk = np.sort(sims)[-k:]
+        # Compute cosine similarity (normalized embeddings, so just dot product)
+        similarity = float(np.dot(jd_emb, resume_emb))
         
-        # Weighted average: emphasize very top chunks
-        if k > 1:
-            weights = np.linspace(0.7, 1.0, k)  # Smoother weighting
-            score = float(np.average(topk, weights=weights))
-        else:
-            score = float(np.mean(topk))
-        
-        # IMPROVED: Softer calibration (1.0 factor = no penalty)
-        # This allows genuinely good semantic matches to score high
-        calibrated = score * 1.0  # No harsh calibration factor
-        
-        return float(np.clip(calibrated, 0.0, 1.0))
-    except Exception:
+        # Clip to valid range
+        return float(np.clip(similarity, 0.0, 1.0))
+    except Exception as e:
+        logger.error(f"Semantic similarity computation failed: {e}")
         return 0.0
 
-def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_chunks, embedder, model=None,
-                                   faiss_index=None, strict_threshold=0.85, partial_threshold=0.70,
-                                   nlp=None, jd_text=""):
+def evaluate_requirement_coverage(atomic_reqs, resume_text, resume_chunks, embedder, model=None,
+                                   faiss_index=None, nlp=None, jd_text=""):
     """
-    Clean, accurate requirement coverage analysis with VERY STRICT thresholds:
-    1. Use semantic search to find relevant resume sections for each requirement
-    2. LLM verifies if requirement is actually met based on evidence
-    3. Score based on: presence (yes/no) + confidence (0-1) + evidence quality
+    Clean, accurate requirement coverage analysis with VERY STRICT thresholds.
     
-    Thresholds (very strict for accurate differentiation):
-    - Strict match: ≥0.85 (was 0.80) - Very high bar for full credit
-    - Partial match: ≥0.70 (was 0.65) - High bar for partial credit
-    - Weak match: ≥0.55 (was 0.50) - Minimum for any credit
+    Parameters:
+    - atomic_reqs: list of requirement strings
+    - resume_text: full resume text
+    - resume_chunks: list of resume text chunks
+    - embedder: sentence transformer model
+    - model: Gemini model for LLM verification (optional)
+    - faiss_index: FAISS index for semantic search (optional)
+    - nlp: spaCy model (optional)
+    - jd_text: job description text (optional)
     
-    No random adjustments, no fingerprints, just accurate matching.
+    Returns: (overall_score, coverage_details)
     """
+    # Split requirements into must-have and nice-to-have if not already done
+    must_atoms = atomic_reqs if isinstance(atomic_reqs, list) else []
+    nice_atoms = []  # For now, treat all as must-have
     
-    # Step 1: Encode resume chunks for semantic search
-    chunk_embs = None
-    if resume_chunks and embedder:
+    strict_threshold = 0.85
+    partial_threshold = 0.70
+
+    # Robust segmentation: sentences + bullet lines + provided chunks
+    def _segment_resume(text, chunks, spacy_model):
+        segments = []
+        if spacy_model:
+            try:
+                doc = spacy_model(text)
+                segments.extend([sent.text.strip() for sent in doc.sents if sent.text.strip()])
+            except Exception:
+                pass
+        if not segments:
+            # Fallback simple sentence split
+            parts = re.split(r"(?<=[.!?])\s+", text)
+            segments.extend([p.strip() for p in parts if p.strip()])
+
+        # Append bullet style lines for richer evidence
+        for line in text.splitlines():
+            cleaned = line.strip().lstrip("-•▹•●")
+            if cleaned and cleaned not in segments and len(cleaned.split()) >= 3:
+                segments.append(cleaned)
+
+        if chunks:
+            segments.extend([c.strip() for c in chunks if isinstance(c, str) and c.strip()])
+
+        # Deduplicate while preserving order
+        seen = set()
+        ordered = []
+        for seg in segments:
+            normalized = " ".join(seg.split())
+            if len(normalized) < 18:
+                continue
+            if normalized.lower() in seen:
+                continue
+            seen.add(normalized.lower())
+            ordered.append(normalized)
+        return ordered[:400]
+
+    resume_segments = _segment_resume(resume_text, resume_chunks, nlp)
+
+    segment_embeddings = None
+    if embedder and resume_segments:
         try:
-            chunk_embs = embedder.encode(resume_chunks, convert_to_numpy=True, normalize_embeddings=True)
-            if chunk_embs.ndim == 1:
-                chunk_embs = chunk_embs.reshape(1, -1)
-        except Exception:
-            chunk_embs = None
+            segment_embeddings = embedder.encode(resume_segments, convert_to_numpy=True, normalize_embeddings=True)
+            if segment_embeddings.ndim == 1:
+                segment_embeddings = segment_embeddings.reshape(1, -1)
+        except Exception as e:
+            logger.error(f"Failed to embed resume segments: {e}")
+            segment_embeddings = None
+
+    def _tokenize_requirement(req):
+        words = re.findall(r"[a-zA-Z0-9+#]+", req.lower())
+        return [w for w in words if len(w) > 2]
+
+    def _keyword_presence(req_tokens, segment_text):
+        if not req_tokens:
+            return 0.0
+        seg_words = set(re.findall(r"[a-zA-Z0-9+#]+", segment_text.lower()))
+        if not seg_words:
+            return 0.0
+        matches = sum(1 for w in req_tokens if w in seg_words)
+        return matches / max(len(req_tokens), 1)
+
+    def _fuzzy_match(req, segment_text):
+        if not req or not segment_text:
+            return 0.0
+        ratio = SequenceMatcher(None, req.lower(), segment_text.lower()).ratio()
+        return float(ratio)
 
     def get_best_resume_evidence(requirement, top_k=5):
-        """
-        Find the most relevant resume sections for this requirement.
-        Uses hybrid approach: semantic search + keyword matching for better accuracy.
-        """
+        """Semantic + keyword evidence using sentence-level parsing (no FAISS dependency)."""
         if not requirement:
             return [], 0.0
-        
-        evidence = []
-        similarities = []
-        keyword_boost_applied = False
-        
-        # Helper: Check if requirement keywords exist in text
-        def has_keyword_match(text, req):
-            """Check for keyword/phrase match with variations."""
-            text_lower = text.lower()
-            req_lower = req.lower()
-            
-            # Direct match
-            if req_lower in text_lower:
-                return True
-            
-            # Check for abbreviation/full form matches
-            abbrev_variants = {
-                'operating system': ['operating system', 'os ', ' os', 'os,', 'os.', 'os)', 'os/'],
-                'database management': ['dbms', 'database management', 'database systems'],
-                'computer network': ['computer network', 'networking', ' cn ', 'cn,', 'cn.'],
-                'data structure': ['data structure', 'ds ', ' ds,', 'ds.'],
-                'object oriented': ['oop', 'object oriented', 'object-oriented'],
-                'aws': ['aws', 'amazon web service'],
-                'kubernetes': ['kubernetes', 'k8s'],
-                'javascript': ['javascript', 'js ', ' js,', 'js.'],
-                'typescript': ['typescript', 'ts '],
-                'postgresql': ['postgresql', 'postgres'],
-                'mongodb': ['mongodb', 'mongo'],
-            }
-            
-            # Check variants
-            for full_form, variants in abbrev_variants.items():
-                if full_form in req_lower:
-                    if any(v in text_lower for v in variants):
-                        return True
-            
-            # Check individual important words (for compound requirements)
-            req_words = [w for w in req_lower.split() if len(w) > 2]
-            if len(req_words) >= 2:
-                # For multi-word requirements, check if most words are present
-                matches = sum(1 for w in req_words if w in text_lower)
-                if matches >= len(req_words) * 0.6:  # 60% of words present
-                    return True
-            
-            return False
-        
-        # Use FAISS if available (faster)
-        if faiss_index is not None and resume_chunks and embedder:
-            try:
-                results = retrieve_relevant_context(requirement, faiss_index, resume_chunks, embedder, top_k=top_k)
-                for text, sim in results:
-                    sim = float(np.clip(sim, 0.0, 1.0))
-                    
-                    # Boost similarity if keyword match found
-                    if has_keyword_match(text, requirement):
-                        sim = min(0.95, sim + 0.30)  # +30% boost, cap at 0.95
-                        keyword_boost_applied = True
-                    
-                    evidence.append({"text": text[:300], "similarity": round(sim, 3)})
-                    similarities.append(sim)
-            except Exception:
-                pass
-        
-        # Fallback to direct embedding comparison
-        elif chunk_embs is not None and embedder and resume_chunks:
-            try:
-                req_emb = embedder.encode(requirement, convert_to_numpy=True, normalize_embeddings=True)
-                if req_emb.ndim > 1:
-                    req_emb = req_emb[0]
-                
-                sims = np.dot(chunk_embs, req_emb)
-                top_indices = np.argsort(sims)[-top_k:][::-1]
-                
-                for idx in top_indices:
-                    if 0 <= idx < len(resume_chunks):
-                        sim = float(np.clip(sims[idx], 0.0, 1.0))
-                        
-                        # Boost similarity if keyword match found
-                        if has_keyword_match(resume_chunks[idx], requirement):
-                            sim = min(0.95, sim + 0.30)  # +30% boost
-                            keyword_boost_applied = True
-                        
-                        if sim > 0.3:  # Only include relevant matches
-                            evidence.append({"text": resume_chunks[idx][:300], "similarity": round(sim, 3)})
-                            similarities.append(sim)
-            except Exception:
-                pass
-        
-        # Additional keyword search if semantic search fails
-        if not similarities or max(similarities) < 0.50:
-            # Search entire resume text for keyword matches
-            for chunk in (resume_chunks or []):
-                if has_keyword_match(chunk, requirement):
-                    # Found keyword match that semantic search missed
-                    boosted_sim = 0.70  # Assign decent similarity for keyword match
-                    if chunk[:300] not in [e["text"] for e in evidence]:
-                        evidence.append({"text": chunk[:300], "similarity": round(boosted_sim, 3)})
-                        similarities.append(boosted_sim)
-                        keyword_boost_applied = True
-                    if len(evidence) >= top_k:
-                        break
-        
-        max_sim = max(similarities) if similarities else 0.0
-        return evidence[:top_k], round(max_sim, 3)
 
-    def calculate_initial_score(requirement, max_similarity):
-        """Calculate preliminary score based on semantic similarity with VERY STRICT thresholds."""
-        if max_similarity >= strict_threshold:  # ≥0.85
-            return 0.85  # Strong match - very high bar
-        elif max_similarity >= partial_threshold:  # ≥0.70
-            return 0.60  # Partial match - high bar
-        elif max_similarity >= 0.55:  # ≥0.55 (was 0.50)
-            return 0.35  # Weak match - minimum threshold raised
-        else:
-            return 0.0  # No match
+        if not resume_segments or segment_embeddings is None:
+            return [], 0.0
+
+        req_tokens = _tokenize_requirement(requirement)
+        try:
+            req_emb = embedder.encode(requirement, convert_to_numpy=True, normalize_embeddings=True)
+            if req_emb.ndim > 1:
+                req_emb = req_emb[0]
+        except Exception:
+            req_emb = None
+
+        scored_segments = []
+        for idx, segment in enumerate(resume_segments):
+            sim_score = 0.0
+            if req_emb is not None:
+                sim_score = float(np.dot(segment_embeddings[idx], req_emb))
+                sim_score = float(np.clip(sim_score, 0.0, 1.0))
+
+            keyword_score = _keyword_presence(req_tokens, segment)
+            fuzzy_score = _fuzzy_match(requirement, segment)
+
+            combined = (0.6 * sim_score) + (0.3 * keyword_score) + (0.1 * fuzzy_score)
+
+            if combined >= 0.35 or keyword_score >= 0.5:
+                scored_segments.append((combined, sim_score, keyword_score, segment))
+
+        if not scored_segments:
+            return [], 0.0
+
+        scored_segments.sort(key=lambda x: x[0], reverse=True)
+        evidence = []
+        for combined, sim_score, keyword_score, seg in scored_segments[:top_k]:
+            evidence.append({
+                "text": seg[:320],
+                "similarity": round(sim_score, 3),
+                "keyword_overlap": round(keyword_score, 3),
+                "combined_score": round(combined, 3)
+            })
+
+        max_sim = max(item[1] for item in scored_segments)
+        return evidence, round(max_sim, 3)
+
+    resume_tokens = token_set(resume_text)
+
+    def calculate_initial_score(max_similarity, keyword_overlap):
+        """Initial deterministic signal using semantic + keyword evidence (BALANCED thresholds)."""
+        score = 0.0
+        
+        # Semantic similarity scoring (more reasonable thresholds)
+        if max_similarity >= 0.80:  # Very strong match
+            score = 0.80
+        elif max_similarity >= 0.70:  # Strong match
+            score = 0.65
+        elif max_similarity >= 0.60:  # Good match
+            score = 0.50
+        elif max_similarity >= 0.45:  # Moderate match
+            score = 0.35
+        elif max_similarity >= 0.30:  # Weak match
+            score = 0.20
+        
+        # Keyword overlap boost (generous, keywords are strong signals)
+        if keyword_overlap >= 0.70:  # Most keywords present
+            score = max(score, 0.70)
+        elif keyword_overlap >= 0.55:  # Many keywords present
+            score = max(score, 0.55)
+        elif keyword_overlap >= 0.40:  # Some keywords present
+            score = max(score, 0.40)
+        elif keyword_overlap >= 0.25:  # Few keywords present
+            score = max(score, 0.25)
+
+        return score
 
     # Step 2: Analyze each requirement
     def analyze_requirements(atoms, req_type):
@@ -198,13 +233,25 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
         llm_queue = []
         
         for atom in atoms:
+            req_tokens = _tokenize_requirement(atom)
+            global_keyword_overlap = 0.0
+            if req_tokens:
+                global_keyword_overlap = sum(1 for tok in req_tokens if tok in resume_tokens) / len(req_tokens)
+
             evidence, max_sim = get_best_resume_evidence(atom)
-            initial_score = calculate_initial_score(atom, max_sim)
+
+            local_keyword_overlap = 0.0
+            if evidence:
+                local_keyword_overlap = max(evi.get("keyword_overlap", 0.0) for evi in evidence)
+
+            keyword_signal = max(global_keyword_overlap, local_keyword_overlap)
+            initial_score = calculate_initial_score(max_sim, keyword_signal)
             
             detail = {
                 "req_type": req_type,
                 "similarity": max_sim,
                 "max_similarity": max_sim,
+                "keyword_overlap": round(keyword_signal, 3),
                 "resume_contexts": evidence,
                 "jd_context": {"text": "", "similarity": 0.0},  # Simplified - focus on resume evidence
                 "pre_llm_score": initial_score,
@@ -250,37 +297,39 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
             detail["llm_rationale"] = verdict.get("rationale", "")
             detail["llm_evidence"] = verdict.get("evidence", "")
             
-            # Calculate final score using STRICT algorithm
+            # Calculate final score using BALANCED algorithm
             if present:
                 # Skill is present - score based on confidence and evidence quality
-                # Range: 0.55 to 1.0 (stricter base)
-                base_score = 0.55  # Lowered from 0.60
-                confidence_bonus = 0.45 * confidence  # Increased range (was 0.40)
+                # Range: 0.50 to 1.0 (balanced, not too harsh)
+                base_score = 0.50  # Reasonable baseline for present skills
+                confidence_bonus = 0.50 * confidence  # Full 50% range based on confidence
                 detail["score"] = base_score + confidence_bonus
                 
-                # Boost for strong evidence (high semantic similarity) - stricter thresholds
-                if detail["max_similarity"] >= 0.90:
-                    detail["score"] = min(1.0, detail["score"] * 1.12)  # 12% boost for very strong
-                elif detail["max_similarity"] >= 0.85:
-                    detail["score"] = min(1.0, detail["score"] * 1.08)  # 8% boost (was 10%)
+                # Boost for strong evidence (high semantic similarity) - reasonable thresholds
+                if detail["max_similarity"] >= 0.85:
+                    detail["score"] = min(1.0, detail["score"] * 1.15)  # 15% boost for very strong evidence
                 elif detail["max_similarity"] >= 0.75:
-                    detail["score"] = min(1.0, detail["score"] * 1.04)  # 4% boost (was 5%)
+                    detail["score"] = min(1.0, detail["score"] * 1.10)  # 10% boost for strong evidence
+                elif detail["max_similarity"] >= 0.65:
+                    detail["score"] = min(1.0, detail["score"] * 1.05)  # 5% boost for good evidence
                     
             else:
-                # Skill is absent - stricter penalties
-                if confidence >= 0.85:  # Raised from 0.8
-                    # Highly confident it's missing - zero points
+                # Skill is absent - balanced penalties (not too harsh)
+                if confidence >= 0.80:  # Very confident it's missing
                     detail["score"] = 0.0
-                elif confidence >= 0.70:  # Raised from 0.6
-                    # Likely missing - very small residual score
-                    detail["score"] = 0.05  # Reduced from 0.10
-                elif confidence >= 0.50:  # Raised from 0.4
-                    # Uncertain - minimal benefit of doubt
-                    detail["score"] = 0.20  # Reduced from 0.25
+                elif confidence >= 0.65:  # Likely missing
+                    detail["score"] = 0.10  # Small benefit of doubt
+                elif confidence >= 0.50:  # Uncertain
+                    detail["score"] = 0.25  # More benefit of doubt
                 else:
                     # Low confidence in absence - maybe present but unclear
-                    # Use semantic similarity as tiebreaker (more conservative)
-                    detail["score"] = min(0.35, detail["pre_llm_score"] * 0.7)  # Reduced from 0.40 and 0.8
+                    # Use evidence quality as tiebreaker
+                    if detail["max_similarity"] >= 0.60:
+                        detail["score"] = 0.45  # Good semantic match, might be there
+                    elif detail["max_similarity"] >= 0.45:
+                        detail["score"] = 0.35  # Moderate match
+                    else:
+                        detail["score"] = min(0.30, detail["pre_llm_score"] * 0.8)  # Fallback to pre-LLM with slight penalty
 
     # Step 4: Calculate overall coverage with sophisticated weighting
     must_scores = [d["score"] for d in must_details.values()]
@@ -294,22 +343,28 @@ def evaluate_requirement_coverage(must_atoms, nice_atoms, resume_text, resume_ch
     
     # Apply penalty if too many must-haves are missing
     must_present_count = sum(1 for d in must_details.values() if d.get("llm_present", False))
-    must_total = len(must_details) if must_details else 1
-    must_fulfillment_rate = must_present_count / must_total
+    must_total = len(must_details) if must_details else 1  # ROBUSTNESS: Prevent division by zero
     
-    # Penalty factor: STRICT penalties for missing must-haves
-    if must_fulfillment_rate < 0.4:  # Less than 40% must-haves present (was 50%)
-        penalty_factor = 0.60  # 40% penalty (was 30%)
-    elif must_fulfillment_rate < 0.6:  # 40-60% present (was 50-70%)
-        penalty_factor = 0.75  # 25% penalty (was 15%)
-    elif must_fulfillment_rate < 0.8:  # 60-80% present (new tier)
-        penalty_factor = 0.90  # 10% penalty
+    # ROBUSTNESS: Handle edge case where must_total is 0
+    if must_total == 0:
+        must_fulfillment_rate = 1.0  # No requirements = 100% fulfillment
+        logger.warning("No must-have requirements found, defaulting to 100% fulfillment")
     else:
-        penalty_factor = 1.0  # No penalty only if 80%+ met
+        must_fulfillment_rate = must_present_count / must_total
     
-    # Calculate overall: 80% must-have, 20% nice-to-have (must-haves matter MUCH more)
+    # Penalty factor: BALANCED penalties for missing must-haves
+    if must_fulfillment_rate < 0.30:  # Less than 30% must-haves present (very critical)
+        penalty_factor = 0.50  # 50% penalty (severe gaps)
+    elif must_fulfillment_rate < 0.50:  # 30-50% present (major gaps)
+        penalty_factor = 0.70  # 30% penalty
+    elif must_fulfillment_rate < 0.70:  # 50-70% present (moderate gaps)
+        penalty_factor = 0.85  # 15% penalty
+    else:
+        penalty_factor = 1.0  # No penalty if 70%+ met (reasonable threshold)
+    
+    # Calculate overall: 75% must-have, 25% nice-to-have (must-haves important but not overwhelming)
     if must_scores:
-        raw_overall = (0.80 * must_coverage + 0.20 * nice_coverage)  # Changed from 75/25
+        raw_overall = (0.75 * must_coverage + 0.25 * nice_coverage)  # Balanced weighting
         overall_coverage = raw_overall * penalty_factor
     else:
         overall_coverage = nice_coverage

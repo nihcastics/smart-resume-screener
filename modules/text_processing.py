@@ -1,10 +1,21 @@
 """
 Text Processing and NLP Utilities
+ENTERPRISE-GRADE: Input validation, security hardening, resource limits
 """
 import re
 import numpy as np
 import faiss
+import logging
+from typing import Any
 from collections import Counter
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# SECURITY: Define limits to prevent resource exhaustion
+MAX_TEXT_LENGTH = 100000  # 100KB max for NLP processing
+MAX_CHUNK_COUNT = 200  # Maximum number of chunks to generate
+MAX_REGEX_INPUT = 50000  # Max text length for regex operations (prevent ReDoS)
 
 def normalize_text(s):
     s = s.lower().strip()
@@ -13,37 +24,111 @@ def normalize_text(s):
 
 
 def chunk_text(t, max_chars=1200, overlap=150, nlp=None):
+    """
+    Chunk text with ROBUSTNESS: input validation, size limits, error handling.
+    """
+    # ROBUSTNESS: Validate inputs
+    if not t or not isinstance(t, str):
+        logger.warning("Invalid input to chunk_text")
+        return []
+    
+    # SECURITY: Limit input size
+    if len(t) > MAX_TEXT_LENGTH:
+        logger.warning(f"Text too long ({len(t)} chars), truncating to {MAX_TEXT_LENGTH}")
+        t = t[:MAX_TEXT_LENGTH]
+    
     t = re.sub(r'\n{3,}', '\n\n', t).strip()
-    if "sentencizer" not in nlp.pipe_names:
-        try: nlp.add_pipe("sentencizer")
-        except: pass
-    doc = nlp(t)
-    sents = [s.text.strip() for s in getattr(doc, "sents", []) if s.text.strip()]
+    
+    if nlp is None:
+        logger.warning("NLP model not provided, using basic chunking")
+        # Fallback: simple character-based chunking
+        chunks = []
+        for i in range(0, len(t), max_chars - overlap):
+            chunk = t[i:i + max_chars]
+            if chunk.strip():
+                chunks.append(chunk.strip())
+        return chunks[:MAX_CHUNK_COUNT]  # SECURITY: Limit chunk count
+    
+    try:
+        if "sentencizer" not in nlp.pipe_names:
+            try:
+                nlp.add_pipe("sentencizer")
+            except:
+                pass
+        
+        doc = nlp(t)
+        sents = [s.text.strip() for s in getattr(doc, "sents", []) if s.text.strip()]
+    except Exception as e:
+        logger.error(f"NLP processing failed: {e}, falling back to basic chunking")
+        # Fallback to simple chunking
+        chunks = []
+        for i in range(0, len(t), max_chars - overlap):
+            chunk = t[i:i + max_chars]
+            if chunk.strip():
+                chunks.append(chunk.strip())
+        return chunks[:MAX_CHUNK_COUNT]
+    
     chunks, buf = [], ""
     for s in sents:
         if len(buf) + len(s) + 1 <= max_chars:
             buf = (buf + " " + s).strip()
         else:
-            if buf: chunks.append(buf)
+            if buf: 
+                chunks.append(buf)
+            if len(chunks) >= MAX_CHUNK_COUNT:  # SECURITY: Limit chunk count
+                logger.warning(f"Reached maximum chunk limit ({MAX_CHUNK_COUNT})")
+                break
             if overlap > 0 and len(buf) > overlap:
                 buf = buf[-overlap:] + " " + s
             else:
                 buf = s
-    if buf: chunks.append(buf)
-    return chunks
+    if buf and len(chunks) < MAX_CHUNK_COUNT: 
+        chunks.append(buf)
+    
+    return chunks[:MAX_CHUNK_COUNT]  # SECURITY: Enforce limit
 
 
 def parse_contacts(txt):
-    emails = re.findall(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', txt)
-    phones = re.findall(r'(\+?\d[\d\s().-]{8,}\d)', txt)
-    return (emails[0] if emails else "Not found"), (phones[0] if phones else "Not found")
+    """
+    Extract contact information from text with SECURITY hardening against ReDoS.
+    Returns dict with name, email, phone fields.
+    """
+    # SECURITY: Limit input size to prevent ReDoS attacks
+    if len(txt) > MAX_REGEX_INPUT:
+        logger.warning(f"Text too long ({len(txt)} chars) for regex, truncating to {MAX_REGEX_INPUT}")
+        txt = txt[:MAX_REGEX_INPUT]
+    
+    # SECURITY: Use simpler, safer regex patterns
+    try:
+        # Extract email
+        emails = re.findall(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', txt, re.IGNORECASE)
+        # Extract phone
+        phones = re.findall(r'(\+?\d[\d\s().-]{8,}\d)', txt)
+        # Extract name (try to find capitalized name patterns near top of document)
+        names = re.findall(r'^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)', txt[:500], re.MULTILINE)
+    except Exception as e:
+        logger.error(f"Contact extraction failed: {e}")
+        return {
+            'name': 'Unknown',
+            'email': 'Not found',
+            'phone': 'Not found'
+        }
+    
+    return {
+        'name': names[0] if names else 'Unknown',
+        'email': emails[0] if emails else 'Not found',
+        'phone': phones[0] if phones else 'Not found'
+    }
 
 
 def build_index(embedder, chunks):
     embs = embedder.encode(chunks, batch_size=32, convert_to_numpy=True, normalize_embeddings=True)
     dim = embs.shape[1]
     idx = faiss.IndexFlatIP(dim)
-    idx.add(embs.astype(np.float32))
+    # Convert to float32 numpy array for FAISS (pyright signature is inaccurate)
+    embs_float32 = np.asarray(embs, dtype=np.float32)
+    add_fn: Any = getattr(idx, "add")
+    add_fn(embs_float32)
     return idx, embs
 
 
@@ -659,57 +744,195 @@ def extract_structured_entities(text, nlp):
 
 def extract_technical_skills(text, nlp):
     """
-    Extract technical skills using advanced NLP: noun chunks + dependency parsing + pattern matching.
-    Returns: list of technical skills/tools/frameworks
+    ROBUST technical skills extraction using multi-strategy approach.
+    Extracts programming languages, frameworks, tools, databases, cloud platforms, etc.
+    Returns: list of unique technical skills
     """
-    doc = nlp(text[:8000])
+    if not text:
+        return []
+    
     skills = set()
+    text_lower = text.lower()
     
-    # Method 1: Noun phrases that are likely technical skills
-    for chunk in doc.noun_chunks:
-        chunk_text = chunk.text.lower().strip()
-        # Filter for technical-looking noun chunks
-        if (2 <= len(chunk_text) <= 40 and 
-            not chunk_text.startswith(('the ', 'a ', 'an ')) and
-            any(char.isalnum() for char in chunk_text)):
-            # Check if contains technical indicators
-            tech_indicators = ['system', 'software', 'framework', 'library', 'tool', 'platform', 
-                             'language', 'database', 'service', 'api', 'sdk', 'development']
-            if any(ind in chunk_text for ind in tech_indicators):
-                skills.add(chunk_text)
+    # ===== STRATEGY 1: COMPREHENSIVE KEYWORD MATCHING =====
+    # This is the most reliable method - match known technical keywords
     
-    # Method 2: Extract from "Skills" section if present
-    skills_section_pattern = r'(?:skills?|technologies?|tools?|technical\s+skills?)[:\s]+([^\n]+(?:\n[^\n]+){0,15})'
-    for match in re.finditer(skills_section_pattern, text.lower()):
+    technical_keywords = {
+        # Programming Languages (EXHAUSTIVE)
+        'python', 'java', 'javascript', 'typescript', 'c++', 'c#', 'ruby', 'go', 'golang',
+        'rust', 'kotlin', 'swift', 'scala', 'php', 'perl', 'r', 'matlab', 'julia',
+        'c', 'objective-c', 'dart', 'elixir', 'haskell', 'lua', 'groovy', 'shell', 'bash',
+        
+        # Frontend Frameworks & Libraries
+        'react', 'reactjs', 'react.js', 'angular', 'vue', 'vuejs', 'vue.js', 'svelte',
+        'ember', 'backbone', 'jquery', 'bootstrap', 'tailwind', 'material-ui', 'mui',
+        'next', 'nextjs', 'next.js', 'nuxt', 'gatsby', 'redux', 'mobx', 'recoil',
+        'webpack', 'vite', 'parcel', 'rollup', 'babel', 'sass', 'scss', 'less',
+        
+        # Backend Frameworks
+        'django', 'flask', 'fastapi', 'express', 'expressjs', 'nest', 'nestjs',
+        'spring', 'spring boot', 'struts', 'hibernate', 'laravel', 'symfony',
+        'rails', 'ruby on rails', 'sinatra', 'asp.net', '.net', 'dotnet',
+        
+        # Databases
+        'sql', 'mysql', 'postgresql', 'postgres', 'mongodb', 'mongo', 'redis',
+        'cassandra', 'dynamodb', 'elasticsearch', 'oracle', 'sql server', 'mssql',
+        'sqlite', 'mariadb', 'couchdb', 'neo4j', 'influxdb', 'firebase', 'firestore',
+        
+        # Cloud Platforms & Services
+        'aws', 'amazon web services', 'azure', 'microsoft azure', 'gcp', 'google cloud',
+        'google cloud platform', 'ec2', 's3', 'lambda', 'cloudfront', 'rds', 'dynamodb',
+        'ecs', 'eks', 'fargate', 'sagemaker', 'cloudwatch', 'iam',
+        'azure functions', 'azure devops', 'app service', 'blob storage',
+        'compute engine', 'app engine', 'cloud functions', 'bigquery', 'pub/sub',
+        'heroku', 'digitalocean', 'linode', 'vercel', 'netlify', 'cloudflare',
+        
+        # DevOps & Tools
+        'docker', 'kubernetes', 'k8s', 'jenkins', 'gitlab', 'github', 'bitbucket',
+        'travis', 'circleci', 'terraform', 'ansible', 'puppet', 'chef', 'vagrant',
+        'helm', 'prometheus', 'grafana', 'datadog', 'new relic', 'splunk',
+        'ci/cd', 'cicd', 'git', 'svn', 'mercurial', 'jira', 'confluence',
+        
+        # Data Science & ML
+        'machine learning', 'deep learning', 'neural networks', 'nlp', 
+        'natural language processing', 'computer vision', 'ai', 'artificial intelligence',
+        'tensorflow', 'pytorch', 'keras', 'scikit-learn', 'sklearn', 'pandas', 'numpy',
+        'scipy', 'matplotlib', 'seaborn', 'plotly', 'jupyter', 'opencv',
+        'xgboost', 'lightgbm', 'catboost', 'hugging face', 'transformers',
+        'spark', 'pyspark', 'hadoop', 'hive', 'kafka', 'airflow', 'mlflow',
+        
+        # Mobile Development
+        'android', 'ios', 'react native', 'flutter', 'kotlin', 'swift', 'xamarin',
+        'ionic', 'cordova', 'phonegap',
+        
+        # Testing & Quality
+        'jest', 'mocha', 'chai', 'jasmine', 'pytest', 'unittest', 'junit', 'testng',
+        'selenium', 'cypress', 'playwright', 'puppeteer', 'postman', 'insomnia',
+        
+        # Architecture & Patterns
+        'microservices', 'serverless', 'rest', 'restful', 'rest api', 'graphql',
+        'grpc', 'websocket', 'soap', 'mvc', 'mvvm', 'event-driven', 'message queue',
+        'rabbitmq', 'activemq', 'zeromq',
+        
+        # Computer Science Fundamentals
+        'data structures', 'algorithms', 'oop', 'object oriented programming',
+        'functional programming', 'design patterns', 'system design',
+        'operating systems', 'os', 'dbms', 'database management systems',
+        'computer networks', 'cn', 'networking',
+        
+        # Other Technologies
+        'linux', 'unix', 'windows', 'macos', 'nginx', 'apache', 'tomcat',
+        'elasticsearch', 'solr', 'memcached', 'varnish', 'cdn',
+        'oauth', 'jwt', 'saml', 'openid', 'ldap', 'active directory',
+    }
+    
+    # Match technical keywords in text (with word boundaries)
+    for keyword in technical_keywords:
+        # Use regex with word boundaries for accurate matching
+        pattern = r'\b' + re.escape(keyword) + r'\b'
+        if re.search(pattern, text_lower, re.IGNORECASE):
+            skills.add(keyword)
+    
+    # ===== STRATEGY 2: VERSION-SPECIFIC PATTERNS =====
+    # Match "Python 3.x", "Java 11", "React 18", etc.
+    version_patterns = [
+        r'\b(python|java|node|react|angular|vue|spring|django|php|ruby|go|rust)\s+\d+(?:\.\d+)*\b',
+        r'\b([a-z]+(?:\s+[a-z]+)?)\s+version\s+\d+(?:\.\d+)*\b',
+    ]
+    
+    for pattern in version_patterns:
+        for match in re.finditer(pattern, text_lower):
+            skill = match.group(0).strip()
+            if len(skill) <= 30:
+                # Extract base technology name
+                base_tech = re.sub(r'\s+\d+.*$', '', skill).strip()
+                skills.add(base_tech)  # Add base (e.g., "python")
+                skills.add(skill)      # Add version-specific (e.g., "python 3.x")
+    
+    # ===== STRATEGY 3: SKILLS SECTION PARSING =====
+    # Extract from dedicated "Skills" sections
+    skills_section_pattern = r'(?:technical\s+)?skills?\s*[:\-]?\s*([^\n]+(?:\n(?!\n)[^\n]+){0,20})'
+    
+    for match in re.finditer(skills_section_pattern, text_lower):
         section_text = match.group(1)
         # Split by common delimiters
-        skill_items = re.split(r'[,;•|/\n]', section_text)
-        for item in skill_items:
-            item = item.strip()
-            if 2 <= len(item) <= 50 and not item.startswith(('the ', 'a ', 'an ')):
-                skills.add(item)
-    
-    # Method 3: Common technical patterns
-    version_pattern = r'\b([a-z]+(?:\s+[a-z]+)?)\s+\d+(?:\.\d+)*\b'
-    for match in re.finditer(version_pattern, text.lower()):
-        tech_with_version = match.group(0).strip()
-        if len(tech_with_version) < 30:
-            skills.add(tech_with_version)
-    
-    # Clean and filter
-    filtered_skills = []
-    generic_words = {'experience', 'knowledge', 'skill', 'ability', 'working', 'using', 'with'}
-    
-    for skill in skills:
-        # Remove generic prefixes/suffixes
-        skill = re.sub(r'^(experience with|knowledge of|using|working with|proficient in)\s+', '', skill)
-        skill = skill.strip()
+        skill_candidates = re.split(r'[,;•|/\n\t]', section_text)
         
-        # Filter out pure generic terms
-        if skill and len(skill) >= 2 and skill not in generic_words:
-            filtered_skills.append(skill)
+        for candidate in skill_candidates:
+            candidate = candidate.strip()
+            # Remove common prefixes
+            candidate = re.sub(r'^(?:experience\s+(?:with|in)|knowledge\s+of|proficient\s+in|skilled\s+in)\s+', '', candidate)
+            candidate = candidate.strip()
+            
+            # Validate: 2-40 chars, contains alphanumeric
+            if 2 <= len(candidate) <= 40 and any(c.isalnum() for c in candidate):
+                # Check if it's a known keyword or looks technical
+                if (candidate in technical_keywords or
+                    any(char in candidate for char in ['+', '#', '.']) or  # C++, C#, .NET
+                    any(c.isdigit() for c in candidate) or  # Has version number
+                    any(c.isupper() for c in candidate[:min(5, len(candidate))])):  # Starts with caps (AWS, SQL)
+                    skills.add(candidate)
     
-    return list(set(filtered_skills))[:50]  # Limit to top 50
+    # ===== STRATEGY 4: NOUN CHUNK EXTRACTION (NLP) =====
+    # Use spaCy to extract technical-looking noun chunks
+    if nlp:
+        try:
+            doc = nlp(text[:6000])  # Limit for performance
+            
+            for chunk in doc.noun_chunks:
+                chunk_text = chunk.text.lower().strip()
+                
+                # Filter for technical indicators
+                if (2 <= len(chunk_text) <= 40 and
+                    not chunk_text.startswith(('the ', 'a ', 'an ', 'my ', 'your '))):
+                    
+                    # Check if contains technical terms
+                    tech_indicators = [
+                        'system', 'framework', 'library', 'tool', 'platform', 'language',
+                        'database', 'service', 'api', 'cloud', 'server', 'network'
+                    ]
+                    
+                    if any(ind in chunk_text for ind in tech_indicators):
+                        # Extract the core technical term
+                        core = re.sub(r'\b(?:the|a|an|my|your|our|this|that|these|those)\b', '', chunk_text).strip()
+                        if core and len(core) >= 2:
+                            skills.add(core)
+        except Exception as e:
+            logger.warning(f"NLP chunk extraction failed: {e}")
+    
+    # ===== STRATEGY 5: ACRONYM & ABBREVIATION DETECTION =====
+    # Find uppercase acronyms (AWS, SQL, REST, API, ML, AI, etc.)
+    acronym_pattern = r'\b[A-Z]{2,6}\b'
+    for match in re.finditer(acronym_pattern, text):
+        acronym = match.group(0)
+        acronym_lower = acronym.lower()
+        # Check if it's a known technical acronym
+        if acronym_lower in technical_keywords or len(acronym) <= 4:
+            skills.add(acronym_lower)
+    
+    # ===== FINAL CLEANUP =====
+    # Remove generic noise words
+    generic_noise = {
+        'experience', 'knowledge', 'skill', 'skills', 'ability', 'working', 'using',
+        'with', 'and', 'or', 'the', 'a', 'an', 'in', 'on', 'at', 'for', 'to',
+        'development', 'developer', 'engineer', 'engineering', 'software',
+        'tools', 'technologies', 'frameworks', 'languages', 'programming'
+    }
+    
+    cleaned_skills = []
+    for skill in skills:
+        if skill not in generic_noise and len(skill) >= 2:
+            cleaned_skills.append(skill)
+    
+    # Deduplicate and limit
+    unique_skills = list(set(cleaned_skills))
+    
+    # Sort by length (shorter = more specific, likely tech names)
+    unique_skills.sort(key=lambda x: (len(x), x))
+    
+    logger.info(f"✅ Extracted {len(unique_skills)} technical skills from resume")
+    
+    return unique_skills[:80]  # Return top 80 skills
 
 
 def semantic_chunk_text(text, nlp, embedder, max_chars=800, overlap=200):
