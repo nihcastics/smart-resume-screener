@@ -23,10 +23,8 @@
     }
   ],
   "env": {
-    "GOOGLE_API_KEY": "@google_api_key",
-    "DATABASE_URL": "@database_url",
-    "JWT_SECRET": "@jwt_secret",
-    "SUPABASE_URL": "@supabase_url",
-    "SUPABASE_KEY": "@supabase_key"
+    "GOOGLE_API_KEY": "@GOOGLE_API_KEY",
+    "DATABASE_URL": "@DATABASE_URL",
+    "JWT_SECRET": "@JWT_SECRET"
   }
 }
