@@ -322,7 +322,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 
 ##  Deployment
 
-### Frontend - Vercel
+### Frontend - Vercel (FREE)
 - **Deploy**: Push to GitHub main branch or manually via Vercel dashboard
 - **URL**: `https://smart-resume-screener-*.vercel.app`
 - **Setup**: 
@@ -330,33 +330,71 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
   2. Set environment variable: `VITE_API_URL` = your backend URL
   3. Auto-deploys on push to main
 
-### Backend - Render (Recommended)
-The backend uses Docker with heavy ML dependencies (torch, faiss). Deploy to Render for easy hosting.
+### Backend Options
 
-**One-Click Deploy**:
+#### Option 1: Hugging Face Spaces (FREE) ⭐ **Recommended**
+Best for free hosting with no credit card required.
+
+**Setup** (5 steps):
+1. Create Space at https://huggingface.co/new-space (Docker, CPU basic)
+2. Add 6 environment variables in Space Settings
+3. Get HF token from https://huggingface.co/settings/tokens
+4. Push code: `git push hf main --force`
+5. Wait 10-15 minutes for build to complete
+
+**Backend URL**: `https://YOUR_USERNAME-smart-resume-screener-backend.hf.space`
+
+📖 **Full guide**: See [HF_SPACES_DEPLOYMENT_GUIDE.md](HF_SPACES_DEPLOYMENT_GUIDE.md)
+
+⚡ **Quick start**: See [DEPLOYMENT_QUICK_START.md](DEPLOYMENT_QUICK_START.md)
+
+**Pros**:
+- ✅ Completely FREE (no credit card)
+- ✅ 16GB RAM (enough for ML models)
+- ✅ No time limits
+- ✅ Easy deployment from GitHub
+- ✅ Community support
+
+**Cons**:
+- First request takes 30-60s to load models (then fast)
+- Auto-sleeps after inactivity (wakes on access)
+
+---
+
+#### Option 2: Render ($7/month)
+Good for paid hosting with more resources.
+
+**Setup**:
 1. Go to [Render Dashboard](https://dashboard.render.com)
 2. Click "New +" → "Web Service"
 3. Connect GitHub repo (nihcastics/smart-resume-screener)
-4. Select branch: `main`
-5. Configure:
+4. Configure:
    - **Name**: `smart-resume-screener-backend`
    - **Runtime**: Docker
-   - **Region**: Oregon (or nearest)
-   - **Plan**: Starter ($7/month) or Pro ($12/month)
-6. Add environment variables:
-   - `GOOGLE_API_KEY`: Your Gemini API key
-   - `DATABASE_URL`: Your PostgreSQL URL
-   - `JWT_SECRET`: Random secret
-7. Click Deploy
-8. Get your backend URL: `https://smart-resume-screener-backend-*.onrender.com`
+   - **Plan**: Standard ($7/month for 2GB RAM)
+5. Add environment variables
+6. Deploy
 
-**Update Frontend with Backend URL**:
-```bash
-echo "https://smart-resume-screener-backend-*.onrender.com" | npx vercel env add VITE_API_URL production
-npx vercel --prod
-```
+**Backend URL**: `https://smart-resume-screener-backend-*.onrender.com`
 
-**Alternative**: For Cloud Run, see [CLOUD_RUN_DEPLOYMENT.md](CLOUD_RUN_DEPLOYMENT.md)
+**Pros**:
+- Always running (no cold starts)
+- Better performance for production
+- More reliable uptime
+
+**Cons**:
+- Costs $7/month
+- Requires credit card
+
+---
+
+**Total Cost Comparison**:
+| Option | Backend | Frontend | Database | Total |
+|--------|---------|----------|----------|-------|
+| **HF Spaces** | FREE | FREE | FREE | **$0/mo** |
+| **Render** | $7/mo | FREE | FREE | **$7/mo** |
+
+See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for Render setup details.
 
 ##  Contributing
 
