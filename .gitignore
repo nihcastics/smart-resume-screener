@@ -43,3 +43,9 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Vercel
+.vercel/
+
+# Deployment
+vercel.json.local
