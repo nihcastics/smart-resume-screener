@@ -1,3 +1,4 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -5,7 +6,40 @@ __pycache__/
 .Python
 env/
 .venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Environment
 .env
-*.log
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+dist/
+
+# Logs
+*.log
+logs/
+
+# Dev containers
+.devcontainer/
+
+# Streamlit
 .streamlit/secrets.toml
+
+# OS
+.DS_Store
+Thumbs.db
