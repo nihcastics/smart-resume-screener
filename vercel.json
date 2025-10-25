@@ -4,7 +4,7 @@
   "builds": [
     {
       "src": "api/index.py",
-      "use": "@vercel/python@2.4.5",
+      "use": "@vercel/python@2.3.0",
       "config": {
         "runtime": "python3.11",
         "maxDuration": 300,
