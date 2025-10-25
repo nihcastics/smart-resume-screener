@@ -320,6 +320,44 @@ cd backend
 uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
+##  Deployment
+
+### Frontend - Vercel
+- **Deploy**: Push to GitHub main branch or manually via Vercel dashboard
+- **URL**: `https://smart-resume-screener-*.vercel.app`
+- **Setup**: 
+  1. Connect GitHub repo to Vercel
+  2. Set environment variable: `VITE_API_URL` = your backend URL
+  3. Auto-deploys on push to main
+
+### Backend - Render (Recommended)
+The backend uses Docker with heavy ML dependencies (torch, faiss). Deploy to Render for easy hosting.
+
+**One-Click Deploy**:
+1. Go to [Render Dashboard](https://dashboard.render.com)
+2. Click "New +" → "Web Service"
+3. Connect GitHub repo (nihcastics/smart-resume-screener)
+4. Select branch: `main`
+5. Configure:
+   - **Name**: `smart-resume-screener-backend`
+   - **Runtime**: Docker
+   - **Region**: Oregon (or nearest)
+   - **Plan**: Starter ($7/month) or Pro ($12/month)
+6. Add environment variables:
+   - `GOOGLE_API_KEY`: Your Gemini API key
+   - `DATABASE_URL`: Your PostgreSQL URL
+   - `JWT_SECRET`: Random secret
+7. Click Deploy
+8. Get your backend URL: `https://smart-resume-screener-backend-*.onrender.com`
+
+**Update Frontend with Backend URL**:
+```bash
+echo "https://smart-resume-screener-backend-*.onrender.com" | npx vercel env add VITE_API_URL production
+npx vercel --prod
+```
+
+**Alternative**: For Cloud Run, see [CLOUD_RUN_DEPLOYMENT.md](CLOUD_RUN_DEPLOYMENT.md)
+
 ##  Contributing
 
 Contributions are welcome! Please follow these steps:
